@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, Sparkles, Trophy, X, Zap } from 'lucide-react'
+import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap } from 'lucide-react'
 
 type Game = { id: string; title: string; subtitle: string; description: string; genre: string; tone: string; mark: string; color: string; path: string; icon?: string; featured?: boolean }
 
@@ -243,6 +243,10 @@ export default function Page() {
           <span>Games remain property of their respective creators.</span>
         </div>
       </footer>
+      <a className="admin-fab" href="/admin" aria-label="Open admin console">
+        <ShieldCheck size={19} />
+        <span>Admin</span>
+      </a>
       {activeGame && (
         <div className="game-modal" role="dialog" aria-modal="true" aria-label={`${activeGame.title} game`}>
           <div className="modal-bar">
