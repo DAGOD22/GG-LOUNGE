@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, Sparkles, Trophy, X, Zap } from 'lucide-react'
 
-type Game = { id: string; title: string; subtitle: string; description: string; genre: string; tone: string; mark: string; color: string; path: string; featured?: boolean }
+type Game = { id: string; title: string; subtitle: string; description: string; genre: string; tone: string; mark: string; color: string; path: string; icon?: string; featured?: boolean }
 
 const games: Game[] = [
   { id: 'cookie-clicker', title: 'Cookie Clicker', subtitle: 'Bake a bigger future.', description: 'Start with one tiny click and build an unstoppable cookie empire.', genre: 'Idle', tone: 'Cozy chaos', mark: 'CC', color: 'cookie', path: '/games/cookie-clicker/index.html', featured: true },
@@ -22,21 +22,246 @@ const games: Game[] = [
   { id: 'subway-surfers', title: 'Subway Surfers', subtitle: 'Run without limits.', description: 'Dash through the city, dodge the tracks, and chase a higher score.', genre: 'Arcade', tone: 'Reflex', mark: 'SS', color: 'youtube', path: '/games/subway-surfers/index.html' },
   { id: 'survival-race', title: 'Survival Race', subtitle: 'Race the danger.', description: 'Keep your wheels steady and survive a relentless run of hazards.', genre: 'Racing', tone: 'Reflex', mark: 'SR', color: 'drive', path: '/games/survival-race/index.html' },
   { id: 'geometry-dash', title: 'Geometry Dash', subtitle: 'Jump the rhythm.', description: 'Sync your timing to the beat and clear a precision platforming gauntlet.', genre: 'Platformer', tone: 'Rhythm', mark: 'GD', color: 'hextris', path: '/games/geometry-dash/index.html' },
+  { id: 'poki', title: 'Poki', subtitle: 'Claim it all.', description: 'A paper-style territory battle against bots — loop out, capture land, cut their tails.', genre: 'Arcade', tone: 'Battle', mark: 'PK', color: 'youtube', path: '/games/poki/index.html' },
   { id: 'vex-8', title: 'Vex 8', subtitle: 'Run the gauntlet.', description: 'Wall-jump, slide, and sprint through a sharp new platforming challenge.', genre: 'Platformer', tone: 'Precision', mark: 'V8', color: 'devil', path: '/games/vex-8/index.html' },
 ]
-const filters = ['All games', 'Idle', 'Arcade', 'Puzzle', 'Racing', 'Platformer', 'Video', 'Favorites']
+const filters = ['All games', 'Idle', 'Arcade', 'Puzzle', 'Racing', 'Platformer', 'Simulation', 'Video', 'Community', 'Favorites']
+const pubColors = ['cookie', 'drive', 'mining', 'devil', 'stack', 'hextris', 'twenty', 'youtube']
+
+type PublishedListing = { id: string; title: string; icon: string | null }
 
 export default function Page() {
-  const [query, setQuery] = useState(''); const [filter, setFilter] = useState('All games'); const [favorites, setFavorites] = useState<string[]>([]); const [activeGame, setActiveGame] = useState<Game | null>(null)
-  const visibleGames = useMemo(() => games.filter((game) => `${game.title} ${game.genre} ${game.tone}`.toLowerCase().includes(query.toLowerCase()) && (filter === 'All games' || game.genre === filter || (filter === 'Favorites' && favorites.includes(game.id)))), [favorites, filter, query])
-  function launch(game: Game) { setActiveGame(game) }
-  function toggleFavorite(id: string) { setFavorites((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) }
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState('All games')
+  const [favorites, setFavorites] = useState<string[]>([])
+  const [activeGame, setActiveGame] = useState<Game | null>(null)
+  const [published, setPublished] = useState<Game[]>([])
 
-  return <main className="lounge-shell">
-    <div className="noise" aria-hidden="true" /><header className="site-header"><a href="#top" className="brand" aria-label="GG-Lounge home"><span className="brand-mark"><Gamepad2 size={19} /></span><span>GG-LOUNGE<span className="tm">™</span></span></a><nav className="header-nav" aria-label="Primary navigation"><a href="#games">Library</a><a href="#about">Studio</a><a href="/request-game">Request a game</a><a href="/admin">Admin</a></nav><div className="header-status"><span className="live-dot" /> {games.length} titles / open all night</div></header>
-    <section className="hero" id="top"><div className="hero-copy"><p className="eyebrow"><Sparkles size={14} /> THE INDEPENDENT ARCADE</p><h1>Stay a while.<br /><em>Play forever.</em></h1><p className="hero-text">A handpicked, no-filler collection of browser games for the minutes between everything.</p><a className="hero-link" href="#games">Enter the lounge <ArrowUpRight size={15} /></a><div className="hero-stats"><span><strong>{games.length}</strong> games</span><span><strong>∞</strong> replay value</span><span><strong>01</strong> lounge</span></div></div><div className="spotlight"><div className="spotlight-top"><span>SPOTLIGHT / 001</span><span className="spotlight-tag">FEATURED</span></div><div className="spotlight-art"><div className="orbit orbit-a" /><div className="orbit orbit-b" /><span className="spotlight-mark">CC</span><span className="spotlight-caption">SWEET<br />DESTRUCTION</span></div><div className="spotlight-bottom"><div><p className="card-kicker">IDLE · COZY CHAOS</p><h2>Cookie Clicker</h2><p>One click away from a very sweet problem.</p></div><button className="circle-play" onClick={() => launch(games[0])} aria-label="Play Cookie Clicker"><Play size={18} fill="currentColor" /></button></div></div></section>
-    <section className="catalog" id="games"><div className="section-heading"><div><p className="eyebrow">THE ARCADE FLOOR</p><h2>Pick your poison<span>.</span></h2></div><div className="collection-note"><Trophy size={16} /><span><strong>{visibleGames.length.toString().padStart(2, '0')}</strong> available now</span></div></div><div className="toolbar"><div className="search-wrap"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles, genres, moods" aria-label="Search games" /></div><div className="filter-tabs" role="tablist" aria-label="Filter games">{filters.map((item) => <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)} role="tab" aria-selected={filter === item}>{item}</button>)}</div></div><div className="game-grid">{visibleGames.map((game, index) => <article className={`game-card ${game.color}`} key={game.id}><button className="favorite-button" onClick={() => toggleFavorite(game.id)} aria-label={`${favorites.includes(game.id) ? 'Remove' : 'Add'} ${game.title} ${favorites.includes(game.id) ? 'from' : 'to'} favorites`}><Heart size={17} fill={favorites.includes(game.id) ? 'currentColor' : 'none'} /></button><div className="game-art"><span className="game-mark">{game.mark}</span><small>{String(index + 1).padStart(2, '0')}</small></div><div className="game-info"><div><p className="card-kicker">{game.genre} · {game.tone}</p><h3>{game.title}</h3><p>{game.description}</p></div><button className="play-button" onClick={() => launch(game)}><Play size={13} fill="currentColor" /> Launch</button></div></article>)}</div>{visibleGames.length === 0 && <div className="empty-state"><Zap size={22} /><h3>No games found</h3><p>Try a different search or clear the filter.</p></div>}</section>
-    <footer id="about"><div className="footer-top"><div className="footer-brand"><span className="brand-mark"><Gamepad2 size={17} /></span><strong>GG-LOUNGE<span className="tm">™</span></strong></div><span className="footer-rule" /><p>Made by <strong>Kai Chauhan</strong></p></div><div className="footer-bottom"><span>© 2026 GG-LOUNGE STUDIOS™. All rights reserved.</span><span>A Production of GG-LOUNGE STUDIOS™</span><span>Games remain property of their respective creators.</span></div></footer>
-    {activeGame && <div className="game-modal" role="dialog" aria-modal="true" aria-label={`${activeGame.title} game`}><div className="modal-bar"><div><span className="modal-kicker">NOW PLAYING</span><strong>{activeGame.title}</strong></div><div className="modal-actions"><button onClick={() => document.querySelector<HTMLIFrameElement>('.game-frame')?.requestFullscreen()} aria-label="Fullscreen"><Maximize2 size={18} /></button><button onClick={() => setActiveGame(null)} aria-label="Close game"><X size={20} /></button></div></div><iframe className="game-frame" src={activeGame.path} title={activeGame.title} /></div>}
-  </main>
+  useEffect(() => {
+    fetch('/api/games')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { games?: PublishedListing[] } | null) => {
+        if (!d?.games) return
+        setPublished(
+          d.games.map((g, i) => ({
+            id: 'pub-' + g.id,
+            title: g.title,
+            subtitle: 'Community upload.',
+            description: 'Published by the lounge community.',
+            genre: 'Community',
+            tone: 'Fresh',
+            mark: g.title.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'GG',
+            color: pubColors[i % pubColors.length],
+            path: '/games/' + g.id,
+            icon: g.icon || undefined,
+          })),
+        )
+      })
+      .catch(() => {})
+  }, [])
+
+  const allGames = useMemo(() => [...games, ...published], [published])
+  const visibleGames = useMemo(
+    () =>
+      allGames.filter(
+        (game) =>
+          `${game.title} ${game.genre} ${game.tone}`.toLowerCase().includes(query.toLowerCase()) &&
+          (filter === 'All games' || game.genre === filter || (filter === 'Favorites' && favorites.includes(game.id))),
+      ),
+    [allGames, favorites, filter, query],
+  )
+
+  function launch(game: Game) {
+    setActiveGame(game)
+  }
+  function toggleFavorite(id: string) {
+    setFavorites((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+  }
+
+  return (
+    <main className="lounge-shell">
+      <div className="noise" aria-hidden="true" />
+      <header className="site-header">
+        <a href="#top" className="brand" aria-label="GG-Lounge home">
+          <span className="brand-mark">
+            <Gamepad2 size={19} />
+          </span>
+          <span>
+            GG-LOUNGE<span className="tm">™</span>
+          </span>
+        </a>
+        <nav className="header-nav" aria-label="Primary navigation">
+          <a href="#games">Library</a>
+          <a href="#about">Studio</a>
+          <a href="/request-game">Request a game</a>
+          <a href="/admin">Admin</a>
+        </nav>
+        <div className="header-status">
+          <span className="live-dot" /> {allGames.length} titles / open all night
+        </div>
+      </header>
+      <section className="hero" id="top">
+        <div className="hero-copy">
+          <p className="eyebrow">
+            <Sparkles size={14} /> THE INDEPENDENT ARCADE
+          </p>
+          <h1>
+            Stay a while.
+            <br />
+            <em>Play forever.</em>
+          </h1>
+          <p className="hero-text">A handpicked, no-filler collection of browser games for the minutes between everything.</p>
+          <a className="hero-link" href="#games">
+            Enter the lounge <ArrowUpRight size={15} />
+          </a>
+          <div className="hero-stats">
+            <span>
+              <strong>{allGames.length}</strong> games
+            </span>
+            <span>
+              <strong>∞</strong> replay value
+            </span>
+            <span>
+              <strong>01</strong> lounge
+            </span>
+          </div>
+        </div>
+        <div className="spotlight">
+          <div className="spotlight-top">
+            <span>SPOTLIGHT / 001</span>
+            <span className="spotlight-tag">FEATURED</span>
+          </div>
+          <div className="spotlight-art">
+            <div className="orbit orbit-a" />
+            <div className="orbit orbit-b" />
+            <span className="spotlight-mark">CC</span>
+            <span className="spotlight-caption">
+              SWEET
+              <br />
+              DESTRUCTION
+            </span>
+          </div>
+          <div className="spotlight-bottom">
+            <div>
+              <p className="card-kicker">IDLE · COZY CHAOS</p>
+              <h2>Cookie Clicker</h2>
+              <p>One click away from a very sweet problem.</p>
+            </div>
+            <button className="circle-play" onClick={() => launch(games[0])} aria-label="Play Cookie Clicker">
+              <Play size={18} fill="currentColor" />
+            </button>
+          </div>
+        </div>
+      </section>
+      <section className="catalog" id="games">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">THE ARCADE FLOOR</p>
+            <h2>
+              Pick your poison<span>.</span>
+            </h2>
+          </div>
+          <div className="collection-note">
+            <Trophy size={16} />
+            <span>
+              <strong>{visibleGames.length.toString().padStart(2, '0')}</strong> available now
+            </span>
+          </div>
+        </div>
+        <div className="toolbar">
+          <div className="search-wrap">
+            <Search size={17} />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles, genres, moods" aria-label="Search games" />
+          </div>
+          <div className="filter-tabs" role="tablist" aria-label="Filter games">
+            {filters.map((item) => (
+              <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)} role="tab" aria-selected={filter === item}>
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="game-grid">
+          {visibleGames.map((game, index) => (
+            <article className={`game-card ${game.color}`} key={game.id}>
+              <button
+                className="favorite-button"
+                onClick={() => toggleFavorite(game.id)}
+                aria-label={`${favorites.includes(game.id) ? 'Remove' : 'Add'} ${game.title} ${favorites.includes(game.id) ? 'from' : 'to'} favorites`}
+              >
+                <Heart size={17} fill={favorites.includes(game.id) ? 'currentColor' : 'none'} />
+              </button>
+              <div className="game-art">
+                {game.icon ? (
+                  <img className="game-icon" src={game.icon} alt="" />
+                ) : (
+                  <span className="game-mark">{game.mark}</span>
+                )}
+                <small>{String(index + 1).padStart(2, '0')}</small>
+              </div>
+              <div className="game-info">
+                <div>
+                  <p className="card-kicker">
+                    {game.genre} · {game.tone}
+                  </p>
+                  <h3>{game.title}</h3>
+                  <p>{game.description}</p>
+                </div>
+                <button className="play-button" onClick={() => launch(game)}>
+                  <Play size={13} fill="currentColor" /> Launch
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+        {visibleGames.length === 0 && (
+          <div className="empty-state">
+            <Zap size={22} />
+            <h3>No games found</h3>
+            <p>Try a different search or clear the filter.</p>
+          </div>
+        )}
+      </section>
+      <footer id="about">
+        <div className="footer-top">
+          <div className="footer-brand">
+            <span className="brand-mark">
+              <Gamepad2 size={17} />
+            </span>
+            <strong>
+              GG-LOUNGE<span className="tm">™</span>
+            </strong>
+          </div>
+          <span className="footer-rule" />
+          <p>
+            Made by <strong>Kai Chauhan</strong>
+          </p>
+        </div>
+        <div className="footer-bottom">
+          <span>© 2026 GG-LOUNGE STUDIOS™. All rights reserved.</span>
+          <span>A Production of GG-LOUNGE STUDIOS™</span>
+          <span>Games remain property of their respective creators.</span>
+        </div>
+      </footer>
+      {activeGame && (
+        <div className="game-modal" role="dialog" aria-modal="true" aria-label={`${activeGame.title} game`}>
+          <div className="modal-bar">
+            <div>
+              <span className="modal-kicker">NOW PLAYING</span>
+              <strong>{activeGame.title}</strong>
+            </div>
+            <div className="modal-actions">
+              <button onClick={() => document.querySelector<HTMLIFrameElement>('.game-frame')?.requestFullscreen()} aria-label="Fullscreen">
+                <Maximize2 size={18} />
+              </button>
+              <button onClick={() => setActiveGame(null)} aria-label="Close game">
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+          <iframe className="game-frame" src={activeGame.path} title={activeGame.title} allow="fullscreen; autoplay; gamepad; keyboard-map" />
+        </div>
+      )}
+    </main>
+  )
 }

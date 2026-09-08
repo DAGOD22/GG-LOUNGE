@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="referrer" content="no-referrer" />
+<title>Poki — Territory Battle</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #0e0f13; font-family: Arial, Helvetica, sans-serif; }
+  #game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+  #hud { position: absolute; top: 10px; right: 10px; background: rgba(10, 10, 14, 0.72); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 10px 12px; color: #fff; font-size: 13px; min-width: 170px; pointer-events: none; }
+  #hud h3 { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.12em; color: #ffd34d; }
+  #hud .row { display: flex; align-items: center; gap: 7px; margin: 3px 0; }
+  #hud .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+  #hud .pct { margin-left: auto; color: #bbb; }
+  #score { position: absolute; bottom: 12px; left: 12px; color: #fff; background: rgba(10,10,14,0.72); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 8px 14px; font-size: 14px; pointer-events: none; }
+  #score b { color: #ffd34d; }
+  #overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(5,5,8,0.78); z-index: 5; }
+  #overlay.hidden { display: none; }
+  #panel { text-align: center; color: #fff; padding: 30px 40px; background: #17181f; border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; max-width: 92vw; }
+  #panel h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -0.02em; }
+  #panel h1 span { color: #ff4d5e; }
+  #panel p { color: #aaa; font-size: 14px; margin: 6px 0 16px; line-height: 1.5; }
+  #panel button { font-size: 17px; font-weight: 700; color: #0e0f13; background: #ffd34d; border: 0; border-radius: 10px; padding: 12px 34px; cursor: pointer; }
+  #panel button:hover { filter: brightness(1.08); }
+  #hint { position: absolute; top: 10px; left: 10px; color: rgba(255,255,255,0.55); font-size: 12px; pointer-events: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud"><h3>LEADERBOARD</h3><div id="board"></div></div>
+<div id="score">YOU — <b id="pct">0%</b> • <b id="kills">0</b> KOs</div>
+<div id="hint">Move: mouse / arrows / WASD / drag</div>
+<div id="overlay"><div id="panel">
+  <h1>POKI <span>•</span> TERRITORY</h1>
+  <p id="panel-text">Claim land by looping back into your color.<br />Don't let rivals cut your tail!</p>
+  <button id="play">PLAY</button>
+</div></div>
+<script>
+"use strict";
+(function () {
+  var COLS = 110, ROWS = 110, CELL = 16;
+  var WORLD_W = COLS * CELL, WORLD_H = ROWS * CELL;
+  var TICK_MS = 62;
+  var BOT_COUNT = 5;
+  var COLORS = ["#ff4d5e", "#3fa7ff", "#43d17c", "#ffd34d", "#b06bff", "#ff8a3d"];
+  var NAMES = ["YOU", "Nova", "Pixel", "Blitz", "Echo", "Volt"];
+
+  var canvas = document.getElementById("game");
+  var ctx = canvas.getContext("2d");
+  var board = document.getElementById("board");
+  var pctEl = document.getElementById("pct");
+  var killsEl = document.getElementById("kills");
+  var overlay = document.getElementById("overlay");
+  var panelText = document.getElementById("panel-text");
+  var playBtn = document.getElementById("play");
+
+  var W = 0, H = 0, DPR = 1;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.floor(W * DPR); canvas.height = Math.floor(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  var owner = new Int16Array(COLS * ROWS).fill(-1);
+  var trail = new Int16Array(COLS * ROWS).fill(-1);
+  function idx(x, y) { return y * COLS + x; }
+  function inBounds(x, y) { return x >= 0 && y >= 0 && x < COLS && y < ROWS; }
+
+  var entities = [];
+  var running = false;
+  var lastTick = 0;
+  var acc = 0;
+  var lastTime = 0;
+  var mouseActive = false;
+  var mouseX = 0, mouseY = 0;
+  var camX = WORLD_W / 2, camY = WORLD_H / 2;
+
+  var DIRS = [{ x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }];
+
+  function clearTrail(e) {
+    for (var i = 0; i < e.trailCells.length; i++) {
+      var c = e.trailCells[i];
+      if (trail[c] === e.id) trail[c] = -1;
+    }
+    e.trailCells.length = 0;
+  }
+
+  function wipeEntity(e) {
+    // remove territory + trail of a dead entity
+    for (var i = 0; i < owner.length; i++) if (owner[i] === e.id) owner[i] = -1;
+    clearTrail(e);
+  }
+
+  function kill(e, byId) {
+    if (!e.alive) return;
+    e.alive = false;
+    wipeEntity(e);
+    if (byId === 0 && e.id !== 0) {
+      entities[0].kills++;
+      killsEl.textContent = String(entities[0].kills);
+    }
+    if (e.id === 0) {
+      gameOver("Eliminated! You held <b>" + territoryPct(0) + "%</b> with <b>" + e.kills + "</b> KOs.");
+    } else if (running) {
+      e.respawnIn = 180; // ticks until bot respawns
+    }
+  }
+
+  function territoryPct(id) {
+    var n = 0;
+    for (var i = 0; i < owner.length; i++) if (owner[i] === id) n++;
+    return Math.floor((n / owner.length) * 1000) / 10;
+  }
+
+  function capture(e) {
+    var i, c;
+    for (i = 0; i < e.trailCells.length; i++) {
+      c = e.trailCells[i];
+      owner[c] = e.id;
+      trail[c] = -1;
+    }
+    e.trailCells.length = 0;
+    // flood fill from borders through cells NOT owned by e => outside; rest is enclosed
+    var seen = new Uint8Array(COLS * ROWS);
+    var stack = [];
+    for (var x = 0; x < COLS; x++) { stack.push(idx(x, 0), idx(x, ROWS - 1)); }
+    for (var y = 0; y < ROWS; y++) { stack.push(idx(0, y), idx(COLS - 1, y)); }
+    while (stack.length) {
+      var cur = stack.pop();
+      if (seen[cur] || owner[cur] === e.id) continue;
+      seen[cur] = 1;
+      var cx = cur % COLS, cy = (cur / COLS) | 0;
+      if (cx > 0) stack.push(cur - 1);
+      if (cx < COLS - 1) stack.push(cur + 1);
+      if (cy > 0) stack.push(cur - COLS);
+      if (cy < ROWS - 1) stack.push(cur + COLS);
+    }
+    for (i = 0; i < owner.length; i++) {
+      if (!seen[i] && owner[i] !== e.id) {
+        var prev = owner[i];
+        owner[i] = e.id;
+        if (prev >= 0 && prev !== e.id) {
+          // stolen land: if victim was mid-trail inside, leave them be
+        }
+      }
+    }
+  }
+
+  function spawn(e, px, py) {
+    e.x = px; e.y = py; e.px = px; e.py = py;
+    e.dir = (Math.random() * 4) | 0;
+    e.alive = true; e.kills = e.kills || 0;
+    e.trailCells = [];
+    e.respawnIn = 0;
+    for (var dy = -3; dy <= 3; dy++) for (var dx = -3; dx <= 3; dx++) {
+      var nx = px + dx, ny = py + dy;
+      if (inBounds(nx, ny)) owner[idx(nx, ny)] = e.id;
+    }
+  }
+
+  function nearestOwnedDir(e) {
+    // greedy steer back toward own territory when trail is long
+    var best = e.dir, bestD = Infinity;
+    for (var d = 0; d < 4; d++) {
+      var nx = e.x + DIRS[d].x * 6, ny = e.y + DIRS[d].y * 6;
+      if (!inBounds(nx, ny)) continue;
+      // sample: is there owned land in that direction?
+      var found = -1;
+      for (var s = 1; s <= 14; s++) {
+        var sx = e.x + DIRS[d].x * s, sy = e.y + DIRS[d].y * s;
+        if (!inBounds(sx, sy)) break;
+        if (owner[idx(sx, sy)] === e.id) { found = s; break; }
+      }
+      var score = found < 0 ? 50 + Math.random() * 10 : found;
+      if (score < bestD) { bestD = score; best = d; }
+    }
+    return best;
+  }
+
+  function botThink(e) {
+    if (e.respawnIn > 0) {
+      e.respawnIn--;
+      if (e.respawnIn === 0) spawn(e, 10 + ((Math.random() * (COLS - 20)) | 0), 10 + ((Math.random() * (ROWS - 20)) | 0));
+      return;
+    }
+    var nx = e.x + DIRS[e.dir].x, ny = e.y + DIRS[e.dir].y;
+    var danger = !inBounds(nx, ny) || (inBounds(nx, ny) && trail[idx(nx, ny)] !== -1);
+    if (danger || Math.random() < 0.06) {
+      var options = [0, 1, 2, 3].filter(function (d) {
+        var tx = e.x + DIRS[d].x, ty = e.y + DIRS[d].y;
+        return inBounds(tx, ty) && trail[idx(tx, ty)] === -1;
+      });
+      if (options.length) e.dir = options[(Math.random() * options.length) | 0];
+    }
+    if (e.trailCells.length > 26) e.dir = nearestOwnedDir(e);
+    else if (e.trailCells.length === 0 && Math.random() < 0.02) e.dir = (e.dir + (Math.random() < 0.5 ? 1 : 3)) % 4;
+  }
+
+  function playerThink(e) {
+    if (!mouseActive) return;
+    var wx = camX + (mouseX - W / 2), wy = camY + (mouseY - H / 2);
+    var ex = (e.x + 0.5) * CELL, ey = (e.y + 0.5) * CELL;
+    var dx = wx - ex, dy = wy - ey;
+    if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+    e.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 0 : 2) : (dy > 0 ? 1 : 3);
+  }
+
+  function stepEntity(e) {
+    e.px = e.x; e.py = e.y;
+    var nx = e.x + DIRS[e.dir].x, ny = e.y + DIRS[e.dir].y;
+    if (!inBounds(nx, ny)) { kill(e, -1); return; }
+    var c = idx(nx, ny);
+    var t = trail[c];
+    if (t !== -1) {
+      if (t === e.id) { kill(e, -1); return; } // hit own tail
+      var victim = entities[t];
+      if (victim && victim.alive) kill(victim, e.id); // cut their tail
+    }
+    // head-on into another entity's head? skip (rare)
+    e.x = nx; e.y = ny;
+    if (owner[c] === e.id) {
+      if (e.trailCells.length > 0) capture(e);
+    } else {
+      owner[c] = owner[c]; // no-op keep
+      trail[c] = e.id;
+      e.trailCells.push(c);
+    }
+  }
+
+  function tick() {
+    var e0 = entities[0];
+    if (e0.alive) { playerThink(e0); stepEntity(e0); }
+    for (var i = 1; i < entities.length; i++) {
+      var b = entities[i];
+      if (!b.alive) { botThink(b); continue; }
+      if ((tick.n + i) % 2 === 0) botThink(b); // think every tick is fine, cheap
+      stepEntity(b);
+    }
+    tick.n++;
+    // HUD
+    pctEl.textContent = territoryPct(0) + "%";
+    updateBoard();
+  }
+  tick.n = 0;
+
+  function updateBoard() {
+    var rows = entities.map(function (e) {
+      return { name: e.name, color: e.color, pct: e.alive ? territoryPct(e.id) : 0 };
+    }).sort(function (a, b) { return b.pct - a.pct; });
+    var html = "";
+    for (var i = 0; i < rows.length; i++) {
+      html += '<div class="row"><span class="dot" style="background:' + rows[i].color + '"></span>' +
+        '<span>' + (i + 1) + ". " + rows[i].name + '</span><span class="pct">' + rows[i].pct + "%</span></div>";
+    }
+    board.innerHTML = html;
+  }
+
+  function render(alpha) {
+    var e0 = entities[0];
+    var tx = (e0.x + 0.5) * CELL, ty = (e0.y + 0.5) * CELL;
+    camX += (tx - camX) * 0.12; camY += (ty - camY) * 0.12;
+    ctx.fillStyle = "#0e0f13";
+    ctx.fillRect(0, 0, W, H);
+    var ox = W / 2 - camX, oy = H / 2 - camY;
+
+    // arena bounds
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(ox, oy, WORLD_W, WORLD_H);
+
+    // owned cells (viewport-culled)
+    var x0 = Math.max(0, Math.floor((camX - W / 2) / CELL) - 1);
+    var x1 = Math.min(COLS - 1, Math.ceil((camX + W / 2) / CELL) + 1);
+    var y0 = Math.max(0, Math.floor((camY - H / 2) / CELL) - 1);
+    var y1 = Math.min(ROWS - 1, Math.ceil((camY + H / 2) / CELL) + 1);
+    for (var y = y0; y <= y1; y++) for (var x = x0; x <= x1; x++) {
+      var o = owner[idx(x, y)];
+      if (o === -1) continue;
+      ctx.fillStyle = COLORS[o];
+      ctx.globalAlpha = 0.55;
+      ctx.fillRect(ox + x * CELL + 0.5, oy + y * CELL + 0.5, CELL - 1, CELL - 1);
+    }
+    ctx.globalAlpha = 1;
+    // trails
+    for (var t = y0; t <= y1; t++) for (var s = x0; s <= x1; s++) {
+      var tr = trail[idx(s, t)];
+      if (tr === -1) continue;
+      ctx.fillStyle = COLORS[tr];
+      ctx.fillRect(ox + s * CELL, oy + t * CELL, CELL, CELL);
+    }
+    // entities (interpolated)
+    for (var i = 0; i < entities.length; i++) {
+      var e = entities[i];
+      if (!e.alive) continue;
+      var ix = (e.px + (e.x - e.px) * alpha + 0.5) * CELL + ox;
+      var iy = (e.py + (e.y - e.py) * alpha + 0.5) * CELL + oy;
+      ctx.beginPath();
+      ctx.arc(ix, iy, CELL * 0.75, 0, Math.PI * 2);
+      ctx.fillStyle = COLORS[e.id];
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = "#fff";
+      ctx.stroke();
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 11px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(e.name, ix, iy - CELL);
+    }
+  }
+
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (!running) return;
+    if (!lastTime) lastTime = now;
+    var dt = Math.min(now - lastTime, 250);
+    lastTime = now;
+    acc += dt;
+    var guard = 0;
+    while (acc >= TICK_MS && guard < 6) { tick(); acc -= TICK_MS; guard++; }
+    render(Math.min(acc / TICK_MS, 1));
+  }
+
+  function start() {
+    owner.fill(-1);
+    trail.fill(-1);
+    entities = [];
+    for (var i = 0; i <= BOT_COUNT; i++) {
+      entities.push({ id: i, name: NAMES[i], color: COLORS[i], x: 0, y: 0, px: 0, py: 0, dir: 0, alive: true, trailCells: [], kills: 0, respawnIn: 0 });
+    }
+    spawn(entities[0], (COLS / 2) | 0, (ROWS / 2) | 0);
+    var spots = [[14, 14], [COLS - 15, 14], [14, ROWS - 15], [COLS - 15, ROWS - 15], [(COLS / 2) | 0, 12]];
+    for (var b = 1; b <= BOT_COUNT; b++) spawn(entities[b], spots[b - 1][0], spots[b - 1][1]);
+    killsEl.textContent = "0";
+    overlay.classList.add("hidden");
+    running = true;
+    acc = 0; lastTime = 0;
+    updateBoard();
+    try { window.focus(); } catch (e) {}
+  }
+
+  function gameOver(html) {
+    running = false;
+    panelText.innerHTML = html + "<br />Claim land by looping back into your color.";
+    playBtn.textContent = "PLAY AGAIN";
+    overlay.classList.remove("hidden");
+  }
+
+  playBtn.addEventListener("click", function () { playBtn.blur(); start(); });
+
+  var KEYMAP = { ArrowUp: 3, KeyW: 3, ArrowRight: 0, KeyD: 0, ArrowDown: 1, KeyS: 1, ArrowLeft: 2, KeyA: 2 };
+  document.addEventListener("keydown", function (e) {
+    if (e.code in KEYMAP) {
+      mouseActive = false;
+      if (entities[0] && entities[0].alive) entities[0].dir = KEYMAP[e.code];
+      e.preventDefault();
+    } else if (e.code === "Enter" || e.code === "Space") {
+      if (!running) start();
+      e.preventDefault();
+    }
+  });
+  canvas.addEventListener("mousemove", function (e) { mouseActive = true; mouseX = e.clientX; mouseY = e.clientY; });
+  canvas.addEventListener("pointerdown", function (e) {
+    mouseActive = true; mouseX = e.clientX; mouseY = e.clientY;
+    try { window.focus(); } catch (err) {}
+  });
+  canvas.addEventListener("touchstart", function (e) {
+    var t = e.changedTouches[0];
+    mouseActive = true; mouseX = t.clientX; mouseY = t.clientY;
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener("touchmove", function (e) {
+    var t = e.changedTouches[0];
+    mouseX = t.clientX; mouseY = t.clientY;
+    e.preventDefault();
+  }, { passive: false });
+
+  updateBoardEmpty();
+  function updateBoardEmpty() {
+    board.innerHTML = NAMES.map(function (n, i) {
+      return '<div class="row"><span class="dot" style="background:' + COLORS[i] + '"></span><span>' + (i + 1) + ". " + n + '</span><span class="pct">0%</span></div>';
+    }).join("");
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

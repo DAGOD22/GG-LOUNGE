@@ -5,7 +5,25 @@
 <!doctype html>
 <html lang="en" xmlns="http://www.w3.org/1999/html">
   <head>
-    <base href="https://cdn.jsdelivr.net/gh/bubblfan/vex/8/" />
+    <script>
+/* GG Lounge CDN fallback: primary -> mirror -> mirror (for school networks that block a CDN) */
+(function(){
+  var SOURCES=[{base:"https://cdn.jsdelivr.net/gh/bubblfan/vex/8/",extra:null,probe:"https://cdn.jsdelivr.net/gh/bubblfan/vex/8/version.js"},{base:"https://cdn.statically.io/gh/bubblfan/vex/main/8/",extra:null,probe:"https://cdn.statically.io/gh/bubblfan/vex/main/8/version.js"},{base:"https://raw.githack.com/bubblfan/vex/main/8/",extra:null,probe:"https://raw.githack.com/bubblfan/vex/main/8/version.js"}];
+  var KEY="ggl_cdn_vex-8";
+  function pick(){
+    try{
+      var q=new URLSearchParams(window.location.search).get("cdn");
+      if(q!==null&&SOURCES[+q])return +q;
+      var s=window.localStorage.getItem(KEY);
+      if(s!==null&&SOURCES[+s])return +s;
+    }catch(e){}
+    return 0;
+  }
+  var idx=pick();
+  window.GGL_CDN=SOURCES;window.GGL_CDN_IDX=idx;window.GGL_CDN_KEY=KEY;
+  document.write('<base href="'+SOURCES[idx].base+'">');
+})();
+</script>
     <meta charset="utf-8" />
     <meta http-equiv="x-ua-compatible" content="ie=edge" />
     <meta
@@ -45,5 +63,29 @@
         });
       });
     </script>
-  </body>
+  <script>
+(function(){
+  if(!window.GGL_CDN)return;
+  var S=window.GGL_CDN,KEY=window.GGL_CDN_KEY,idx=window.GGL_CDN_IDX;
+  var order=[idx];for(var k=0;k<S.length;k++){if(k!==idx)order.push(k);}
+  function fail(){
+    var d=document.createElement("div");
+    d.style.cssText="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0b0d12;color:#f4f2ec;font-family:Arial,sans-serif;z-index:99999;text-align:center;padding:24px";
+    d.innerHTML="<div><h2>Game files blocked on this network</h2><p>All download mirrors failed. Try again later or on another network.</p></div>";
+    document.body.appendChild(d);
+  }
+  function attempt(n){
+    if(n>=order.length){fail();return;}
+    var i=order[n];
+    fetch(S[i].probe,{method:"HEAD",mode:"cors",cache:"no-store"}).then(function(r){
+      if(r&&(r.ok||r.status===405||r.status===403)){
+        try{localStorage.setItem(KEY,String(i));}catch(e){}
+        if(i!==idx){var u=new URL(window.location.href);u.searchParams.set("cdn",String(i));window.location.replace(u.toString());}
+      }else{attempt(n+1);}
+    }).catch(function(){attempt(n+1);});
+  }
+  attempt(0);
+})();
+</script>
+</body>
 </html>

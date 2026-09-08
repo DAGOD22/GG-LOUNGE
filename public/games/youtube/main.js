@@ -319,6 +319,10 @@
     return html + "</div>";
   }
 
+  function officialEmbed(id, holder) {
+    holder.innerHTML = '<iframe class="player official" src="https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1&rel=0" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="no-referrer"></iframe>';
+  }
+
   function errorBox(title, message, retryFn) {
     main.innerHTML =
       '<div class="error-box"><h2>' + esc(title) + '</h2><p>' + esc(message) + '</p>' +
@@ -627,7 +631,8 @@
     } else if (data.hls) {
       attachHls(video, data.hls);
     } else {
-      holder.innerHTML = '<div class="player-fallback">No playable stream from this server.<br>Try another server in Settings, or turn School mode off.</div>';
+      holder.innerHTML = '<div class="player-fallback">No playable stream from this server.<br>Try another server in Settings, turn School mode off,<br><br><button class="btn" id="official-btn">Play with official YouTube player</button></div>';
+      document.getElementById("official-btn").onclick = function () { officialEmbed(id, holder); };
     }
 
     video.onerror = function () {
@@ -637,6 +642,12 @@
         video.setAttribute("data-retried", "1");
         video.src = prefs.schoolMode ? defaultStream.url : mediaUrl(defaultStream.url);
         video.play().catch(function () {});
+      } else if (!document.getElementById("official-btn")) {
+        var wrap = document.createElement("div");
+        wrap.className = "player-fallback official-wrap";
+        wrap.innerHTML = 'This stream is blocked or broken on this network.<br><br><button class="btn" id="official-btn">Play with official YouTube player</button>';
+        holder.appendChild(wrap);
+        document.getElementById("official-btn").onclick = function () { officialEmbed(id, holder); };
       }
     };
 
