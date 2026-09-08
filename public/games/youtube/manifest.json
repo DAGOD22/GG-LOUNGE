@@ -2,7 +2,7 @@
 	"id": "ytunbl",
 	"name": "YouTube Unblocked",
 	"icon": "icon.svg",
-	"version": "1.0",
-	"versionCode": 1,
-	"description": "A lightweight unblocked YouTube client with all ads removed."
+	"version": "2.0",
+	"versionCode": 2,
+	"description": "Piped-powered unblocked YouTube client. No ads, no Google login, works on school networks."
 }
