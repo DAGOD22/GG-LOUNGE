@@ -24,8 +24,10 @@ const games: Game[] = [
   { id: 'geometry-dash', title: 'Geometry Dash', subtitle: 'Jump the rhythm.', description: 'Sync your timing to the beat and clear a precision platforming gauntlet.', genre: 'Platformer', tone: 'Rhythm', mark: 'GD', color: 'hextris', path: '/games/geometry-dash/index.html' },
   { id: 'poki', title: 'Poki', subtitle: 'Claim it all.', description: 'A paper-style territory battle against bots — loop out, capture land, cut their tails.', genre: 'Arcade', tone: 'Battle', mark: 'PK', color: 'youtube', path: '/games/poki/index.html' },
   { id: 'vex-8', title: 'Vex 8', subtitle: 'Run the gauntlet.', description: 'Wall-jump, slide, and sprint through a sharp new platforming challenge.', genre: 'Platformer', tone: 'Precision', mark: 'V8', color: 'devil', path: '/games/vex-8/index.html' },
+  { id: 'eaglercraftx', title: 'EaglercraftX', subtitle: 'Minecraft in a tab.', description: 'The real EaglercraftX 1.8 client — singleplayer and multiplayer Minecraft, right in the browser.', genre: 'Sandbox', tone: 'Blocky', mark: 'EX', color: 'mining', path: '/games/eaglercraftx/index.html' },
+  { id: 'backrooms', title: 'Backrooms', subtitle: 'Doom meets Level 0.', description: 'THE BACKDOOMS — a self-contained DOOM-style shooter lost in the humming yellow halls.', genre: 'Arcade', tone: 'Horror', mark: 'BR', color: 'twenty', path: '/games/backrooms/index.html' },
 ]
-const filters = ['All games', 'Idle', 'Arcade', 'Puzzle', 'Racing', 'Platformer', 'Simulation', 'Video', 'Community', 'Favorites']
+const filters = ['All games', 'Idle', 'Arcade', 'Puzzle', 'Racing', 'Platformer', 'Simulation', 'Sandbox', 'Video', 'Community', 'Favorites']
 const pubColors = ['cookie', 'drive', 'mining', 'devil', 'stack', 'hextris', 'twenty', 'youtube']
 
 type PublishedListing = { id: string; title: string; icon: string | null }

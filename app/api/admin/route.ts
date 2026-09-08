@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
 
   if (body.action === "login") {
-    if (typeof body.password !== "string" || body.password !== adminPassword()) {
+    if (typeof body.password !== "string" || body.password.trim() !== adminPassword()) {
       return NextResponse.json({ error: "Incorrect admin password." }, { status: 401 });
     }
     const response = NextResponse.json({ ok: true });

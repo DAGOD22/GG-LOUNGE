@@ -86,7 +86,7 @@ export default function AdminPage() {
     const r = await fetch('/api/admin', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ action: 'login', password }),
+      body: JSON.stringify({ action: 'login', password: password.trim() }),
     });
     if (!r.ok) {
       setError('Incorrect admin password.');

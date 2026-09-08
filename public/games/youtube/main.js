@@ -228,10 +228,11 @@
     }).catch(function (proxyErr) {
       var order = directOrder();
       var chain = Promise.reject(proxyErr);
-      order.slice(0, 4).forEach(function (base) {
+      order.slice(0, 6).forEach(function (base) {
         chain = chain.catch(function () {
-          return fetchJson(base + path, 12000).then(function (data) {
+          return fetchJson(base + path, 10000).then(function (data) {
             lastVia = base;
+            directCursor = DIRECT_INSTANCES.indexOf(base); // start here next time
             setNet("ok", "Direct • connected");
             return data;
           });
@@ -321,6 +322,13 @@
 
   function officialEmbed(id, holder) {
     holder.innerHTML = '<iframe class="player official" src="https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1&rel=0" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="no-referrer"></iframe>';
+  }
+
+  function officialOnly(id) {
+    main.innerHTML =
+      '<div class="watch"><div class="player-col"><div class="player-holder">' +
+      '<iframe class="player official" src="https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1&rel=0" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="no-referrer"></iframe>' +
+      '</div><p class="official-note">Stream servers are unreachable, so this is playing through the official YouTube player.</p></div></div>';
   }
 
   function errorBox(title, message, retryFn) {
@@ -590,6 +598,15 @@
       paintWatch(id, data);
     }, function (err) {
       errorBox("Couldn't load this video", err.message || "Network error", renderWatch);
+      var row = main.querySelector(".btn-row");
+      if (row) {
+        var btn = document.createElement("button");
+        btn.className = "btn";
+        btn.id = "err-official";
+        btn.textContent = "Play with official YouTube player";
+        btn.onclick = function () { officialOnly(id); };
+        row.appendChild(btn);
+      }
     });
   }
 
