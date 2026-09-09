@@ -8,6 +8,7 @@
 	<meta name="viewport" content="initial-scale=1.0001, minimum-scale=1.0001, maximum-scale=1.0001, user-scalable=no, minimal-ui" />
 	<meta name="mobile-web-app-capable" content="yes">
 	<link rel="stylesheet" type="text/css" href="game.css">
+	<script type="text/javascript" src="gdsdk-stub.js"></script>
 	<script type="text/javascript" src="game.js"></script>
 </head>
 
@@ -19,17 +20,5 @@
 		<div id="play" class="play" onclick=""><img src="media/graphics/splash/mobile/cover-start.jpg" /></div>
 	</div>
 	<script src="cheats.js"></script>
-	<script>
-	// The MarketJS framework boots via window.gameStart(), which the original
-	// page called when the GameDistribution SDK signaled ready. No SDK here,
-	// so boot directly once everything is loaded.
-	window.addEventListener('load', function () {
-		setTimeout(function () {
-			try {
-				if (typeof window.gameStart === 'function') window.gameStart();
-			} catch (err) { console.error('Drift Boss boot failed:', err); }
-		}, 400);
-	});
-	</script>
 </body>
 </html>

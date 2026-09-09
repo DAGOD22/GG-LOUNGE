@@ -8,9 +8,13 @@ import {
   Eye,
   Gamepad2,
   Gavel,
+  Inbox,
+  LayoutDashboard,
   LockKeyhole,
   LogOut,
   Play,
+  Server,
+  ShieldAlert,
   ShieldCheck,
   Trash2,
   Upload,
@@ -162,8 +166,9 @@ export default function AdminPage() {
   if (checking) {
     return (
       <main className="admin-shell">
-        <section className="admin-login">
-          <p className="muted">Loading console…</p>
+        <section className="admin-login-card">
+          <div className="admin-spinner" aria-hidden />
+          <p className="muted">Contacting control room…</p>
         </section>
       </main>
     );
@@ -171,15 +176,15 @@ export default function AdminPage() {
 
   if (!unlocked) {
     return (
-      <main className="admin-shell">
-        <section className="admin-login">
+      <main className="admin-shell admin-gate">
+        <section className="admin-login-card">
           <div className="admin-lock">
-            <LockKeyhole />
+            <LockKeyhole size={26} />
           </div>
           <p className="eyebrow">GG-LOUNGE™ / CONTROL ROOM</p>
           <h1>Admin access.</h1>
-          <p>Unlock the moderation and publishing console.</p>
-          <form onSubmit={login}>
+          <p className="muted">Unlock the moderation and publishing console.</p>
+          <form onSubmit={login} className="admin-form">
             <label htmlFor="admin-password">Admin password</label>
             <input
               id="admin-password"
@@ -188,12 +193,13 @@ export default function AdminPage() {
               onChange={(e) => setPassword(e.target.value)}
               autoFocus
               required
+              placeholder="••••••"
             />
-            <button type="submit">Unlock console</button>
+            <button type="submit" className="btn-primary">Unlock console</button>
           </form>
           {error && <p className="admin-error">{error}</p>}
           <a className="admin-back" href="/">
-            Back to lounge
+            ← Back to lounge
           </a>
         </section>
       </main>
@@ -201,51 +207,78 @@ export default function AdminPage() {
   }
 
   const pending = data.requests.filter((r) => r.status === 'pending');
+  const stats = [
+    { icon: <Users size={18} />, label: 'Visitors logged', value: data.visits.length, href: '#users' },
+    { icon: <Inbox size={18} />, label: 'Pending requests', value: pending.length, href: '#requests', alert: pending.length > 0 },
+    { icon: <Gamepad2 size={18} />, label: 'Published games', value: data.games.length, href: '#games' },
+    { icon: <ShieldAlert size={18} />, label: 'Active bans', value: data.bans.length, href: '#bans' },
+  ];
 
   return (
     <main className="admin-shell">
-      <header className="admin-header">
-        <div>
-          <p className="eyebrow">
-            <ShieldCheck size={14} /> GG-LOUNGE™ / CONTROL ROOM
-          </p>
-          <h1>Moderation console</h1>
+      <header className="console-header">
+        <div className="console-brand">
+          <span className="console-shield">
+            <ShieldCheck size={20} />
+          </span>
+          <div>
+            <p className="eyebrow">GG-LOUNGE™ / CONTROL ROOM</p>
+            <h1>Moderation console</h1>
+          </div>
           <span className={`mode-badge ${data.mode === 'postgres' ? 'pg' : 'local'}`}>
-            {data.mode === 'postgres' ? 'Postgres • permanent' : 'Local mode • connect Postgres for permanence'}
+            <Server size={12} /> {data.mode === 'postgres' ? 'Postgres • permanent' : 'Local mode • connect Postgres for permanence'}
           </span>
         </div>
-        <div className="admin-header-actions">
-          <a href="/">Back to lounge</a>
-          <button onClick={() => void logout()}>
+        <div className="console-actions">
+          <nav className="console-nav">
+            <a href="#users">Users</a>
+            <a href="#publish">Publish</a>
+            <a href="#requests">Requests{pending.length > 0 && <em>{pending.length}</em>}</a>
+            <a href="#games">Games</a>
+          </nav>
+          <a className="btn-ghost" href="/">Lounge</a>
+          <button className="btn-ghost" onClick={() => void logout()}>
             <LogOut size={15} /> Log out
           </button>
         </div>
       </header>
 
-      <section className="admin-grid">
+      <section className="stat-row">
+        {stats.map((s) => (
+          <a key={s.label} className={`stat-card${s.alert ? ' alert' : ''}`} href={s.href}>
+            <span className="stat-icon">{s.icon}</span>
+            <span className="stat-value">{s.value}</span>
+            <span className="stat-label">{s.label}</span>
+          </a>
+        ))}
+      </section>
+
+      <section className="admin-grid" id="users">
         <section className="admin-panel">
           <div className="panel-heading">
-            <Users size={19} />
+            <span className="panel-icon"><Users size={18} /></span>
             <div>
               <h2>Recent visitors</h2>
               <p>Kick (15 min) or ban visitors by IP.</p>
             </div>
           </div>
           <div className="visit-list">
-            {data.visits.length === 0 && <p className="muted">No visits logged yet.</p>}
+            {data.visits.length === 0 && (
+              <p className="empty-state"><LayoutDashboard size={20} /> No visits logged yet.</p>
+            )}
             {data.visits.slice(0, 20).map((v) => (
               <div className="visit-row" key={v.id}>
-                <div>
+                <div className="row-main">
                   <strong>{v.ip}</strong>
                   <span>
                     {v.path} • {shortUa(v.ua)} • {timeAgo(v.createdAt)}
                   </span>
                 </div>
                 <div className="row-actions">
-                  <button title="Kick for 15 minutes" onClick={() => void action({ action: 'kick', identifier: v.ip, minutes: 15 })}>
+                  <button className="btn-mini" title="Kick for 15 minutes" onClick={() => void action({ action: 'kick', identifier: v.ip, minutes: 15 })}>
                     <Clock size={14} /> Kick
                   </button>
-                  <button title="Ban permanently" onClick={() => void action({ action: 'ban', identifier: v.ip, reason: 'Banned by admin' })}>
+                  <button className="btn-mini danger" title="Ban permanently" onClick={() => void action({ action: 'ban', identifier: v.ip, reason: 'Banned by admin' })}>
                     <Ban size={14} /> Ban
                   </button>
                 </div>
@@ -254,7 +287,7 @@ export default function AdminPage() {
           </div>
         </section>
 
-        <div>
+        <div className="side-stack" id="bans">
           <form
             className="admin-panel"
             onSubmit={(e) => {
@@ -265,7 +298,7 @@ export default function AdminPage() {
             }}
           >
             <div className="panel-heading">
-              <Gavel size={19} />
+              <span className="panel-icon"><Gavel size={18} /></span>
               <div>
                 <h2>Ban a visitor</h2>
                 <p>Block an IP address or identifier.</p>
@@ -274,29 +307,29 @@ export default function AdminPage() {
             <label htmlFor="identifier">Identifier (IP)</label>
             <input id="identifier" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required placeholder="1.2.3.4" />
             <label htmlFor="reason">Reason</label>
-            <textarea id="reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
-            <button type="submit">Add ban</button>
+            <textarea id="reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder="Why are they banned?" />
+            <button type="submit" className="btn-primary"><Ban size={15} /> Add ban</button>
           </form>
 
           <section className="admin-panel">
             <div className="panel-heading">
-              <Ban size={19} />
+              <span className="panel-icon"><Ban size={18} /></span>
               <div>
                 <h2>Active bans</h2>
-                <p>{data.bans.length} records</p>
+                <p>{data.bans.length} record{data.bans.length === 1 ? '' : 's'}</p>
               </div>
             </div>
-            {data.bans.length === 0 && <p className="muted">Nobody is banned.</p>}
+            {data.bans.length === 0 && <p className="empty-state"><ShieldCheck size={20} /> Nobody is banned. Peace reigns.</p>}
             {data.bans.map((b) => (
               <div className="ban-row" key={b.id}>
-                <div>
+                <div className="row-main">
                   <strong>{b.identifier}</strong>
                   <span>
                     {b.reason || 'No reason provided'}
                     {b.expiresAt ? ` • lifts ${timeAgo(b.expiresAt) === 'just now' ? 'soon' : timeAgo(b.expiresAt)}` : ' • permanent'}
                   </span>
                 </div>
-                <button onClick={() => void remove('ban', b.id)} aria-label="Remove ban">
+                <button className="btn-icon danger" onClick={() => void remove('ban', b.id)} aria-label="Remove ban">
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -305,9 +338,9 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section className="admin-panel admin-wide">
+      <section className="admin-panel admin-wide" id="publish">
         <div className="panel-heading">
-          <Upload size={19} />
+          <span className="panel-icon"><Upload size={18} /></span>
           <div>
             <h2>Publish a game</h2>
             <p>Upload an index.html file — it goes live in the lounge permanently.</p>
@@ -327,7 +360,7 @@ export default function AdminPage() {
             <input id="pub-file" type="file" accept=".html,text/html" required onChange={(e) => setPubFile(e.target.files?.[0] ?? null)} />
           </div>
           <div className="upload-actions">
-            <button type="submit" disabled={!!pubProgress}>
+            <button type="submit" className="btn-primary" disabled={!!pubProgress}>
               <Gamepad2 size={15} /> {pubProgress ? `Uploading ${pubProgress.done}/${pubProgress.total}…` : 'Publish now'}
             </button>
             {pubProgress && (
@@ -337,63 +370,63 @@ export default function AdminPage() {
             )}
           </div>
         </form>
-        {pubMessage && <p className="muted">{pubMessage}</p>}
+        {pubMessage && <p className={`pub-message${pubMessage.startsWith('Published') ? ' ok' : ''}`}>{pubMessage}</p>}
       </section>
 
-      <section className="admin-panel admin-wide">
+      <section className="admin-panel admin-wide" id="requests">
         <div className="panel-heading">
-          <Check size={19} />
+          <span className="panel-icon"><Inbox size={18} /></span>
           <div>
             <h2>Game requests</h2>
             <p>{pending.length} pending — approve or deny community HTML uploads.</p>
           </div>
         </div>
-        {data.requests.length === 0 && <p className="muted">No requests yet.</p>}
+        {data.requests.length === 0 && <p className="empty-state"><Inbox size={20} /> No requests yet.</p>}
         {data.requests.map((r) => (
           <div className="request-row" key={r.id}>
-            <div>
+            <div className="row-main">
               <strong>
                 {r.icon && <img src={r.icon} alt="" />}
                 {r.title}
               </strong>
               <span>
-                {r.status} • {timeAgo(r.createdAt)}
+                <em className={`pill ${r.status}`}>{r.status}</em> • {timeAgo(r.createdAt)}
               </span>
             </div>
             <div className="row-actions">
-              <a className="admin-btn" href={`/api/admin/preview?id=${encodeURIComponent(r.id)}&kind=request`} target="_blank" rel="noreferrer">
+              <a className="btn-mini" href={`/api/admin/preview?id=${encodeURIComponent(r.id)}&kind=request`} target="_blank" rel="noreferrer">
                 <Eye size={15} /> Preview
               </a>
               {r.status === 'pending' && (
                 <>
-                  <button onClick={() => void action({ action: 'publish', id: r.id })}>
+                  <button className="btn-mini ok" onClick={() => void action({ action: 'publish', id: r.id })}>
                     <Check size={15} /> Publish
                   </button>
-                  <button className="danger" onClick={() => void action({ action: 'deny', id: r.id })}>
+                  <button className="btn-mini danger" onClick={() => void action({ action: 'deny', id: r.id })}>
                     <X size={15} /> Deny
                   </button>
                 </>
               )}
-              <button className="danger" onClick={() => void remove('request', r.id)}>
-                <Trash2 size={15} /> Delete
+              <button className="btn-icon danger" onClick={() => void remove('request', r.id)} aria-label="Delete request">
+                <Trash2 size={15} />
               </button>
             </div>
           </div>
         ))}
       </section>
 
-      <section className="admin-panel admin-wide">
+      <section className="admin-panel admin-wide" id="games">
         <div className="panel-heading">
-          <Play size={19} />
+          <span className="panel-icon"><Play size={18} /></span>
           <div>
             <h2>Published games</h2>
-            <p>{data.games.length} permanent community games in the lounge.</p>
+            <p>{data.games.length} permanent community game{data.games.length === 1 ? '' : 's'} in the lounge.</p>
           </div>
         </div>
-        {data.games.length === 0 && <p className="muted">Nothing published yet — use the form above.</p>}
+        {data.games.length === 0 && <p className="empty-state"><Gamepad2 size={20} /> Nothing published yet — use the form above.</p>}
         {data.games.map((g) => (
           <div className="request-row" key={g.id}>
-            <div>
+            <div className="row-main">
               <strong>
                 {g.icon && <img src={g.icon} alt="" />}
                 {g.title}
@@ -401,10 +434,10 @@ export default function AdminPage() {
               <span>{timeAgo(g.createdAt)}</span>
             </div>
             <div className="row-actions">
-              <a className="admin-btn" href={`/games/${encodeURIComponent(g.id)}`} target="_blank" rel="noreferrer">
+              <a className="btn-mini" href={`/games/${encodeURIComponent(g.id)}`} target="_blank" rel="noreferrer">
                 <Play size={15} /> Play
               </a>
-              <button className="danger" onClick={() => void remove('game', g.id)}>
+              <button className="btn-mini danger" onClick={() => void remove('game', g.id)}>
                 <Trash2 size={15} /> Delete
               </button>
             </div>
