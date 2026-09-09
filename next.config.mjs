@@ -7,6 +7,15 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  serverExternalPackages: ['@nebula-services/bare-server-node'],
+  async headers() {
+    return [
+      {
+        source: '/uv/uv.sw.js',
+        headers: [{ key: 'Service-Worker-Allowed', value: '/' }],
+      },
+    ];
+  },
 }
 
 export default nextConfig

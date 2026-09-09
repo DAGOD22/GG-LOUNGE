@@ -101,6 +101,19 @@
     netText.textContent = text;
   }
 
+  // If a proxied thumbnail fails (proxy unreachable), retry it direct once.
+  document.addEventListener("error", function (ev) {
+    var t = ev.target;
+    if (t && t.tagName === "IMG" && !t.getAttribute("data-direct-retried") &&
+        t.src.indexOf(API_BASE + "/img?url=") >= 0) {
+      t.setAttribute("data-direct-retried", "1");
+      try {
+        var u = new URL(t.src, location.href).searchParams.get("url");
+        if (u) t.src = u;
+      } catch (e) { /* noop */ }
+    }
+  }, true);
+
   // ---------- helpers ----------
   function esc(s) {
     return String(s == null ? "" : s)
@@ -176,13 +189,26 @@
   }
   function imgUrl(u, fallback) {
     if (!u) return fallback || "";
-    if (prefs.strictImg) return API_BASE + "/img?url=" + encodeURIComponent(u);
+    // School mode proxies images same-origin too (auto-falls back to direct
+    // via the global IMG error handler below if the proxy is unreachable).
+    if (prefs.strictImg || prefs.schoolMode) return API_BASE + "/img?url=" + encodeURIComponent(u);
     return u;
   }
 
   // ---------- api client ----------
   var lastVia = "";
   var directCursor = 0;
+  var proxyAlive = null; // null = unknown, true/false after probe or first use
+
+  // One cheap boot probe so we don't waste seconds on a dead proxy (or a
+  // dead direct route) before trying the other path.
+  function probeProxy() {
+    if (proxyAlive !== null) return;
+    proxyAlive = undefined; // probing
+    fetchJson(API_BASE + "/trending?region=" + encodeURIComponent(prefs.region || "US"), 6000).then(function () {
+      proxyAlive = true;
+    }, function () { proxyAlive = false; });
+  }
 
   function fetchJson(url, timeoutMs) {
     return new Promise(function (resolve, reject) {
@@ -211,6 +237,25 @@
     return out;
   }
 
+  function tryDirect(path, proxyErr) {
+    var order = directOrder();
+    var chain = Promise.reject(proxyErr);
+    order.slice(0, 6).forEach(function (base) {
+      chain = chain.catch(function () {
+        return fetchJson(base + path, 10000).then(function (data) {
+          lastVia = base;
+          directCursor = DIRECT_INSTANCES.indexOf(base); // start here next time
+          setNet("ok", "Direct • connected");
+          return data;
+        });
+      });
+    });
+    return chain.catch(function (err) {
+      setNet("bad", "Offline");
+      throw err;
+    });
+  }
+
   function api(path) {
     // Manual instance selected → go direct only.
     if (prefs.instance && prefs.instance !== "auto") {
@@ -220,28 +265,19 @@
         return data;
       });
     }
+    // Proxy known-dead (e.g. sandbox preview): skip straight to direct.
+    if (proxyAlive === false) {
+      return tryDirect(path, new Error("lounge proxy unreachable"));
+    }
     // Auto: lounge proxy first (same origin = unblockable), then direct Piped.
     return fetchJson(API_BASE + path).then(function (data) {
       lastVia = "lounge proxy";
+      proxyAlive = true;
       setNet("ok", prefs.schoolMode ? "School mode • connected" : "Connected");
       return data;
     }).catch(function (proxyErr) {
-      var order = directOrder();
-      var chain = Promise.reject(proxyErr);
-      order.slice(0, 6).forEach(function (base) {
-        chain = chain.catch(function () {
-          return fetchJson(base + path, 10000).then(function (data) {
-            lastVia = base;
-            directCursor = DIRECT_INSTANCES.indexOf(base); // start here next time
-            setNet("ok", "Direct • connected");
-            return data;
-          });
-        });
-      });
-      return chain.catch(function (err) {
-        setNet("bad", "Offline");
-        throw err;
-      });
+      proxyAlive = false;
+      return tryDirect(path, proxyErr);
     });
   }
 
@@ -541,6 +577,13 @@
       var am = /mp4/i.test(a.mimeType || "") || /mp4/i.test(a.format || "") ? 0 : 1;
       var bm = /mp4/i.test(b.mimeType || "") || /mp4/i.test(b.format || "") ? 0 : 1;
       if (am !== bm) return am - bm;
+      // In school mode, prefer non-googlevideo hosts (pipedproxy mirrors),
+      // since school filters usually block video CDNs but not these.
+      if (prefs.schoolMode) {
+        var ag = /googlevideo\.com/i.test(a.url || "") ? 1 : 0;
+        var bg = /googlevideo\.com/i.test(b.url || "") ? 1 : 0;
+        if (ag !== bg) return ag - bg;
+      }
       return (b.height || 0) - (a.height || 0);
     });
     return { muxed: muxed, all: videos, audio: (data.audioStreams || []).slice() };
@@ -641,10 +684,23 @@
       }
     }
 
+    // Ordered playback candidates: proxied best stream (school mode, if the
+    // proxy is alive) → direct best stream → other direct renditions.
+    var candidates = [];
+    var candIdx = 0;
+    if (defaultStream) {
+      if (prefs.schoolMode && proxyAlive !== false) candidates.push(mediaUrl(defaultStream.url));
+      candidates.push(defaultStream.url);
+      for (var ci = 0; ci < picked.muxed.length && candidates.length < 6; ci++) {
+        var cu = picked.muxed[ci].url;
+        if (cu && cu !== defaultStream.url && candidates.indexOf(cu) < 0) candidates.push(cu);
+      }
+    }
+
     if (isLive && data.hls) {
       attachHls(video, data.hls);
     } else if (defaultStream) {
-      video.src = mediaUrl(defaultStream.url);
+      video.src = candidates[0];
     } else if (data.hls) {
       attachHls(video, data.hls);
     } else {
@@ -653,11 +709,10 @@
     }
 
     video.onerror = function () {
-      // One automatic recovery: retry direct if proxied (or vice versa).
-      var retried = video.getAttribute("data-retried");
-      if (!retried && defaultStream) {
-        video.setAttribute("data-retried", "1");
-        video.src = prefs.schoolMode ? defaultStream.url : mediaUrl(defaultStream.url);
+      // Step through every candidate before giving up to the official player.
+      candIdx++;
+      if (candIdx < candidates.length) {
+        video.src = candidates[candIdx];
         video.play().catch(function () {});
       } else if (!document.getElementById("official-btn")) {
         var wrap = document.createElement("div");
@@ -724,14 +779,14 @@
         var wasPlaying = !video.paused;
         if (val === "__audio") {
           var best = picked.audio.slice().sort(function (a, b) { return (b.bitrate || 0) - (a.bitrate || 0); })[0];
-          if (best) video.src = mediaUrl(best.url);
+          if (best) { video.src = mediaUrl(best.url); candidates = proxyAlive === false ? [best.url] : [mediaUrl(best.url), best.url]; candIdx = 0; }
         } else {
           var target = picked.muxed[0];
           for (var k = 0; k < picked.muxed.length; k++) {
             if (qualityLabel(picked.muxed[k]) === val) target = picked.muxed[k];
           }
           if (val === "auto") target = picked.muxed[0];
-          if (target) video.src = mediaUrl(target.url);
+          if (target) { video.src = mediaUrl(target.url); candidates = proxyAlive === false ? [target.url] : [mediaUrl(target.url), target.url]; candIdx = 0; }
         }
         video.currentTime = t;
         if (wasPlaying) video.play().catch(function () {});
@@ -1110,6 +1165,7 @@
   };
 
   // ---------- boot ----------
+  probeProxy();
   state = bootFromUrl();
   setActiveNav(state.view);
   render();
