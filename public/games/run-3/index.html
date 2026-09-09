@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run 3 — GG Lounge</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #stage { position: fixed; inset: 0; }
+  ruffle-player { width: 100%; height: 100%; }
+</style>
+<script>
+  window.RufflePlayer = window.RufflePlayer || {};
+  window.RufflePlayer.config = {
+    autoplay: "auto", unmuteOverlay: "visible", backgroundColor: "black",
+    letterbox: "fullscreen", scale: "showAll", warnOnUnsupportedContent: false,
+    showSwfDownload: false, contextMenu: true, polyfills: true,
+  };
+</script>
+<script src="ruffle/ruffle.js"></script>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+  window.addEventListener("load", function () {
+    var player = window.RufflePlayer.newest().createPlayer();
+    player.style.width = "100%";
+    player.style.height = "100%";
+    document.getElementById("stage").appendChild(player);
+    player.load("run3.swf");
+  });
+</script>
+</body>
+</html>
