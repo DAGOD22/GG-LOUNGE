@@ -33,4 +33,4 @@ export async function POST(request: Request) {
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
 
-export async function DELETE(request: Request) { if (!await isAdmin()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }); const body = await request.json(); const type = clean(body.type, 20); const id = clean(body.id, 80); if (type === 'ban') await pool.query('DELETE FROM "banned_user" WHERE "id"=$1', [id]); if (type === 'game') await pool.query('DELETE FROM "published_game" WHERE "id"=$1', [id]); return NextResponse.json({ ok: true }) }
+export async function DELETE(request: Request) { if (!await isAdmin()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }); const body = await request.json(); const type = clean(body.type, 20); const id = clean(body.id, 80); if (type === 'ban') await pool.query('DELETE FROM "banned_user" WHERE "id"=$1', [id]); if (type === 'game') await pool.query('DELETE FROM "published_game" WHERE "id"=$1', [id]); if (type === 'message') await pool.query('DELETE FROM "chat_message" WHERE "id"=$1', [id]); return NextResponse.json({ ok: true }) }
