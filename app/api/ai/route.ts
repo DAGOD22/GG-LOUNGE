@@ -1,5 +1,7 @@
-import { gateway } from '@ai-sdk/gateway'
+import { createGateway } from '@ai-sdk/gateway'
 import { generateText } from 'ai'
+
+const gateway = createGateway({ apiKey: process.env.ai_key })
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
