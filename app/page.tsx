@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap, LayoutGrid, Rows3, Shuffle, ExternalLink, Copy, AlertCircle, Loader2, ChevronLeft, ChevronRight, Sun, Moon, Download, Flag, Flame, Crown, Gift, Monitor, Keyboard, Bug, ThumbsUp, Globe, MessageSquare, Star, Timer, WifiOff, Wifi } from 'lucide-react'
+import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap, LayoutGrid, Rows3, Shuffle, ExternalLink, Copy, AlertCircle, Loader2, ChevronLeft, ChevronRight, Sun, Moon, Download, Flag, Flame, Crown, Gift, Monitor, Keyboard, Bug, ThumbsUp, Globe, MessageSquare, Star, Timer, WifiOff, Wifi, Filter, ArrowUpDown, Eye, EyeOff, ShieldAlert, ListFilter, Users } from 'lucide-react'
 
 type Game = { id: string; title: string; subtitle: string; description: string; genre: string; tone: string; mark: string; color: string; path: string; icon?: string; featured?: boolean }
 
@@ -83,11 +83,8 @@ const games: Game[] = [
   { id: 'minecraftbeta', title: 'Minecraft Beta', subtitle: 'Survive the night.', description: 'A playable beta-style Minecraft — mine, build, survive.', genre: 'Sandbox', tone: 'Blocky', mark: 'MB', color: 'mining', path: '/games/minecraftbeta/index.html' },
   { id: 'riddleschool2', title: 'Riddle School 2', subtitle: 'Escape again.', description: 'Point, click and puzzle your way out — the sequel.', genre: 'Puzzle', tone: 'Story', mark: 'R2', color: 'stack', path: '/games/riddleschool2/index.html' },
   { id: 'riddleschool3', title: 'Riddle School 3', subtitle: 'No skipping class.', description: 'The third escape — trickier puzzles, funnier endings.', genre: 'Puzzle', tone: 'Story', mark: 'R3', color: 'stack', path: '/games/riddleschool3/index.html' },
-  { id: 'bad-ice-cream-2', title: 'Bad Ice Cream 2', subtitle: 'Double chill.', description: 'More mazes, more fruit, more chaos — solo or co-op.', genre: 'Arcade', tone: 'Retro', mark: 'I2', color: 'hextris', path: '/games/bad-ice-cream-2/index.html' },
   { id: 'bad-ice-cream-3', title: 'Bad Ice Cream 3', subtitle: 'Triple chill.', description: 'The iciest one yet — 40 levels of fruity mayhem.', genre: 'Arcade', tone: 'Retro', mark: 'I3', color: 'hextris', path: '/games/bad-ice-cream-3/index.html' },
   { id: 'slope-2', title: 'Slope 2', subtitle: 'Faster. Steeper.', description: 'The sequel to the endless neon slope — even less mercy.', genre: 'Arcade', tone: 'Reflex', mark: 'S2', color: 'hextris', path: '/games/slope-2/index.html' },
-  { id: 'slope-ball', title: 'Slope Ball', subtitle: 'Roll the slope.', description: 'A slope-style ball roller with fresh tracks and traps.', genre: 'Arcade', tone: 'Reflex', mark: 'BL', color: 'stack', path: '/games/slope-ball/index.html' },
-  { id: 'flashtetris', title: 'Tetris Flash', subtitle: 'Stack ’em, classic style.', description: 'The timeless Flash block-stacker — clear lines, chase the score.', genre: 'Puzzle', tone: 'Retro', mark: 'TF', color: 'twenty', path: '/games/flashtetris/index.html' },
   { id: 'twitch-tetris', title: 'Tetris', subtitle: 'Pure blocks.', description: 'A clean modern Tetris — spin, drop, clear.', genre: 'Puzzle', tone: 'Retro', mark: 'TE', color: 'twenty', path: '/games/twitch-tetris/index.html' },
   { id: 'ducklife1', title: 'Duck Life', subtitle: 'Train your duck.', description: 'The original — run, swim and fly to racing glory.', genre: 'Simulation', tone: 'Cute', mark: 'D1', color: 'mining', path: '/games/ducklife1/index.html' },
   { id: 'ducklife3', title: 'Duck Life 3', subtitle: 'Evolve your duck.', description: 'Bigger races, tougher training, champion ducks.', genre: 'Simulation', tone: 'Cute', mark: 'D3', color: 'mining', path: '/games/ducklife3/index.html' },
@@ -122,7 +119,6 @@ const games: Game[] = [
   { id: 'gta-simulator', title: 'GTA Simulator', subtitle: 'City free roam.', description: 'GTA Simulator — drive, drift, evade.', genre: 'Racing', tone: 'Urban', mark: 'GT', color: 'twenty', path: '/games/gta-simulator/index.html' },
   { id: 'gunspin', title: 'Gunspin', subtitle: 'Spin to win.', description: 'Gunspin — shoot recoil to fly.', genre: 'Arcade', tone: 'Physics', mark: 'GS', color: 'devil', path: '/games/gunspin/index.html' },
   { id: 'football-bros', title: 'Football Bros', subtitle: 'Score goals.', description: 'Football Bros — pass, shoot, score.', genre: 'Arcade', tone: 'Sports', mark: 'FB', color: 'mining', path: '/games/football-bros/index.html' },
-  { id: 'real-pool-3d', title: 'Real Pool 3D', subtitle: 'Bank shots.', description: 'Real Pool 3D — aim, shoot, sink.', genre: 'Arcade', tone: 'Precision', mark: 'RP', color: 'mining', path: '/games/real-pool-3d/index.html' },
   { id: 'steep-descent', title: 'Steep Descent', subtitle: 'Downhill rush.', description: 'Steep Descent — ski steep, dodge trees.', genre: 'Racing', tone: 'Snow', mark: 'SD', color: 'hextris', path: '/games/steep-descent/index.html' },
   { id: 'steal-brainrot', title: 'Steal Brainrot', subtitle: 'Meme chaos.', description: 'Steal Brainrot — collect memes, avoid brainrot.', genre: 'Arcade', tone: 'Chaos', mark: 'SB', color: 'youtube', path: '/games/steal-brainrot/index.html' },
   { id: 'rocket-goal-io', title: 'Rocket Goal', subtitle: 'Boost & score.', description: 'Rocket Goal — boost cars, score goals.', genre: 'Arcade', tone: 'Sports', mark: 'RG', color: 'drive', path: '/games/rocket-goal-io/index.html' },
@@ -141,13 +137,8 @@ const games: Game[] = [
   { id: 'drive-online', title: 'Drive Online', subtitle: 'Multiplayer drive.', description: 'Drive Online — cruise with friends.', genre: 'Racing', tone: 'Social', mark: 'DO', color: 'drive', path: '/games/drive-online/index.html' },
   { id: 'extreme-racing', title: 'Extreme Racing', subtitle: 'Extreme speed.', description: 'Extreme Racing — nitro, jump, win.', genre: 'Racing', tone: 'Reflex', mark: 'ER', color: 'devil', path: '/games/extreme-racing/index.html' },
   { id: 'monster-survival', title: 'Monster Survival', subtitle: 'Survive night.', description: 'Monster Survival — survive monsters.', genre: 'Arcade', tone: 'Horror', mark: 'MS', color: 'twenty', path: '/games/monster-survival/index.html' },
-  { id: 'cheese-chompers-3d', title: 'Cheese Chompers 3D', subtitle: 'Chomp cheese.', description: 'Cheese Chompers — chase cheese, avoid cats.', genre: 'Arcade', tone: 'Cute', mark: 'CC', color: 'cookie', path: '/games/cheese-chompers-3d/index.html' },
-  { id: 'spiral-roll', title: 'Spiral Roll', subtitle: 'Roll spiral.', description: 'Spiral Roll — roll ball down spiral.', genre: 'Arcade', tone: 'Reflex', mark: 'SR', color: 'hextris', path: '/games/spiral-roll/index.html' },
-  { id: 'shape-transform', title: 'Shape Transform', subtitle: 'Morph & fit.', description: 'Shape Transform — morph to fit gaps.', genre: 'Puzzle', tone: 'Reflex', mark: 'ST', color: 'stack', path: '/games/shape-transform/index.html' },
-  { id: 'mr-dude', title: 'Mr Dude', subtitle: 'Dude run.', description: 'Mr Dude — run, jump, dodge.', genre: 'Platformer', tone: 'Fun', mark: 'MD', color: 'cookie', path: '/games/mr-dude/index.html' },
   { id: 'obby-shooter', title: 'Obby Shooter', subtitle: 'Obby + gun.', description: 'Obby Shooter — parkour and shoot.', genre: 'Arcade', tone: 'Battle', mark: 'OS', color: 'devil', path: '/games/obby-shooter/index.html' },
   { id: 'helix-jump', title: 'Helix Jump', subtitle: 'Fall through.', description: 'Helix Jump — drop ball through helix.', genre: 'Arcade', tone: 'Reflex', mark: 'HJ', color: 'hextris', path: '/games/helix-jump/index.html' },
-  { id: 'obby-snowboard', title: 'Obby Snowboard', subtitle: 'Snow obby.', description: 'Obby Snowboard — board through obby.', genre: 'Arcade', tone: 'Snow', mark: 'OS', color: 'hextris', path: '/games/obby-snowboard/index.html' },
   { id: 'ninja-parkour', title: 'Ninja Parkour', subtitle: 'Wall run.', description: 'Ninja Parkour — wall run, leap.', genre: 'Platformer', tone: 'Precision', mark: 'NP', color: 'stack', path: '/games/ninja-parkour/index.html' },
   { id: 'color-puzzle', title: 'Color Puzzle', subtitle: 'Sort colors.', description: 'Color Puzzle — sort tubes by color.', genre: 'Puzzle', tone: 'Brain', mark: 'CP', color: 'hextris', path: '/games/color-puzzle/index.html' },
   { id: 'red-vs-blue', title: 'Red vs Blue', subtitle: 'Team battle.', description: 'Red vs Blue — battle arena.', genre: 'Arcade', tone: 'Battle', mark: 'RB', color: 'devil', path: '/games/red-vs-blue/index.html' },
@@ -156,9 +147,7 @@ const games: Game[] = [
   { id: 'bad-simulator', title: 'Bad Simulator', subtitle: 'Be bad.', description: 'Bad Simulator — cause chaos.', genre: 'Arcade', tone: 'Chaos', mark: 'BS', color: 'twenty', path: '/games/bad-simulator/index.html' },
   { id: 'war-the-knights', title: 'War The Knights', subtitle: 'Knight war.', description: 'War The Knights — slash, defend castle.', genre: 'Arcade', tone: 'Battle', mark: 'WK', color: 'devil', path: '/games/war-the-knights/index.html' },
   { id: 'raven-shooting', title: 'Raven Shooting', subtitle: 'Shoot ravens.', description: 'Raven Shooting — aim, shoot ravens.', genre: 'Arcade', tone: 'Aim', mark: 'RS', color: 'stack', path: '/games/raven-shooting/index.html' },
-  { id: 'summer', title: 'Summer Vibes', subtitle: 'Beach fun.', description: 'Summer — beach run, collect shells.', genre: 'Arcade', tone: 'Chill', mark: 'SU', color: 'cookie', path: '/games/summer/index.html' },
   { id: 'ks2-cs', title: 'KS2 CS', subtitle: 'Tactical shoot.', description: 'KS2 CS — tactical shooter.', genre: 'Arcade', tone: 'Battle', mark: 'CS', color: 'stack', path: '/games/ks2-cs/index.html' },
-  { id: 'gta-mods', title: 'GTA Mods', subtitle: 'Modded city.', description: 'GTA Mods — modded GTA fun.', genre: 'Racing', tone: 'Mods', mark: 'GM', color: 'twenty', path: '/games/gta-mods/index.html' },
   { id: 'cb-clicker', title: 'CB Clicker', subtitle: 'Click billions.', description: 'CB Clicker — click to billions.', genre: 'Idle', tone: 'Clicker', mark: 'CB', color: 'cookie', path: '/games/cb-clicker/index.html' },
   { id: 'moto-x3m-winter', title: 'Moto X3M Winter', subtitle: 'Icy stunts.', description: 'Moto X3M Winter — icy stunt racing.', genre: 'Racing', tone: 'Winter', mark: 'MX', color: 'hextris', path: '/games/moto-x3m-winter/index.html' },
   { id: 'a-small-world-cup', title: 'A Small World Cup', subtitle: 'Tap-timing soccer', description: 'Tap to shoot, bend, score — physics cup. 6X classic.', genre: 'Arcade', tone: 'Sports', mark: 'SW', color: 'drive', path: '/games/a-small-world-cup/index.html' },
@@ -204,7 +193,6 @@ const games: Game[] = [
   { id: 'one-escape', title: 'One Escape', subtitle: 'Stealth prison', description: 'Stealth escape — guards, keys, vents.', genre: 'Puzzle', tone: 'Stealth', mark: 'OE', color: 'stack', path: '/games/one-escape/index.html' },
   { id: 'run-rabbit-run', title: 'Run Rabbit Run', subtitle: 'Carrot chase', description: 'Rabbit run — forest dash, carrots.', genre: 'Platformer', tone: 'Runner', mark: 'RR', color: 'cookie', path: '/games/run-rabbit-run/index.html' },
   { id: 'car-driving', title: 'Car Driving', subtitle: 'City drive', description: 'City driving — traffic, park.', genre: 'Racing', tone: 'Sim', mark: 'CD', color: 'drive', path: '/games/car-driving/index.html' },
-  { id: 'spiders', title: 'Spiders', subtitle: 'Web swing', description: 'Swing as spider — webs, prey.', genre: 'Arcade', tone: 'Swing', mark: 'SP', color: 'mining', path: '/games/spiders/index.html' },
   { id: 'short-ride', title: 'Short Ride', subtitle: 'Bike pain', description: 'Bike through pain parkour — saws.', genre: 'Racing', tone: 'Ragdoll', mark: 'SR', color: 'devil', path: '/games/short-ride/index.html' },
   { id: 'the-little-giant', title: 'The Little Giant', subtitle: 'Grow giant', description: 'Twin-stick — stomp, grow bigger.', genre: 'Arcade', tone: 'Grow', mark: 'LG', color: 'stack', path: '/games/the-little-giant/index.html' },
   { id: 'swerve', title: 'SWERVE', subtitle: 'Swerve pad', description: 'Swerve, collect, stay on track.', genre: 'Arcade', tone: 'Reflex', mark: 'SW', color: 'hextris', path: '/games/swerve/index.html' },
@@ -238,6 +226,9 @@ const PROXY_TILES = [
   { id:'tk', label:'TikTok', sub:'Shorts feed', href:'/proxy', icon:'♪', color:'#00f2ea', url:'https://www.tiktok.com' },
 ]
 type RequestItem = { id:string; title:string; votes:number; status:string }
+const STAFF_PICKS = ['cookie-clicker','retro-bowl','among-us','stack','hole-io','moto-x3m','drive-mad','vortex-tunnel']
+const LOW_QUALITY_HINTS = new Set(['spiral-roll','shape-transform','mr-dude','obby-snowboard','spiders','summer','real-pool-3d','gta-mods','cheese-chompers-3d','flashtetris','bad-ice-cream-2','slope-ball'])
+
 
 
 export default function Page() {
@@ -266,6 +257,11 @@ export default function Page() {
   const [newReqTitle, setNewReqTitle] = useState('')
   const [reportSent, setReportSent] = useState(false)
   const [leaderTab, setLeaderTab] = useState<'today'|'week'>('today')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [sortBy, setSortBy] = useState<'featured'|'popular'|'newest'|'az'>('featured')
+  const [visibleCount, setVisibleCount] = useState(36)
+  const [hideLow, setHideLow] = useState(false)
+  const [showStaffOnly, setShowStaffOnly] = useState(false)
 
   const featuredGames = useMemo(()=> games.filter(g=> FEATURED_IDS.includes(g.id)), [])
 
@@ -329,6 +325,39 @@ export default function Page() {
   useEffect(()=>{ try{ localStorage.setItem('ggl_playcounts', JSON.stringify(playCounts))}catch{}},[playCounts])
   useEffect(()=>{ try{ localStorage.setItem('ggl_req_votes', JSON.stringify(requestVotes))}catch{}},[requestVotes])
   useEffect(()=>{ try{ localStorage.setItem('ggl_theme', theme); document.documentElement.setAttribute('data-theme', theme); }catch{}},[theme])
+  // anonymous id for cloud sync
+  const anonIdRef = useRef<string>('')
+  useEffect(()=>{
+    try{
+      let id = localStorage.getItem('ggl_anon_id')
+      if(!id){ id='anon_'+Math.random().toString(36).slice(2,9)+Date.now().toString(36); localStorage.setItem('ggl_anon_id', id) }
+      anonIdRef.current=id
+      // load cloud state and merge (cloud wins if newer)
+      fetch('/api/user-state?id='+encodeURIComponent(id)).then(r=> r.ok? r.json():null).then((d:any)=>{
+        if(d?.state){
+          const s=d.state
+          if(Array.isArray(s.favorites) && s.favorites.length> favorites.length) setFavorites(s.favorites)
+          if(s.playCounts && Object.keys(s.playCounts).length> Object.keys(playCounts).length) setPlayCounts(s.playCounts)
+        }
+      }).catch(()=>{})
+    }catch{}
+  },[])
+  // sync to cloud debounced
+  useEffect(()=>{
+    const id = anonIdRef.current || (typeof localStorage!=='undefined' ? localStorage.getItem('ggl_anon_id') : '')
+    if(!id) return
+    const h = setTimeout(()=>{
+      fetch('/api/user-state', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ id, favorites, playCounts })}).catch(()=>{})
+    }, 1200)
+    return ()=> clearTimeout(h)
+  },[favorites, playCounts])
+
+  // debounce search 300ms
+  useEffect(()=>{
+    const id=setTimeout(()=> setDebouncedQuery(query), 280)
+    return ()=> clearTimeout(id)
+  },[query])
+  useEffect(()=>{ setVisibleCount(36) },[debouncedQuery, filter, sortBy, hideLow, showStaffOnly])
   // fetch requests for upvote list
   useEffect(()=>{
     fetch('/api/game-requests').then(r=> r.ok? r.json(): null).then((d:any)=>{
@@ -338,14 +367,25 @@ export default function Page() {
 
   const allGames = useMemo(() => [...games, ...published], [published])
   const visibleGames = useMemo(
-    () =>
-      allGames.filter(
+    () => {
+      let base = allGames.filter(
         (game) =>
-          `${game.title} ${game.genre} ${game.tone} ${game.description}`.toLowerCase().includes(query.toLowerCase()) &&
+          `${game.title} ${game.genre} ${game.tone} ${game.description}`.toLowerCase().includes(debouncedQuery.toLowerCase()) &&
           (filter === 'All games' || game.genre === filter || (filter === 'Favorites' && favorites.includes(game.id))),
-      ),
-    [allGames, favorites, filter, query],
+      )
+      if (hideLow) base = base.filter(g=> !LOW_QUALITY_HINTS.has(g.id))
+      if (showStaffOnly) base = base.filter(g=> STAFF_PICKS.includes(g.id))
+      // sorting
+      if (sortBy==='popular') base = [...base].sort((a,b)=> (playCounts[b.id]||0) - (playCounts[a.id]||0))
+      else if (sortBy==='az') base = [...base].sort((a,b)=> a.title.localeCompare(b.title))
+      else if (sortBy==='newest') base = [...base].reverse()
+      // featured first when default
+      else base = [...base].sort((a,b)=> (b.featured?1:0) - (a.featured?1:0))
+      return base
+    },
+    [allGames, favorites, filter, debouncedQuery, playCounts, sortBy, hideLow, showStaffOnly],
   )
+  const paginatedGames = useMemo(()=> visibleGames.slice(0, visibleCount), [visibleGames, visibleCount])
 
   const grouped = useMemo(()=>{
     const map: Record<string, Game[]> = {}
@@ -354,9 +394,9 @@ export default function Page() {
       if(!map[k]) map[k]=[]
       map[k].push(g)
     }
-    // sort keys by count descending, but keep All order stable
     return Object.entries(map).sort((a,b)=> b[1].length - a[1].length)
   }, [visibleGames])
+  const staffGames = useMemo(()=> allGames.filter(g=> STAFF_PICKS.includes(g.id)), [allGames])
 
   const spotlight = featuredGames[spotIdx] || games[0]
   const gameOfDay = useMemo(()=> {
@@ -374,10 +414,22 @@ export default function Page() {
   }, [allGames, favorites, query])
   const leaderboard = useMemo(()=>{
     const entries = allGames.map(g=> ({ game:g, count: playCounts[g.id]||0})).sort((a,b)=> b.count - a.count).slice(0,5)
-    // if no plays, fall back to featured order
     if(entries.every(e=> e.count===0)) return featuredGames.slice(0,5).map((g,i)=> ({ game:g, count: 5-i}))
     return entries
   }, [allGames, playCounts])
+  // JSON-LD for SEO - top games as ItemList
+  const jsonLd = useMemo(()=> ({
+    '@context':'https://schema.org',
+    '@type':'ItemList',
+    name:'GG-Lounge Games',
+    itemListElement: allGames.slice(0,20).map((g,i)=> ({
+      '@type':'ListItem',
+      position:i+1,
+      name:g.title,
+      description:g.description,
+      url: typeof window!=='undefined' ? window.location.origin + '/#'+g.id : '/#'+g.id,
+    }))
+  }), [allGames])
 
   function launch(game: Game) {
     setActiveGame(game)
@@ -440,6 +492,7 @@ export default function Page() {
     try{ await fetch('/api/report', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ upvoteRequestId:id })}) }catch{}
   }
   function openProxyTile(url:string){ window.location.href = '/proxy?url='+encodeURIComponent(url) }
+  function copyGameLink(path:string){ try{ navigator.clipboard.writeText(location.origin+path); }catch{} }
 
   function handleFrameLoad(){
     setFrameLoading(false)
@@ -543,6 +596,8 @@ export default function Page() {
 
   return (
     <main className="lounge-shell">
+      <a href="#games" className="sr-only focus:not-sr-only" style={{position:'absolute',left:12,top:12,zIndex:50,padding:'8px 12px',background:'var(--lime)',color:'#0b0d12',borderRadius:999,fontWeight:900}}>Skip to games</a>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{__html: JSON.stringify(jsonLd)}} />
       <div className="noise" aria-hidden="true" />
       <header className="site-header">
         <a href="#top" className="brand" aria-label="GG-Lounge home">
@@ -755,13 +810,25 @@ export default function Page() {
           <div className="search-wrap">
             <Search size={17} />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles, genres, moods" aria-label="Search games" />
+            {query!==debouncedQuery && <span style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',fontSize:10,color:'var(--muted)',background:'var(--panel)',padding:'2px 6px',borderRadius:999,border:'1px solid var(--line)'}}>…</span>}
           </div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <div style={{display:'flex',gap:6,alignItems:'center',padding:'4px 6px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.04)'}}>
+              <ListFilter size={12}/><span style={{fontSize:11,fontWeight:800}}>Sort</span>
+              <select value={sortBy} onChange={e=> setSortBy(e.target.value as any)} aria-label="Sort games" style={{background:'transparent',color:'var(--foreground)',border:0,fontSize:12,fontWeight:700,outline:'none'}}>
+                <option value="featured">Featured</option>
+                <option value="popular">Most played</option>
+                <option value="newest">Newest</option>
+                <option value="az">A-Z</option>
+              </select>
+            </div>
             <div className="view-toggle" role="group" aria-label="View toggle">
               <button className={view==='shelves'?'active':''} onClick={()=> setView('shelves')} aria-label="Shelves view"><Rows3 size={16}/> Shelves</button>
               <button className={view==='grid'?'active':''} onClick={()=> setView('grid')} aria-label="Grid view"><LayoutGrid size={16}/> Grid</button>
             </div>
             <button onClick={shufflePick} className="btn-mini" title="Random game"><Shuffle size={14}/> Shuffle</button>
+            <button onClick={()=> setHideLow(v=>!v)} aria-pressed={hideLow} title="Hide low quality duplicates" style={{padding:'6px 10px',borderRadius:999,border: hideLow?'1px solid var(--lime)':'1px solid var(--line)',background: hideLow?'var(--lime)':'rgba(255,255,255,.06)',color: hideLow?'#0b0d12':'var(--foreground)',fontWeight:800,fontSize:11,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><Filter size={12}/>{hideLow?'Filtered':'Filter duplicates'}</button>
+            <button onClick={()=> setShowStaffOnly(v=>!v)} aria-pressed={showStaffOnly} title="Staff picks only" style={{padding:'6px 10px',borderRadius:999,border: showStaffOnly?'1px solid var(--lime)':'1px solid var(--line)',background: showStaffOnly?'var(--lime)':'rgba(255,255,255,.06)',color: showStaffOnly?'#0b0d12':'var(--foreground)',fontWeight:800,fontSize:11,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><Star size={12} fill={showStaffOnly?'currentColor':'none'}/>{showStaffOnly?'Staff only':'All'}</button>
           </div>
         </div>
         <div className="filter-tabs" role="tablist" aria-label="Filter games">
@@ -773,8 +840,31 @@ export default function Page() {
         </div>
 
         {/* Content */}
-        {view === 'shelves' && filter==='All games' && !query ? (
+        {view === 'shelves' && filter==='All games' && !debouncedQuery ? (
           <div className="shelves">
+            <div className="shelf">
+              <div className="shelf-head">
+                <h3><Star size={14} fill="var(--lime)" color="var(--lime)"/> Staff Picks <span>{staffGames.length}</span></h3>
+                <div className="shelf-actions"><span style={{fontSize:11,color:'var(--muted)',fontWeight:700}}>Hand-curated • no filler</span></div>
+              </div>
+              <div className="shelf-track" style={{contentVisibility:'auto'}}>
+                {staffGames.map((game,i)=> (
+                  <article className={`shelf-card-art ${game.color}`} key={`staff-${game.id}`} style={{contentVisibility:'auto',border: game.featured?'1px solid var(--lime)':undefined}}>
+                    <button className="favorite-button" onClick={()=> toggleFavorite(game.id)} aria-label={`${favorites.includes(game.id)?'Remove':'Add'} ${game.title}`}><Heart size={15} fill={favorites.includes(game.id)?'currentColor':'none'}/></button>
+                    <div className="shelf-art" onClick={()=> launch(game)} role="button" tabIndex={0} aria-label={`Play ${game.title}`} onKeyDown={e=> e.key==='Enter'&&launch(game)}>
+                      {game.icon ? <img className="game-icon" src={game.icon} alt={`${game.title} icon`} loading="lazy" style={{width:56,height:56}}/> : <span className="game-mark" style={{fontSize:32}} aria-hidden="true">{game.mark}</span>}
+                      <small aria-hidden="true">★ {String(i+1).padStart(2,'0')}</small>
+                    </div>
+                    <div className="shelf-info">
+                      <p className="card-kicker" style={{fontSize:9}}>{game.genre} · {game.tone}</p>
+                      <h4 onClick={()=> launch(game)} style={{cursor:'pointer'}}>{game.title}</h4>
+                      <p>{game.description}</p>
+                      <button className="play-button" onClick={()=> launch(game)} aria-label={`Play ${game.title}`}><Play size={12} fill="currentColor"/> Play</button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
             {grouped.map(([genre, list])=> (
               <div key={genre} className="shelf">
                 <div className="shelf-head">
@@ -785,13 +875,13 @@ export default function Page() {
                     <button className="btn-mini" onClick={()=> setFilter(genre)}>View all</button>
                   </div>
                 </div>
-                <div className="shelf-track">
-                  {list.map((game, index)=> (
-                    <article className={`shelf-card-art ${game.color}`} key={game.id}>
+                <div className="shelf-track" style={{contentVisibility:'auto'}}>
+                  {list.slice(0,14).map((game, index)=> (
+                    <article className={`shelf-card-art ${game.color}`} key={game.id} style={{contentVisibility:'auto'}}>
                       <button className="favorite-button" onClick={()=> toggleFavorite(game.id)} aria-label={`${favorites.includes(game.id)?'Remove':'Add'} ${game.title}`}><Heart size={15} fill={favorites.includes(game.id)?'currentColor':'none'}/></button>
-                      <div className="shelf-art" onClick={()=> launch(game)} role="button" tabIndex={0} onKeyDown={e=> e.key==='Enter'&&launch(game)}>
-                        {game.icon ? <img className="game-icon" src={game.icon} alt="" style={{width:56,height:56}}/> : <span className="game-mark" style={{fontSize:32}}>{game.mark}</span>}
-                        <small>{String(index+1).padStart(2,'0')}</small>
+                      <div className="shelf-art" onClick={()=> launch(game)} role="button" tabIndex={0} aria-label={`Play ${game.title}`} onKeyDown={e=> e.key==='Enter'&&launch(game)}>
+                        {game.icon ? <img className="game-icon" src={game.icon} alt={`${game.title} icon`} loading="lazy" style={{width:56,height:56}}/> : <span className="game-mark" style={{fontSize:32}} aria-hidden="true">{game.mark}</span>}
+                        <small aria-hidden="true">{String(index+1).padStart(2,'0')}</small>
                       </div>
                       <div className="shelf-info">
                         <p className="card-kicker" style={{fontSize:9}}>{game.genre} · {game.tone}</p>
@@ -808,9 +898,9 @@ export default function Page() {
           </div>
         ) : (
           <>
-            <div className={query || filter!=='All games' ? 'game-grid' : 'game-grid'}>
-              {visibleGames.map((game, index) => (
-                <article className={`game-card ${game.color}`} key={game.id}>
+            <div className={query || filter!=='All games' ? 'game-grid' : 'game-grid'} style={{contentVisibility:'auto',containIntrinsicSize:'0 600px'}}>
+              {paginatedGames.map((game, index) => (
+                <article className={`game-card ${game.color}`} key={game.id} style={{contentVisibility:'auto'}}>
                   <button
                     className="favorite-button"
                     onClick={() => toggleFavorite(game.id)}
@@ -818,13 +908,13 @@ export default function Page() {
                   >
                     <Heart size={17} fill={favorites.includes(game.id) ? 'currentColor' : 'none'} />
                   </button>
-                  <div className="game-art" onClick={()=> launch(game)} role="button" tabIndex={0} onKeyDown={e=> e.key==='Enter'&&launch(game)} style={{cursor:'pointer'}}>
+                  <div className="game-art" onClick={()=> launch(game)} role="button" tabIndex={0} aria-label={`Play ${game.title}`} onKeyDown={e=> e.key==='Enter'&&launch(game)} style={{cursor:'pointer'}}>
                     {game.icon ? (
-                      <img className="game-icon" src={game.icon} alt="" />
+                      <img className="game-icon" src={game.icon} alt={`${game.title} icon`} loading="lazy" decoding="async" />
                     ) : (
-                      <span className="game-mark">{game.mark}</span>
+                      <span className="game-mark" aria-hidden="true">{game.mark}</span>
                     )}
-                    <small>{String(index + 1).padStart(2, '0')}</small>
+                    <small aria-hidden="true">{String(index + 1).padStart(2, '0')}</small>
                   </div>
                   <div className="game-info">
                     <div>
@@ -841,12 +931,18 @@ export default function Page() {
               ))}
             </div>
             {visibleGames.length === 0 && (
-              <div className="empty-state">
+              <div className="empty-state" role="status" aria-live="polite">
                 <Zap size={22} />
                 <h3>No games found</h3>
                 <p>Try a different search or clear the filter.</p>
               </div>
             )}
+            {visibleGames.length > paginatedGames.length && (
+              <div style={{display:'flex',justifyContent:'center',marginTop:18}}>
+                <button onClick={()=> setVisibleCount(c=> c+36)} style={{padding:'10px 18px',borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',color:'var(--foreground)',fontWeight:800,cursor:'pointer'}}>Load more — {visibleGames.length - paginatedGames.length} remaining</button>
+              </div>
+            )}
+            <p style={{textAlign:'center',marginTop:10,fontSize:11,color:'var(--muted)'}} aria-live="polite">Showing {paginatedGames.length} of {visibleGames.length} • {allGames.length} total</p>
           </>
         )}
       {/* Requests + Upvotes */}
@@ -894,7 +990,7 @@ export default function Page() {
         <span>Admin</span>
       </a>
       {activeGame && (
-        <div className="game-modal" role="dialog" aria-modal="true" aria-label={`${activeGame.title} game`} onClick={(e)=>{ if(e.target===e.currentTarget) setActiveGame(null)}}>
+        <div className="game-modal" role="dialog" aria-modal="true" aria-label={`${activeGame.title} game — ${activeGame.genre} ${activeGame.tone}`} onClick={(e)=>{ if(e.target===e.currentTarget) setActiveGame(null)}}>
           <div className="modal-bar">
             <div style={{display:'flex',alignItems:'center',gap:12,minWidth:0}}>
               <span className={`game-badge ${activeGame.color}`}>{activeGame.mark}</span>

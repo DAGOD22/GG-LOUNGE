@@ -4,9 +4,37 @@ import './globals.css'
 import GlobalSW from './global-sw'
 
 export const metadata: Metadata = {
-  title: 'GG-Lounge — Small games. Big energy.',
-  description: 'GG-LOUNGE™ is an independent browser arcade featuring ten handpicked games. A production of GG-LOUNGE STUDIOS™.',
-  generator: 'v0.app',
+  title: {
+    default: 'GG-Lounge — 200+ Unblocked Games',
+    template: '%s | GG-Lounge',
+  },
+  description: '200+ unblocked browser games — Slope, Retro Bowl, Stack, Hole.io, Moto X3M, 1v1.LOL and more. Fast, no login, proxy-unblocked for school.',
+  keywords: ['unblocked games','slope','retro bowl','stack','hole.io','moto x3m','1v1.lol','proxy games','school games','GG Lounge'],
+  authors: [{ name: 'GG-Lounge Studios', url: 'https://gg-lounge.example.com' }],
+  creator: 'GG-Lounge Studios',
+  publisher: 'GG-Lounge Studios',
+  formatDetection: { email: false, address: false, telephone: false },
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://gg-lounge.example.com'),
+  alternates: { canonical: '/' },
+  openGraph: {
+    title: 'GG-Lounge — 200+ Unblocked Games',
+    description: '200+ unblocked games for school — fast, proxy-powered, no login.',
+    url: '/',
+    siteName: 'GG-Lounge',
+    images: [{ url: '/placeholder-logo.png', width: 1200, height: 630, alt: 'GG Lounge' }],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'GG-Lounge — 200+ Unblocked Games',
+    description: '200+ unblocked games, proxy-powered.',
+    images: ['/placeholder-logo.png'],
+  },
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large' } },
+  verification: { google: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION || undefined },
+  category: 'games',
+  generator: 'GG-Lounge',
 }
 
 export const viewport: Viewport = {
@@ -31,6 +59,20 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('ggl_theme');if(t){document.documentElement.setAttribute('data-theme',t);document.documentElement.style.colorScheme=t==='light'?'light':'dark'}else if(window.matchMedia('(prefers-color-scheme: light)').matches){document.documentElement.setAttribute('data-theme','light')} }catch(e){}})();`,
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'WebSite',
+              name: 'GG-Lounge',
+              url: process.env.NEXT_PUBLIC_SITE_URL || 'https://gg-lounge.example.com',
+              description: '200+ unblocked browser games',
+              publisher: { '@type': 'Organization', name: 'GG-Lounge Studios' },
+              potentialAction: { '@type': 'SearchAction', target: '/?q={search_term_string}', 'query-input': 'required name=search_term_string' },
+            }),
           }}
         />
       </head>

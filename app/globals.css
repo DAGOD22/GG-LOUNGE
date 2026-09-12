@@ -236,3 +236,23 @@
 .controls-toggle{padding:7px 12px;border-radius:99px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#fff;font-size:11px;font-weight:800;cursor:pointer}
 .controls-toggle.active{background:var(--lime);color:#111;border-color:var(--lime)}
 @media(max-width:760px){.touch-controls.show{display:flex}.modal-actions{gap:6px}.modal-actions button{width:34px;height:34px}}
+/* --- A11y & Performance fixes --- */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.sr-only.focus\:not-sr-only:focus{position:static;width:auto;height:auto;margin:0;overflow:visible;clip:auto;white-space:normal}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+  .orbit{display:none}
+}
+:focus-visible{outline:2px solid var(--lime);outline-offset:3px;box-shadow:0 0 0 4px rgba(215,243,74,.2)}
+button:focus-visible,a:focus-visible{outline:2px solid var(--lime)}
+/* High contrast for light mode */
+[data-theme="light"] .search-wrap input::placeholder{color:#9ca3af}
+[data-theme="light"] .game-card:hover{border-color:rgba(17,17,24,.18);box-shadow:0 12px 30px rgba(0,0,0,.08)}
+/* Content visibility for performance */
+.game-card,.shelf-card-art{content-visibility:auto;contain-intrinsic-size:0 260px}
+/* Offline banner already inline, but global fallback */
+.offline-fallback{padding:12px;text-align:center;background:rgba(255,92,92,.08);border:1px solid rgba(255,92,92,.2);border-radius:12px;color:var(--foreground)}
+/* Pagination load more */
+.btn-load{padding:10px 18px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--foreground);font-weight:800;cursor:pointer}
+.btn-load:hover{border-color:var(--lime);background:rgba(215,243,74,.1)}
+

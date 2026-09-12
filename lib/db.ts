@@ -153,6 +153,7 @@ interface LocalStore {
   requests: GameRequest[];
   games: PublishedGame[];
   reports: Report[];
+  userStates: Record<string, UserState>;
 }
 
 let localDir: string | null = null;
@@ -187,9 +188,10 @@ async function readLocal(): Promise<LocalStore> {
       requests: parsed.requests ?? [],
       games: parsed.games ?? [],
       reports: (parsed as any).reports ?? [],
+      userStates: (parsed as any).userStates ?? {},
     };
   } catch {
-    return { bans: [], visits: [], requests: [], games: [], reports: [] };
+    return { bans: [], visits: [], requests: [], games: [], reports: [], userStates: {} };
   }
 }
 
@@ -319,6 +321,8 @@ export function validateGameHtml(html: string): string | null {
   if (!html || typeof html !== "string") return "Missing game HTML.";
   if (html.length > MAX_HTML_BYTES) return "Game file is too large (50MB max).";
   if (!/<html[\s>]/i.test(html)) return "That file doesn't look like an index.html page.";
+  const risks = scanHtmlForRisks(html)
+  if (risks.includes("external-script") && html.length> 500_000) return "External scripts need manual review — flagged for admin.";
   return null;
 }
 
@@ -399,6 +403,45 @@ export async function leaderboard(limit=10): Promise<{gameId:string,count:number
   for(const v of s.visits) if(v.path.startsWith('/play/')) map[v.path.slice(6)] = (map[v.path.slice(6)]||0)+1
   return Object.entries(map).sort((a,b)=> b[1]-a[1]).slice(0,limit).map(([gameId,count])=> ({gameId,count}))
 }
+// --- Moderation & user state ---
+export function scanHtmlForRisks(html:string): string[] {
+  const risks:string[]=[]
+  if(/<script[^>]*src=["']https?:\/\/[^"']+["']/i.test(html)) risks.push("external-script")
+  if(/eval\s*\(|Function\s*\(|\bimport\s*\(/i.test(html)) risks.push("obfuscated-code")
+  if(/fetch\s*\(\s*["']https?:/i.test(html)) risks.push("external-fetch")
+  if(/<iframe[^>]*src=["']https?:/i.test(html)) risks.push("iframe-embed")
+  if(html.length> 2_000_000) risks.push("large-file")
+  return risks
+}
+export interface UserState { id:string; favorites:string[]; playCounts:Record<string,number>; updatedAt:string }
+export async function getUserState(id:string): Promise<UserState|null>{
+  if(getMode()==="postgres"){
+    try{
+      const rows = await pgQuery<{payload:string}>('SELECT payload FROM user_state WHERE id=$1',[id])
+      if(rows[0]?.payload) return JSON.parse(rows[0].payload as string)
+    }catch{}
+    return null
+  }
+  const s = await readLocal() as any
+  const map = (s.userStates||{}) as Record<string,UserState>
+  return map[id]||null
+}
+export async function setUserState(id:string, state: Omit<UserState,'id'|'updatedAt'>): Promise<UserState>{
+  const full: UserState = { id, ...state, updatedAt: new Date().toISOString() }
+  if(getMode()==="postgres"){
+    try{
+      await pgQuery('CREATE TABLE IF NOT EXISTS user_state (id TEXT PRIMARY KEY, payload TEXT NOT NULL, updatedAt TIMESTAMPTZ NOT NULL DEFAULT NOW())')
+      await pgQuery('INSERT INTO user_state (id,payload) VALUES ($1,$2) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload, updatedAt=NOW()',[id, JSON.stringify(full)])
+    }catch{}
+    return full
+  }
+  const store = await readLocal() as any
+  store.userStates = store.userStates || {}
+  store.userStates[id]=full
+  await writeLocal(store)
+  return full
+}
+
 
 export async function listRequests(): Promise<GameRequest[]> {
   if (getMode() === "postgres") {
