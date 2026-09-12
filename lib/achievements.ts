@@ -209,7 +209,160 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'paper_10_percent', gameId: 'poki', title: 'Land Grab', description: 'Claim 10% of the map', icon: '🗺️', tier: 'bronze', target: 10, unit: 'percent', points: 10, rarity: 'common' },
   { id: 'paper_50_percent', gameId: 'poki', title: 'Conqueror', description: 'Claim 50% of the map', icon: '🏴', tier: 'silver', target: 50, unit: 'percent', points: 25, rarity: 'rare' },
   { id: 'paper_5_kills', gameId: 'poki', title: 'Tail Cutter', description: 'Eliminate 5 players', icon: '✂️', tier: 'silver', target: 5, unit: 'kills', points: 20, rarity: 'common' },
-  { id: 'paper_win', gameId: 'poki', title: 'Paper Master', description: 'Win a game (100%)', icon: '👑', tier: 'platinum', target: 1, unit: 'wins', points: 50, rarity: 'epic' },
+  { id: 'paper_win', gameId: 'poki', title: 'Paper Master', description: 'Win a game (100%)', icon: '👑', tier: 'platinum', target: 1, unit: 'wins', points: 50, rarity: 'epic' } ,
+
+  // 31. Level Devil
+  { id: 'ld_first_troll', gameId: 'level-devil', title: 'Trolled', description: 'Fall for your first hidden spike — welcome to Level Devil', icon: '😵', tier: 'bronze', target: 1, unit: 'trolls', points: 10, rarity: 'common' },
+  { id: 'ld_5_trolls', gameId: 'level-devil', title: 'Paranoid', description: 'Survive 5 troll levels with eyes wide open', icon: '👀', tier: 'silver', target: 5, unit: 'levels', points: 20, rarity: 'rare' },
+  { id: 'ld_10_levels', gameId: 'level-devil', title: 'Trust No One', description: 'Complete 10 levels without trusting the floor', icon: '🧠', tier: 'silver', target: 10, unit: 'levels', points: 25, rarity: 'rare' },
+  { id: 'ld_no_death', gameId: 'level-devil', title: 'Flawless Trickster', description: 'Beat a level without dying', icon: '✨', tier: 'gold', target: 1, unit: 'flawless', points: 35, rarity: 'epic' },
+  { id: 'ld_speedrun_30', gameId: 'level-devil', title: 'Speed Troll', description: 'Beat a level in under 30 seconds', icon: '⚡', tier: 'gold', target: 30, unit: 'seconds', points: 30, rarity: 'epic' },
+  { id: 'ld_20_deaths', gameId: 'level-devil', title: 'Rage Quit? Never', description: 'Die 20 times and keep coming back', icon: '💀', tier: 'bronze', target: 20, unit: 'deaths', points: 15, rarity: 'common' },
+
+  // 32. Idle Mining Empire
+  { id: 'im_first_ore', gameId: 'idle-mining', title: 'First Nugget', description: 'Mine your first ore', icon: '⛏️', tier: 'bronze', target: 1, unit: 'ores', points: 5, rarity: 'common' },
+  { id: 'im_1000_gold', gameId: 'idle-mining', title: 'Gold Rush', description: 'Earn 1,000 gold', icon: '💰', tier: 'bronze', target: 1000, unit: 'gold', points: 15, rarity: 'common' },
+  { id: 'im_10_upgrades', gameId: 'idle-mining', title: 'Tycoon', description: 'Buy 10 mine upgrades', icon: '🛒', tier: 'silver', target: 10, unit: 'upgrades', points: 20, rarity: 'rare' },
+  { id: 'im_deep_1000', gameId: 'idle-mining', title: 'Deep Diver', description: 'Dig 1000m deep', icon: '🕳️', tier: 'silver', target: 1000, unit: 'meters', points: 25, rarity: 'rare' },
+  { id: 'im_prestige', gameId: 'idle-mining', title: 'Prestige', description: 'Prestige your mine once', icon: '🔄', tier: 'gold', target: 1, unit: 'prestiges', points: 40, rarity: 'epic' },
+  { id: 'im_1m_gold', gameId: 'idle-mining', title: 'Millionaire Miner', description: 'Earn 1,000,000 gold', icon: '🏦', tier: 'platinum', target: 1000000, unit: 'gold', points: 60, rarity: 'legendary' },
+
+  // 33. Stickman Hook
+  { id: 'sh_first_swing', gameId: 'stickman-hook', title: 'First Swing', description: 'Complete first level with a single hook', icon: '🪝', tier: 'bronze', target: 1, unit: 'levels', points: 10, rarity: 'common' },
+  { id: 'sh_10_levels', gameId: 'stickman-hook', title: 'Tarzan', description: 'Swing through 10 levels', icon: '🌴', tier: 'silver', target: 10, unit: 'levels', points: 20, rarity: 'rare' },
+  { id: 'sh_no_fall', gameId: 'stickman-hook', title: 'Grip Master', description: 'Beat a level without falling', icon: '🧗', tier: 'silver', target: 1, unit: 'flawless', points: 25, rarity: 'rare' },
+  { id: 'sh_speed_20', gameId: 'stickman-hook', title: 'Velocity', description: 'Beat a level in under 20 seconds', icon: '💨', tier: 'gold', target: 20, unit: 'seconds', points: 30, rarity: 'epic' },
+  { id: 'sh_50_swings', gameId: 'stickman-hook', title: 'Swing King', description: 'Perform 50 grapple swings', icon: '🔄', tier: 'bronze', target: 50, unit: 'swings', points: 15, rarity: 'common' },
+
+  // 34. Hextris
+  { id: 'hx_first_spin', gameId: 'hextris', title: 'First Spin', description: 'Rotate hex for first line clear', icon: '⬡', tier: 'bronze', target: 1, unit: 'spins', points: 10, rarity: 'common' },
+  { id: 'hx_500_points', gameId: 'hextris', title: 'Hex Apprentice', description: 'Score 500 points', icon: '🔷', tier: 'bronze', target: 500, unit: 'points', points: 15, rarity: 'common' },
+  { id: 'hx_5000_points', gameId: 'hextris', title: 'Hex Master', description: 'Score 5,000 points', icon: '💠', tier: 'silver', target: 5000, unit: 'points', points: 25, rarity: 'rare' },
+  { id: 'hx_10_combos', gameId: 'hextris', title: 'Combo Hex', description: 'Chain 10 combos in a row', icon: '✨', tier: 'gold', target: 10, unit: 'combos', points: 30, rarity: 'epic' },
+  { id: 'hx_survive_60', gameId: 'hextris', title: 'Survivor', description: 'Survive 60 seconds', icon: '⏱️', tier: 'silver', target: 60, unit: 'seconds', points: 20, rarity: 'common' },
+  { id: 'hx_20000', gameId: 'hextris', title: 'Hex Legend', description: 'Score 20,000 points', icon: '👑', tier: 'platinum', target: 20000, unit: 'points', points: 50, rarity: 'legendary' },
+
+  // 35. 2048
+  { id: 'tfe_first_512', gameId: '2048', title: 'Halfway Hero', description: 'Reach 512 tile', icon: '🔢', tier: 'bronze', target: 512, unit: 'tile', points: 10, rarity: 'common' },
+  { id: 'tfe_1024', gameId: '2048', title: '1024!', description: 'Reach 1024 tile', icon: '🧮', tier: 'silver', target: 1024, unit: 'tile', points: 20, rarity: 'rare' },
+  { id: 'tfe_2048', gameId: '2048', title: '2048!', description: 'Reach 2048 tile and win', icon: '🎉', tier: 'gold', target: 2048, unit: 'tile', points: 40, rarity: 'epic' },
+  { id: 'tfe_4096', gameId: '2048', title: '4096 Overkill', description: 'Reach 4096 — beyond the game', icon: '🚀', tier: 'platinum', target: 4096, unit: 'tile', points: 60, rarity: 'legendary' },
+  { id: 'tfe_10_games', gameId: '2048', title: 'Strategist', description: 'Play 10 games', icon: '♟️', tier: 'bronze', target: 10, unit: 'games', points: 10, rarity: 'common' },
+  { id: 'tfe_no_undo', gameId: '2048', title: 'Pure Skill', description: 'Win without undo', icon: '✨', tier: 'gold', target: 1, unit: 'wins', points: 35, rarity: 'epic' },
+
+  // 36. Chrome Dino
+  { id: 'dino_100m', gameId: 'chrome-dino', title: 'First Dash', description: 'Run 100 meters as the dino', icon: '🦖', tier: 'bronze', target: 100, unit: 'meters', points: 10, rarity: 'common' },
+  { id: 'dino_500m', gameId: 'chrome-dino', title: 'Desert Runner', description: 'Run 500 meters', icon: '🏜️', tier: 'silver', target: 500, unit: 'meters', points: 20, rarity: 'rare' },
+  { id: 'dino_2000m', gameId: 'chrome-dino', title: 'Dino Legend', description: 'Run 2000 meters — no internet needed', icon: '🌋', tier: 'gold', target: 2000, unit: 'meters', points: 35, rarity: 'epic' },
+  { id: 'dino_5_birds', gameId: 'chrome-dino', title: 'Duck!', description: 'Dodge 5 pterodactyls', icon: '🦅', tier: 'bronze', target: 5, unit: 'birds', points: 15, rarity: 'common' },
+  { id: 'dino_no_crash_30', gameId: 'chrome-dino', title: 'Cactus Whisperer', description: 'Survive 30 seconds clean', icon: '🌵', tier: 'silver', target: 30, unit: 'seconds', points: 20, rarity: 'common' },
+
+  // 37. Monkey Mart
+  { id: 'mm_first_sale', gameId: 'monkey-mart', title: 'First Sale', description: 'Serve first customer', icon: '🐒', tier: 'bronze', target: 1, unit: 'sales', points: 10, rarity: 'common' },
+  { id: 'mm_100_sales', gameId: 'monkey-mart', title: 'Shopkeeper', description: 'Make 100 sales', icon: '🛒', tier: 'silver', target: 100, unit: 'sales', points: 20, rarity: 'rare' },
+  { id: 'mm_upgrade_5', gameId: 'monkey-mart', title: 'Expansion', description: 'Buy 5 shop upgrades', icon: '🏪', tier: 'silver', target: 5, unit: 'upgrades', points: 20, rarity: 'common' },
+  { id: 'mm_10k_gold', gameId: 'monkey-mart', title: 'Banana Tycoon', description: 'Earn 10,000 coins', icon: '🍌', tier: 'gold', target: 10000, unit: 'coins', points: 35, rarity: 'epic' },
+  { id: 'mm_no_wait', gameId: 'monkey-mart', title: 'Speed Service', description: 'Serve 10 customers with no wait', icon: '⚡', tier: 'gold', target: 10, unit: 'fast', points: 30, rarity: 'rare' },
+
+  // 38. Krunker
+  { id: 'kr_first_kill', gameId: 'krunker', title: 'First Blood', description: 'Get first Krunker kill', icon: '💥', tier: 'bronze', target: 1, unit: 'kills', points: 10, rarity: 'common' },
+  { id: 'kr_25_kills', gameId: 'krunker', title: 'Fragger', description: 'Get 25 kills', icon: '🔫', tier: 'silver', target: 25, unit: 'kills', points: 25, rarity: 'rare' },
+  { id: 'kr_5_wins', gameId: 'krunker', title: 'Lobby Legend', description: 'Win 5 matches', icon: '🏆', tier: 'gold', target: 5, unit: 'wins', points: 35, rarity: 'epic' },
+  { id: 'kr_headshot_10', gameId: 'krunker', title: 'Head Hunter', description: 'Land 10 headshots', icon: '🎯', tier: 'silver', target: 10, unit: 'headshots', points: 20, rarity: 'common' },
+  { id: 'kr_noscope', gameId: 'krunker', title: 'No Scope Hero', description: 'No-scope kill', icon: '👁️', tier: 'gold', target: 1, unit: 'noscopes', points: 30, rarity: 'epic' },
+
+  // 39. SmashKarts
+  { id: 'sk_first_race', gameId: 'smashkarts', title: 'Start Engines', description: 'Finish first SmashKarts race', icon: '🏁', tier: 'bronze', target: 1, unit: 'races', points: 10, rarity: 'common' },
+  { id: 'sk_5_wins', gameId: 'smashkarts', title: 'Podium Finish', description: 'Win 5 races', icon: '🥇', tier: 'silver', target: 5, unit: 'wins', points: 25, rarity: 'rare' },
+  { id: 'sk_10_kills', gameId: 'smashkarts', title: 'Demolition', description: 'Eliminate 10 players with weapons', icon: '💣', tier: 'silver', target: 10, unit: 'kills', points: 20, rarity: 'common' },
+  { id: 'sk_powerup_20', gameId: 'smashkarts', title: 'Power Hungry', description: 'Collect 20 powerups', icon: '⚡', tier: 'bronze', target: 20, unit: 'powerups', points: 15, rarity: 'common' },
+  { id: 'sk_no_hit_win', gameId: 'smashkarts', title: 'Flawless Victory', description: 'Win without getting hit', icon: '🛡️', tier: 'gold', target: 1, unit: 'flawless', points: 40, rarity: 'legendary' },
+
+  // 40. Crossy Road
+  { id: 'cr2_50_steps', gameId: 'crossyroad', title: 'Jaywalker', description: 'Hop 50 steps', icon: '🐥', tier: 'bronze', target: 50, unit: 'steps', points: 10, rarity: 'common' },
+  { id: 'cr2_200_steps', gameId: 'crossyroad', title: 'Commuter', description: 'Hop 200 steps', icon: '🚶', tier: 'silver', target: 200, unit: 'steps', points: 20, rarity: 'rare' },
+  { id: 'cr2_collect_20', gameId: 'crossyroad', title: 'Coin Collector', description: 'Collect 20 coins', icon: '🪙', tier: 'bronze', target: 20, unit: 'coins', points: 15, rarity: 'common' },
+  { id: 'cr2_no_death_100', gameId: 'crossyroad', title: 'Careful Crosser', description: '100 steps without dying', icon: '✨', tier: 'gold', target: 100, unit: 'steps', points: 30, rarity: 'epic' },
+  { id: 'cr2_unlock_char', gameId: 'crossyroad', title: 'Wardrobe', description: 'Unlock a new character', icon: '🎭', tier: 'silver', target: 1, unit: 'unlocks', points: 20, rarity: 'common' },
+
+  // 41. Flappy Bird
+  { id: 'fb_first_pipe', gameId: 'flappy-bird', title: 'First Pipe', description: 'Pass your first pipe', icon: '🐦', tier: 'bronze', target: 1, unit: 'pipes', points: 10, rarity: 'common' },
+  { id: 'fb_10_pipes', gameId: 'flappy-bird', title: 'Flapper', description: 'Pass 10 pipes', icon: '🌬️', tier: 'silver', target: 10, unit: 'pipes', points: 20, rarity: 'rare' },
+  { id: 'fb_30_pipes', gameId: 'flappy-bird', title: 'Sky Master', description: 'Pass 30 pipes in one run', icon: '☁️', tier: 'gold', target: 30, unit: 'pipes', points: 35, rarity: 'epic' },
+  { id: 'fb_5_games', gameId: 'flappy-bird', title: 'Addicted', description: 'Play 5 games', icon: '🔁', tier: 'bronze', target: 5, unit: 'games', points: 10, rarity: 'common' },
+  { id: 'fb_no_crash_20', gameId: 'flappy-bird', title: 'Zen Bird', description: 'Survive 20 pipes without crashing', icon: '🧘', tier: 'gold', target: 20, unit: 'pipes', points: 30, rarity: 'rare' },
+
+  // 42. Run 3
+  { id: 'r3_level_1', gameId: 'run-3', title: 'First Gap', description: 'Beat level 1 in the tunnel', icon: '🏃', tier: 'bronze', target: 1, unit: 'levels', points: 10, rarity: 'common' },
+  { id: 'r3_10_levels', gameId: 'run-3', title: 'Space Runner', description: 'Beat 10 levels', icon: '🌌', tier: 'silver', target: 10, unit: 'levels', points: 25, rarity: 'rare' },
+  { id: 'r3_no_fall', gameId: 'run-3', title: 'Grip', description: 'Beat a level without falling into space', icon: '🛸', tier: 'gold', target: 1, unit: 'flawless', points: 30, rarity: 'epic' },
+  { id: 'r3_20_levels', gameId: 'run-3', title: 'Infinite Runner', description: 'Beat 20 levels', icon: '♾️', tier: 'platinum', target: 20, unit: 'levels', points: 50, rarity: 'legendary' },
+  { id: 'r3_collect_50', gameId: 'run-3', title: 'Hoarder', description: 'Collect 50 power cells', icon: '🔋', tier: 'bronze', target: 50, unit: 'cells', points: 15, rarity: 'common' },
+
+  // 43. Happy Wheels
+  { id: 'hw_first_level', gameId: 'happy-wheels', title: 'First Blood', description: 'Beat first level (or die spectacularly)', icon: '🩸', tier: 'bronze', target: 1, unit: 'levels', points: 10, rarity: 'common' },
+  { id: 'hw_5_levels', gameId: 'happy-wheels', title: 'Survivor', description: 'Beat 5 levels', icon: '🦽', tier: 'silver', target: 5, unit: 'levels', points: 25, rarity: 'rare' },
+  { id: 'hw_no_limb', gameId: 'happy-wheels', title: 'Flesh Wound', description: 'Finish a level missing a limb', icon: '🦾', tier: 'gold', target: 1, unit: 'wins', points: 35, rarity: 'epic' },
+  { id: 'hw_20_deaths', gameId: 'happy-wheels', title: 'Ragdoll Science', description: 'Die 20 times for science', icon: '💀', tier: 'bronze', target: 20, unit: 'deaths', points: 15, rarity: 'common' },
+  { id: 'hw_perfect', gameId: 'happy-wheels', title: 'Unscathed', description: 'Win without losing limbs', icon: '✨', tier: 'platinum', target: 1, unit: 'flawless', points: 45, rarity: 'legendary' },
+
+  // 44. Wordle
+  { id: 'wd_first_win', gameId: 'wordle', title: 'Wordsmith', description: 'Guess your first word correctly', icon: '📝', tier: 'bronze', target: 1, unit: 'wins', points: 10, rarity: 'common' },
+  { id: 'wd_5_wins', gameId: 'wordle', title: 'Vocabulary', description: 'Win 5 games', icon: '📚', tier: 'silver', target: 5, unit: 'wins', points: 20, rarity: 'rare' },
+  { id: 'wd_no_hint_win', gameId: 'wordle', title: 'Pure Brain', description: 'Win in 2 guesses', icon: '🧠', tier: 'gold', target: 1, unit: 'wins', points: 35, rarity: 'epic' },
+  { id: 'wd_streak_3', gameId: 'wordle', title: 'Streak Starter', description: 'Win 3 in a row', icon: '🔥', tier: 'gold', target: 3, unit: 'streak', points: 30, rarity: 'rare' },
+  { id: 'wd_20_games', gameId: 'wordle', title: 'Librarian', description: 'Play 20 games', icon: '🏛️', tier: 'bronze', target: 20, unit: 'games', points: 15, rarity: 'common' },
+
+  // 45. Granny
+  { id: 'gr_escape', gameId: 'granny', title: 'Escape!', description: 'Escape Granny’s house', icon: '🏚️', tier: 'gold', target: 1, unit: 'escapes', points: 40, rarity: 'epic' },
+  { id: 'gr_5_minutes', gameId: 'granny', title: 'Hiding Expert', description: 'Survive 5 minutes', icon: '⏳', tier: 'silver', target: 300, unit: 'seconds', points: 25, rarity: 'rare' },
+  { id: 'gr_find_key', gameId: 'granny', title: 'Key Hunter', description: 'Find the padlock key', icon: '🔑', tier: 'bronze', target: 1, unit: 'keys', points: 15, rarity: 'common' },
+  { id: 'gr_no_sound', gameId: 'granny', title: 'Silent Escape', description: 'Escape without making a sound', icon: '🤫', tier: 'platinum', target: 1, unit: 'stealth', points: 50, rarity: 'legendary' },
+  { id: 'gr_10_games', gameId: 'granny', title: 'Frequent Visitor', description: 'Play 10 times and live', icon: '👵', tier: 'bronze', target: 10, unit: 'games', points: 10, rarity: 'common' },
+
+  // 46. Snow Rider 3D
+  { id: 'sr3d_500m', gameId: 'snow-rider-3d', title: 'Fresh Powder', description: 'Ride 500 meters', icon: '🏂', tier: 'bronze', target: 500, unit: 'meters', points: 15, rarity: 'common' },
+  { id: 'sr3d_2000m', gameId: 'snow-rider-3d', title: 'Alpine Legend', description: 'Ride 2000 meters', icon: '🏔️', tier: 'silver', target: 2000, unit: 'meters', points: 25, rarity: 'rare' },
+  { id: 'sr3d_10_gifts', gameId: 'snow-rider-3d', title: 'Gift Hunter', description: 'Collect 10 gifts', icon: '🎁', tier: 'bronze', target: 10, unit: 'gifts', points: 20, rarity: 'common' },
+  { id: 'sr3d_no_crash_30', gameId: 'snow-rider-3d', title: 'Carve', description: 'Ride 30 seconds without crashing', icon: '❄️', tier: 'gold', target: 30, unit: 'seconds', points: 30, rarity: 'epic' },
+  { id: 'sr3d_50_tricks', gameId: 'snow-rider-3d', title: 'Stylish', description: 'Land 50 tricks', icon: '🤸', tier: 'silver', target: 50, unit: 'tricks', points: 20, rarity: 'common' },
+
+  // 47. N-GON
+  { id: 'ng_first_level', gameId: 'n-gon', title: 'N-Goner', description: 'Beat first portal', icon: '🔺', tier: 'bronze', target: 1, unit: 'levels', points: 10, rarity: 'common' },
+  { id: 'ng_10_levels', gameId: 'n-gon', title: 'Geometer', description: 'Beat 10 levels', icon: '📐', tier: 'silver', target: 10, unit: 'levels', points: 25, rarity: 'rare' },
+  { id: 'ng_no_death_5', gameId: 'n-gon', title: 'Precision Portal', description: 'Clear 5 levels without dying', icon: '✨', tier: 'gold', target: 5, unit: 'flawless', points: 35, rarity: 'epic' },
+  { id: 'ng_speedrun', gameId: 'n-gon', title: 'Quick Maths', description: 'Beat a level in under 30 seconds', icon: '⚡', tier: 'gold', target: 30, unit: 'seconds', points: 30, rarity: 'rare' },
+  { id: 'ng_20_levels', gameId: 'n-gon', title: 'The Theorem', description: 'Beat 20 levels', icon: '🏆', tier: 'platinum', target: 20, unit: 'levels', points: 50, rarity: 'legendary' },
+
+  // 48. Minecraft Classic
+  { id: 'mc_first_block', gameId: 'minecraft-classic', title: 'Punch a Tree', description: 'Break your first block', icon: '🌳', tier: 'bronze', target: 1, unit: 'blocks', points: 10, rarity: 'common' },
+  { id: 'mc_100_blocks', gameId: 'minecraft-classic', title: 'Miner', description: 'Break 100 blocks', icon: '⛏️', tier: 'silver', target: 100, unit: 'blocks', points: 20, rarity: 'rare' },
+  { id: 'mc_build_50', gameId: 'minecraft-classic', title: 'Builder', description: 'Place 50 blocks', icon: '🏗️', tier: 'silver', target: 50, unit: 'blocks', points: 20, rarity: 'common' },
+  { id: 'mc_house', gameId: 'minecraft-classic', title: 'Home Sweet Home', description: 'Build a house', icon: '🏠', tier: 'gold', target: 1, unit: 'houses', points: 35, rarity: 'epic' },
+  { id: 'mc_diamond', gameId: 'minecraft-classic', title: 'Diamond Seeker', description: 'Dig down and find the diamond layer', icon: '💎', tier: 'platinum', target: 1, unit: 'finds', points: 50, rarity: 'legendary' },
+
+  // 49. Draw Climber
+  { id: 'dc_first_draw', gameId: 'draw-climber', title: 'First Legs', description: 'Draw your first wobbly legs', icon: '✏️', tier: 'bronze', target: 1, unit: 'draws', points: 10, rarity: 'common' },
+  { id: 'dc_10_levels', gameId: 'draw-climber', title: 'Artist', description: 'Beat 10 levels', icon: '🎨', tier: 'silver', target: 10, unit: 'levels', points: 20, rarity: 'rare' },
+  { id: 'dc_speed_20', gameId: 'draw-climber', title: 'Speed Sketch', description: 'Beat a level in under 20 seconds', icon: '⚡', tier: 'gold', target: 20, unit: 'seconds', points: 30, rarity: 'epic' },
+  { id: 'dc_no_retry', gameId: 'draw-climber', title: 'One Shot', description: 'Beat a level first try', icon: '✨', tier: 'silver', target: 1, unit: 'flawless', points: 25, rarity: 'rare' },
+  { id: 'dc_30_draws', gameId: 'draw-climber', title: 'Sketcher', description: 'Draw 30 times', icon: '🖌️', tier: 'bronze', target: 30, unit: 'draws', points: 15, rarity: 'common' },
+
+  // 50. Piano Tiles
+  { id: 'pt_first_song', gameId: 'piano-tiles', title: 'First Note', description: 'Complete your first song', icon: '🎹', tier: 'bronze', target: 1, unit: 'songs', points: 10, rarity: 'common' },
+  { id: 'pt_50_tiles', gameId: 'piano-tiles', title: 'Tapper', description: 'Tap 50 black tiles', icon: '🎵', tier: 'bronze', target: 50, unit: 'tiles', points: 15, rarity: 'common' },
+  { id: 'pt_500_tiles', gameId: 'piano-tiles', title: 'Virtuoso', description: 'Tap 500 tiles without missing', icon: '🎼', tier: 'silver', target: 500, unit: 'tiles', points: 25, rarity: 'rare' },
+  { id: 'pt_no_miss_30', gameId: 'piano-tiles', title: 'Perfect Pitch', description: 'Hit 30 tiles in a row', icon: '✨', tier: 'gold', target: 30, unit: 'perfect', points: 35, rarity: 'epic' },
+  { id: 'pt_5_stars', gameId: 'piano-tiles', title: 'Maestro', description: 'Get 5 stars on a song', icon: '⭐', tier: 'platinum', target: 1, unit: 'stars', points: 45, rarity: 'legendary' },
+
+  // BONUS: Extra hidden & mastery for existing favorites (makes old ones not horrible)
+  { id: 'cc_1m_cookies', gameId: 'cookie-clicker', title: 'Cookieverse', description: 'Bake 1,000,000 cookies — the factory never sleeps', icon: '🌌', tier: 'diamond', target: 1000000, unit: 'cookies', points: 100, rarity: 'legendary' },
+  { id: 'cc_golden_cookie', gameId: 'cookie-clicker', title: 'Golden Touch', description: 'Click a golden cookie', icon: '🌟', tier: 'gold', target: 1, unit: 'golden', points: 35, rarity: 'epic' },
+  { id: 'slope_2500m', gameId: 'slope', title: 'Beyond Neon', description: 'Travel 2,500 meters — are you even human?', icon: '🚀', tier: 'diamond', target: 2500, unit: 'meters', points: 70, rarity: 'legendary' },
+  { id: 'stack_100', gameId: 'stack', title: 'Heaven Piercer', description: 'Stack 100 blocks perfectly', icon: '🏙️', tier: 'diamond', target: 100, unit: 'blocks', points: 80, rarity: 'legendary' },
+  { id: 'gd_100_attempts', gameId: 'geometry-dash', title: 'Masochist', description: 'Attempt a level 100 times', icon: '😵', tier: 'platinum', target: 100, unit: 'attempts', points: 50, rarity: 'epic' },
+  { id: 'hole_500_eats', gameId: 'holeio', title: 'Consume Everything', description: 'Eat 500 objects in total', icon: '🕳️✨', tier: 'diamond', target: 500, unit: 'eats', points: 80, rarity: 'legendary' },
+
 ]
 
 export function getAchievementsForGame(gameId: string): Achievement[] {

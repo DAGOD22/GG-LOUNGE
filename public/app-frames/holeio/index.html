@@ -27,7 +27,7 @@
   function setBare(b){try{localStorage.setItem('gg_bare',b);}catch(e){} try{document.cookie='gg_bare='+encodeURIComponent(b)+'; path=/; max-age=86400; samesite=lax';}catch(e){} try{if(self.__uv$config) self.__uv$config.bare=b.endsWith('/')?b:b+'/';}catch(e){}}
   async function probeBare(u){try{var r=await fetch(u,{cache:'no-store',signal:AbortSignal.timeout(3500)});return r.ok;}catch(e){return false;}}
   async function chooseBare(target){var cur=getBare(); try{if(await probeBare(cur)) return cur;}catch(e){} for(var i=0;i<PUBLIC_BARES.length;i++){var cand=PUBLIC_BARES[i];try{if(await probeBare(cand)){setBare(cand);return cand;}}catch(e){}} return cur;}
-  function showErr(msg,bare){if(errEl){errEl.style.display='block';errEl.innerHTML='<b>'+(msg||'waiting')+'</b>'+(bare?'<br><span style="opacity:.7">bare: '+bare+'</span>':'')+'<br><span style="opacity:.6">hole-io.com now shows only a download page (Voodoo moved the browser build) — we use playable mirrors that still host the Unity build. Click Local for instant offline play.</span>';}}
+  function showErr(msg,bare){if(errEl){errEl.style.display='block';errEl.innerHTML='<b>'+(msg||'Connecting…')+'</b><br><span style="opacity:.7">Trying next playable version automatically — tap Local for instant offline play.</span>';}}
   async function ensureSW(){
     if(!('serviceWorker' in navigator)) return false;
     if(navigator.serviceWorker.controller) return true;

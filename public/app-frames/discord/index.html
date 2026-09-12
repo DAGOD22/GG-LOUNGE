@@ -33,7 +33,7 @@
   function showErr(msg, bare){
     var el=document.getElementById('err');
     var acts=document.getElementById('actions');
-    if(el){ el.style.display='block'; el.innerHTML = '<b>Tunnel warm-up:</b> '+ (msg||'waiting') + (bare?'<br><span style="opacity:.7">bare: '+bare+'</span>':'') + '<br><span style="opacity:.6">If this sticks, open in Proxy from the bar above — Proxy probes all mirrors automatically.</span>'; }
+    if(el){ el.style.display='block'; el.innerHTML = '<b>Connecting…</b> '+ (msg||'Hang tight — this usually takes a few seconds.') + '<br><span style="opacity:.7">We keep your connection private and encrypted.</span>'; }
     if(acts) acts.style.display='flex';
   }
   async function ensureSW(){

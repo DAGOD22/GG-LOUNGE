@@ -553,7 +553,7 @@ export function scanHtmlForRisks(html:string): string[] {
   if(html.length> 2_000_000) risks.push("large-file")
   return risks
 }
-export interface UserState { id:string; favorites:string[]; playCounts:Record<string,number>; updatedAt:string }
+export interface UserState { id:string; favorites:string[]; playCounts:Record<string,number>; recentlyPlayed?: string[]; updatedAt:string }
 export interface AuthUser { id:string; username:string; usernameLower:string; passwordHash:string; favoriteFoodHash:string; favoriteFoodNorm:string; createdAt:string }
 export interface AuthSession { token:string; userId:string; createdAt:string; expiresAt:string }
 export interface GameSave { userId:string; gameId:string; data:string; updatedAt:string }

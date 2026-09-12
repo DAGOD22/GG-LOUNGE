@@ -3,6 +3,14 @@ import { useState } from 'react'
 import { Heart, Play } from 'lucide-react'
 import type { Game } from '@/lib/games'
 
+function Highlight({ text, query }: { text:string; query:string }){
+  if(!query) return <>{text}</>
+  const q=query.trim(); if(!q) return <>{text}</>
+  const li=text.toLowerCase().indexOf(q.toLowerCase())
+  if(li===-1) return <>{text}</>
+  return <>{text.slice(0,li)}<mark className="hl">{text.slice(li, li+q.length)}</mark>{text.slice(li+q.length)}</>
+}
+
 export function GameCard({
   game,
   index,
@@ -10,6 +18,7 @@ export function GameCard({
   onToggle,
   onLaunch,
   variant = 'grid',
+  query = '',
 }: {
   game: Game
   index: number
@@ -17,6 +26,7 @@ export function GameCard({
   onToggle: (id: string) => void
   onLaunch: (g: Game) => void
   variant?: 'grid' | 'shelf'
+  query?: string
 }) {
   const [imgError, setImgError] = useState(false)
   const showIcon = !!game.icon && !imgError
@@ -64,8 +74,8 @@ export function GameCard({
           <p className="card-kicker">
             {game.genre} · {game.tone}
           </p>
-          <h3>{game.title}</h3>
-          <p>{game.description}</p>
+          <h3><Highlight text={game.title} query={query} /></h3>
+          <p><Highlight text={game.description} query={query} /></p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="play-button" onClick={() => onLaunch(game)}>
@@ -88,12 +98,14 @@ export function ShelfCard({
   isFavorite,
   onToggle,
   onLaunch,
+  query = '',
 }: {
   game: Game
   index: number
   isFavorite: boolean
   onToggle: (id: string) => void
   onLaunch: (g: Game) => void
+  query?: string
 }) {
   const [imgError, setImgError] = useState(false)
   const showIcon = !!game.icon && !imgError
@@ -134,9 +146,9 @@ export function ShelfCard({
           {game.genre} · {game.tone}
         </p>
         <h4 onClick={() => onLaunch(game)} style={{ cursor: 'pointer' }}>
-          {game.title}
+          <Highlight text={game.title} query={query} />
         </h4>
-        <p>{game.description}</p>
+        <p><Highlight text={game.description} query={query} /></p>
         <button className="play-button" onClick={() => onLaunch(game)} aria-label={`Play ${game.title}`}>
           <Play size={12} fill="currentColor" /> Play
         </button>

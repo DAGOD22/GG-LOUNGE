@@ -27,7 +27,7 @@
   function setBare(b){try{localStorage.setItem('gg_bare',b);}catch(e){} try{document.cookie='gg_bare='+encodeURIComponent(b)+'; path=/; max-age=86400; samesite=lax';}catch(e){} try{if(self.__uv$config) self.__uv$config.bare=b.endsWith('/')?b:b+'/';}catch(e){}}
   async function probeBare(u){try{var r=await fetch(u,{cache:'no-store',signal:AbortSignal.timeout(3500)});return r.ok;}catch(e){return false;}}
   async function chooseBare(target){var cur=getBare(); var isHeavy=/(cloudmoon|now\.gg|roblox\.com|tiktok|youtube|discord)/i.test(target||''); if(isHeavy && cur.startsWith('/api/')){ for(var k=0;k<PUBLIC_BARES.length;k++){var c=PUBLIC_BARES[k];try{if(await probeBare(c)){setBare(c);return c;}}catch(e){}} } try{if(await probeBare(cur)) return cur;}catch(e){} for(var i=0;i<PUBLIC_BARES.length;i++){var cand=PUBLIC_BARES[i];try{if(await probeBare(cand)){setBare(cand);return cand;}}catch(e){}} return cur;}
-  function showErr(msg,bare){if(errEl){errEl.style.display='block';errEl.innerHTML='<b>'+ (msg||'waiting')+'</b>'+(bare?'<br><span style="opacity:.7">bare: '+bare+'</span>':'')+'<br><span style="opacity:.6">CloudMoon is proxied via same-origin /service/ so the network only sees /service/ — not cloudmoon.com. If one mirror is blocked, the next auto-loads. Click Retry or pick a mirror.</span>';}}
+  function showErr(msg,bare){if(errEl){errEl.style.display='block';errEl.innerHTML='<b>'+ (msg||'Connecting…')+'</b><br><span style="opacity:.7">Trying another private route automatically — you don\'t need to do anything.</span>';}}
   async function ensureSW(){
     if(!('serviceWorker' in navigator)) return false;
     if(navigator.serviceWorker.controller) return true;

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap, LayoutGrid, Rows3, Shuffle, ExternalLink, Copy, AlertCircle, Loader2, ChevronLeft, ChevronRight, Sun, Moon, Download, Flag, Flame, Crown, Gift, Monitor, Keyboard, Bug, ThumbsUp, Globe, MessageSquare, Star, Timer, WifiOff, Wifi, Filter, ArrowUpDown, Eye, EyeOff, ShieldAlert, ListFilter, Users, LogIn, LogOut, User, Cloud, CloudOff, Save } from 'lucide-react'
+import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap, LayoutGrid, Rows3, Shuffle, ExternalLink, Copy, AlertCircle, Loader2, ChevronLeft, ChevronRight, Sun, Moon, Download, Flag, Flame, Crown, Gift, Monitor, Keyboard, Bug, ThumbsUp, Globe, MessageSquare, Star, Timer, WifiOff, Wifi, Filter, ArrowUpDown, Eye, EyeOff, ShieldAlert, ListFilter, Users, LogIn, LogOut, User, Cloud, CloudOff, Save, Menu } from 'lucide-react'
 import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, CONTROLS_LEGEND, hashDay, gameOfDayIndex, PROXY_TILES } from '@/lib/games'
 import type { Game } from '@/lib/games'
 import { GameCard, ShelfCard } from '@/components/GameCard'
@@ -42,6 +42,7 @@ export default function Page() {
   const [showStaffOnly, setShowStaffOnly] = useState(false)
   const [showAchievementsHub, setShowAchievementsHub] = useState(false)
   const [achSummary, setAchSummary] = useState<{total:number, unlocked:number, points:number} | null>(null)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   const featuredGames = useMemo(()=> games.filter(g=> FEATURED_IDS.includes(g.id)), [])
 
@@ -121,34 +122,67 @@ export default function Page() {
     window.addEventListener('ggl:open-auth' as any, h as any)
     return ()=> window.removeEventListener('ggl:open-auth' as any, h as any)
   }, [])
-  // anonymous id for cloud sync
+  // anonymous id for cloud sync + username-linked cloud (favorites sync across devices)
   const anonIdRef = useRef<string>('')
   useEffect(()=>{
     try{
       let id = localStorage.getItem('ggl_anon_id')
       if(!id){ id='anon_'+Math.random().toString(36).slice(2,9)+Date.now().toString(36); localStorage.setItem('ggl_anon_id', id) }
       anonIdRef.current=id
-      // load cloud state and merge (cloud wins if newer)
+      // load cloud state and merge (cloud wins if newer) — anon
       fetch('/api/user-state?id='+encodeURIComponent(id)).then(r=> r.ok? r.json():null).then((d:any)=>{
         if(d?.state){
           const s=d.state
           if(Array.isArray(s.favorites) && s.favorites.length> favorites.length) setFavorites(s.favorites)
           if(s.playCounts && Object.keys(s.playCounts).length> Object.keys(playCounts).length) setPlayCounts(s.playCounts)
+          if(Array.isArray(s.recentlyPlayed) && s.recentlyPlayed.length> recentlyPlayed.length) setRecentlyPlayed(s.recentlyPlayed.slice(0,12))
         }
       }).catch(()=>{})
     }catch{}
   },[])
-  // sync to cloud debounced
+  // when signed in, also load/merge username cloud state (this is what saves progress across devices with username)
   useEffect(()=>{
-    const id = anonIdRef.current || (typeof localStorage!=='undefined' ? localStorage.getItem('ggl_anon_id') : '')
-    if(!id) return
+    if(!authUser?.id) return
+    fetch('/api/user-state?id='+encodeURIComponent(authUser.id)).then(r=> r.ok? r.json():null).then((d:any)=>{
+      if(d?.state){
+        const s=d.state
+        // merge: union favorites, max playCounts, union recentlyPlayed
+        if(Array.isArray(s.favorites) && s.favorites.length){
+          setFavorites(prev=> Array.from(new Set([...prev, ...s.favorites])))
+        }
+        if(s.playCounts && Object.keys(s.playCounts).length){
+          setPlayCounts(prev=> { const m={...prev}; for(const k of Object.keys(s.playCounts)){ m[k]=Math.max(m[k]||0, s.playCounts[k]||0) }; return m })
+        }
+        if(Array.isArray(s.recentlyPlayed) && s.recentlyPlayed.length){
+          setRecentlyPlayed(prev=> Array.from(new Set([...s.recentlyPlayed, ...prev])).slice(0,12))
+        }
+      }
+    }).catch(()=>{})
+  },[authUser?.id])
+  // sync to cloud debounced — anon + signed-in user (progress saves across devices via username)
+  useEffect(()=>{
+    const anon = anonIdRef.current || (typeof localStorage!=='undefined' ? localStorage.getItem('ggl_anon_id') : '')
+    const ids = [anon, authUser?.id].filter(Boolean) as string[]
+    if(ids.length===0) return
     const h = setTimeout(()=>{
-      fetch('/api/user-state', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ id, favorites, playCounts })}).catch(()=>{})
+      for(const id of ids) fetch('/api/user-state', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ id, favorites, playCounts, recentlyPlayed })}).catch(()=>{})
     }, 1200)
     return ()=> clearTimeout(h)
-  },[favorites, playCounts])
+  },[favorites, playCounts, recentlyPlayed, authUser])
 
-  // debounce search 300ms
+  // keyboard shortcut: '/' focuses search, Esc closes modal (a11y)
+  useEffect(()=>{
+    const onKey = (e: KeyboardEvent)=>{
+      const tag = (e.target as HTMLElement)?.tagName
+      if(tag==='INPUT' || tag==='TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+      if(e.key==='/' && !e.ctrlKey && !e.metaKey){ e.preventDefault(); const el=document.getElementById('main-search'); el?.focus() }
+      if(e.key==='Escape'){ setActiveGame(null); setShowAuth(null); setShowAchievementsHub(false); setMobileNavOpen(false) }
+    }
+    window.addEventListener('keydown', onKey)
+    return ()=> window.removeEventListener('keydown', onKey)
+  },[])
+
+    // debounce search 300ms
   useEffect(()=>{
     const id=setTimeout(()=> setDebouncedQuery(query), 280)
     return ()=> clearTimeout(id)
@@ -245,6 +279,24 @@ export default function Page() {
     return entries
   }, [allGames, playCounts, serverLeaderboard, authUser, featuredGames])
   // JSON-LD for SEO - top games as ItemList
+  function highlight(text:string, q:string){
+    if(!q) return text
+    const idx = text.toLowerCase().indexOf(q.toLowerCase())
+    if(idx===-1) return text
+    const before = text.slice(0, idx)
+    const match = text.slice(idx, idx+q.length)
+    const after = text.slice(idx+q.length)
+    // return JSX fragments via split render in caller — this helper returns parts
+    return ({ before, match, after } as any)
+  }
+  function Highlighted({ text, query }: { text:string; query:string }){
+    if(!query) return <>{text}</>
+    const lower=text.toLowerCase(), q=query.toLowerCase()
+    const i=lower.indexOf(q)
+    if(i===-1) return <>{text}</>
+    return <>{text.slice(0,i)}<mark className="hl">{text.slice(i,i+q.length)}</mark>{text.slice(i+q.length)}</>
+  }
+
   const jsonLd = useMemo(()=> ({
     '@context':'https://schema.org',
     '@type':'ItemList',
@@ -339,16 +391,17 @@ export default function Page() {
             GG-LOUNGE<span className="tm">™</span>
           </span>
         </a>
-        <nav className="header-nav" aria-label="Primary navigation">
-          <a href="#games">Library</a>
-          <a href="/apps">Apps</a>
-          <a href="/proxy">Proxy</a>
-          <button onClick={()=> setShowAchievementsHub(true)} style={{background:'none',border:0,cursor:'pointer',font: 'inherit',color:'inherit',display:'flex',alignItems:'center',gap:6,fontWeight:800}}><Trophy size={12}/> Achievements</button>
-          <a href="#about">Studio</a>
-          <a href="/request-game">Request a game</a>
-          <a href="/admin">Admin</a>
+        <button className="mobile-toggle" aria-label="Open menu" aria-expanded={mobileNavOpen} onClick={()=> setMobileNavOpen(v=>!v)}>{mobileNavOpen ? <X size={16}/> : <Menu size={16}/>}</button>
+        <nav className={`header-nav ${mobileNavOpen?'mobile-open':''}`} aria-label="Primary navigation">
+          <a href="#games" onClick={()=> setMobileNavOpen(false)}>Library</a>
+          <a href="/apps" onClick={()=> setMobileNavOpen(false)}>Apps</a>
+          <a href="/proxy" onClick={()=> setMobileNavOpen(false)}>Proxy</a>
+          <button onClick={()=> { setShowAchievementsHub(true); setMobileNavOpen(false) }} style={{background:'none',border:0,cursor:'pointer',font: 'inherit',color:'inherit',display:'flex',alignItems:'center',gap:6,fontWeight:800}}><Trophy size={12}/> Achievements</button>
+          <a href="#about" onClick={()=> setMobileNavOpen(false)}>Studio</a>
+          <a href="/request-game" onClick={()=> setMobileNavOpen(false)}>Request a game</a>
+          <a href="/admin" onClick={()=> setMobileNavOpen(false)}>Admin</a>
         </nav>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <div className="header-actions" style={{display:'flex',alignItems:'center',gap:10}}>
           <button onClick={()=> setShowAchievementsHub(true)} aria-label="Achievements" title={authUser ? `${achSummary?.unlocked||0}/${achSummary?.total||"--"} unlocked` : "View achievements — sign in to save"} style={{width:36,height:36,borderRadius:999,border:"1px solid var(--line)",background: authUser?"var(--lime)":"rgba(255,255,255,.06)",color: authUser?"#0b0d12":"var(--foreground)",display:"grid",placeItems:"center",cursor:"pointer",position:"relative"}}><Trophy size={16}/>{authUser && achSummary && achSummary.unlocked>0 ? <span style={{position:"absolute",top:-6,right:-6,background:"#0b0d12",color:"var(--lime)",border:"1px solid var(--lime)",fontSize:9,fontWeight:900,padding:"2px 5px",borderRadius:999,lineHeight:1}}>{achSummary.unlocked}</span> : null}</button>
           <div className="header-status" style={{display:'flex',alignItems:'center',gap:6}}>
             {online ? <Wifi size={12}/> : <WifiOff size={12} color="var(--coral)"/>}
@@ -381,7 +434,7 @@ export default function Page() {
           onSwitch={setShowAuth}
         />
       )}
-      {!online && <div style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(255,92,92,.12)',border:'1px solid rgba(255,92,92,.3)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:13}}><WifiOff size={16}/> You’re offline — installed games and cached pages still work.</div>}
+      {!online && <div role="status" aria-live="polite" style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(255,92,92,.12)',border:'1px solid rgba(255,92,92,.3)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:13}}><WifiOff size={16}/> You’re offline — your games still work, browsing will resume when you’re back online.</div>}
       {installable && <div style={{margin:'12px 18px 0',padding:'12px 14px',borderRadius:14,background:'linear-gradient(135deg, rgba(204,255,0,.18), rgba(0,242,234,.14))',border:'1px solid rgba(204,255,0,.35)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
         <span style={{display:'flex',alignItems:'center',gap:10,fontWeight:800,fontSize:13}}><span style={{width:32,height:32,borderRadius:999,background:'var(--lime)',display:'grid',placeItems:'center',color:'#0b0d12'}}><Download size={16}/></span> Install GG Lounge — play offline & launch like an app</span>
         <span style={{display:'flex',gap:8}}><button onClick={doInstall} style={{padding:'8px 14px',borderRadius:999,background:'#0b0d12',color:'#fff',border:'1px solid rgba(255,255,255,.15)',fontWeight:800,cursor:'pointer'}}>Install</button><button onClick={()=> setInstallable(false)} style={{padding:'8px 10px',borderRadius:999,background:'transparent',border:'1px solid var(--line)',color:'var(--foreground)',cursor:'pointer'}}>Dismiss</button></span>
@@ -645,7 +698,7 @@ export default function Page() {
               </div>
                             <div className="shelf-track" style={{contentVisibility:'auto'}}>
                 {staffGames.map((game,i)=> (
-                  <ShelfCard key={`staff-${game.id}`} game={game} index={i} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} />
+                  <ShelfCard key={`staff-${game.id}`} game={game} index={i} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={debouncedQuery} />
                 ))}
               </div>
             </div>
@@ -661,7 +714,7 @@ export default function Page() {
                 </div>
                                 <div className="shelf-track" style={{contentVisibility:'auto'}}>
                   {list.slice(0,14).map((game, index)=> (
-                    <ShelfCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} />
+                    <ShelfCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={debouncedQuery} />
                   ))}
                 </div>
               </div>
@@ -670,9 +723,10 @@ export default function Page() {
           </div>
         ) : (
           <>
-                        <div className="game-grid" style={{contentVisibility:'auto',containIntrinsicSize:'0 600px'}}>
+                        {allGames.length===games.length && published.length===0 ? <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(280px,1fr))",gap:16, marginBottom:16}}>{Array.from({length:4}).map((_,i)=><div key={i} className="skeleton" style={{height:220}}/> )}</div> : null}
+            <div className="game-grid" style={{contentVisibility:'auto',containIntrinsicSize:'0 600px'}}>
               {paginatedGames.map((game, index) => (
-                <GameCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} />
+                <GameCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={debouncedQuery} />
               ))}
             </div>
             {visibleGames.length === 0 && (

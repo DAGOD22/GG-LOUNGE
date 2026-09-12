@@ -52,6 +52,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" className="bg-background" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
+        <link rel="preconnect" href="https://www.bing.com" />
+        <link rel="preconnect" href="https://tomphttp.outv1.workers.dev" />
+        <link rel="preconnect" href="https://pipedapi.tokhmi.xyz" />
+        <link rel="preconnect" href="https://www.google.com" />
+        <link rel="dns-prefetch" href="https://bare.noblocc.uk" />
         <link rel="apple-touch-icon" href="/apple-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="GG Lounge" />

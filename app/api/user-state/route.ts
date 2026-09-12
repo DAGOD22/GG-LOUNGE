@@ -20,7 +20,8 @@ export async function POST(req: Request) {
     const playCounts = typeof (body as any).playCounts === "object" && (body as any).playCounts ? (body as any).playCounts : {};
     const sanitized: Record<string,number> = {};
     for(const k of Object.keys(playCounts).slice(0,200)) sanitized[String(k).slice(0,40)] = Math.max(0, Math.min(9999, Number(playCounts[k])||0));
-    const saved = await setUserState(id, { favorites, playCounts: sanitized });
+    const recentlyPlayed = Array.isArray((body as any).recentlyPlayed) ? (body as any).recentlyPlayed.slice(0,20).map((x:any)=> String(x).slice(0,40)) : [];
+    const saved = await setUserState(id, { favorites, playCounts: sanitized, recentlyPlayed } as any);
     return NextResponse.json({ ok: true, state: saved });
   } catch(e) {
     console.error("[user-state]", e);
