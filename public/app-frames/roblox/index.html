@@ -37,6 +37,7 @@
   }
   function fillSel(activeIdx){
     sel.innerHTML='';
+    mirrorRow.innerHTML='';
     MIRRORS.forEach(function(m,i){
       var o=document.createElement('option'); o.value=i; o.textContent=m.label + (i===0?' • recommended':'');
       if(i===activeIdx) o.selected=true; sel.appendChild(o);
@@ -58,7 +59,20 @@
       if(!self.Ultraviolet||!self.__uv$config||!self.__uv$config.encodeUrl) throw new Error('uv not ready — loading /uv/uv.bundle.js…');
       var bare=await chooseBare(m.url); setBare(bare);
       var hasSW=false; try{hasSW=await ensureSW();}catch(e){}
-      if(!hasSW && tries<4){ showErr('ServiceWorker warming… (attempt '+tries+')',bare); bootTimer=setTimeout(function(){boot();},700+tries*300); return; }
+      if(!hasSW){
+        if(tries < 6){
+          showErr('ServiceWorker warming… (attempt '+tries+'/6) — if this stays, tap Retry or open via Proxy',bare);
+          bootTimer=setTimeout(function(){boot();},700+tries*300);
+          return;
+        } else {
+          // After 6 attempts, still no SW — offer manual Fallback without getting stuck on white 404
+          showErr('ServiceWorker not controlling — this browser may block workers. Try “Open via Proxy” below or tap Retry. Bare: '+bare, bare);
+          // keep loader visible, don't set frame.src to avoid white 404
+          // allow retry via button, and auto-try next mirror
+          bootTimer=setTimeout(function(){ nextMirror(); }, 2500);
+          return;
+        }
+      }
       var cfg=self.__uv$config; if(!cfg||!cfg.encodeUrl) throw new Error('encodeUrl missing');
       try{var fresh=await chooseBare(m.url); if(fresh) cfg.bare=fresh.endsWith('/')?fresh:fresh+'/';}catch(e){}
       var url=cfg.prefix+cfg.encodeUrl(m.url);
@@ -81,11 +95,19 @@
             var d=frame.contentDocument;
             var txt = d && d.body ? (d.body.innerText||'') : '';
             var htmlLen = d && d.body ? d.body.innerHTML.length : 0;
-            if(!d || !d.body || htmlLen<700 || /not authorised|unauthorized|blocked|something went wrong/i.test(txt)){
-              showErr('This mirror returned empty/blocked/unauthorized — trying next mirror automatically ('+(htmlLen||0)+'b)',bare);
+            var is404 = /404|not found|page not found|does not exist/i.test(txt);
+            var isEmpty = !d || !d.body || htmlLen<700 || is404 || /not authorised|unauthorized|blocked|something went wrong|an error occurred/i.test(txt);
+            if(isEmpty){
+              showErr('This mirror returned '+(is404?'404 — not found': 'empty/blocked')+' — trying next mirror automatically ('+(htmlLen||0)+'b)',bare);
               nextMirror();
+            } else {
+              // Has content, hide loader
+              loader.classList.add('hidden');
             }
-          }catch(e){}
+          }catch(e){
+            // cross-origin or SW intercept — assume success, hide loader after delay
+            try{ loader.classList.add('hidden'); }catch(e){}
+          }
         },4600);
         // also second check at 9s for slower cloudmoon
         setTimeout(function(){

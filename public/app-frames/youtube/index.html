@@ -68,10 +68,17 @@
       // try to ensure SW is controlling before we navigate to /service/... otherwise Next shows 404 page not found
       var hasSW = false;
       try{ hasSW = await ensureSW(); }catch(e){}
-      if(!hasSW && tries < 4) {
-        showErr('ServiceWorker warming… (attempt '+tries+')', bare);
-        setTimeout(go, 700 + tries*300);
-        return;
+      if(!hasSW) {
+        if(tries < 6){
+          showErr('ServiceWorker warming… (attempt '+tries+'/6) — hang tight', bare);
+          setTimeout(go, 700 + tries*300);
+          return;
+        } else {
+          showErr('ServiceWorker not controlling after 6 tries — try Refresh or open via Proxy. Some browsers block workers in private mode.', bare);
+          // don't redirect to /service/ which would 404 without SW
+          setTimeout(go, 2500);
+          return;
+        }
       }
       // final encode
       var cfg = self.__uv$config;

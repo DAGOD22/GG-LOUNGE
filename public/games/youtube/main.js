@@ -37,8 +37,6 @@
     "https://pipedapi.orangenet.cc",
     "https://pipedapi.owo.si",
     "https://pipedapi.darkness.services",
-    "https://iv.ggtyler.dev",
-    "https://invidious.privacydev.net"
   ];
   var REGIONS = [
     ["AU", "Australia"], ["US", "United States"], ["GB", "United Kingdom"],
@@ -255,7 +253,7 @@
   function tryDirect(path, proxyErr) {
     var order = directOrder();
     var chain = Promise.reject(proxyErr);
-    order.slice(0, 8).forEach(function (base) {
+    order.slice(0, 12).forEach(function (base) {
       chain = chain.catch(function () {
         return fetchJson(base + path, 10000).then(function (data) {
           lastVia = base;

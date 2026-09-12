@@ -40,8 +40,6 @@ export const PIPED_INSTANCES = [
   "https://pipedapi.orangenet.cc",
   "https://pipedapi.owo.si",
   "https://pipedapi.darkness.services",
-  "https://iv.ggtyler.dev",
-  "https://invidious.privacydev.net",
 ] as const;
 
 // Hosts we are willing to proxy bytes for (video/audio/images).
@@ -144,8 +142,8 @@ export async function pipedGet(
   pathWithQuery: string,
   opts?: { timeoutMs?: number; attempts?: number },
 ): Promise<PipedResult> {
-  const timeoutMs = opts?.timeoutMs ?? 6000;
-  const attempts = opts?.attempts ?? 7;
+  const timeoutMs = opts?.timeoutMs ?? 7000;
+  const attempts = opts?.attempts ?? 12;
   const errors: string[] = [];
 
   for (const instance of shuffledInstances().slice(0, attempts)) {
@@ -163,7 +161,14 @@ export async function pipedGet(
       try {
         data = JSON.parse(text);
       } catch {
-        // leave as text
+        // leave as text — likely HTML/cloudflare challenge, treat as 500
+        errors.push(`${instance} -> invalid JSON`);
+        continue;
+      }
+      // If data is still string (HTML) or empty, treat as 500
+      if (typeof data === 'string') {
+        errors.push(`${instance} -> non-JSON`);
+        continue;
       }
       if (!res.ok) {
         // 4xx is a real answer from a working instance (bad id etc.) — return it.
