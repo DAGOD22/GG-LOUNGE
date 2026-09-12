@@ -3,7 +3,7 @@ import { Gamepad2, Scale, AlertTriangle, Shield, FileText, Gavel, Mail } from 'l
 
 export const metadata: Metadata = {
   title: 'Terms of Service — GG-Lounge',
-  description: 'Terms for GG-Lounge — acceptable use, DMCA, proxy, and liability.',
+  description: 'Terms for GG-Lounge — acceptable use, proxy, and liability.',
 }
 
 export default function TermsPage() {
@@ -37,34 +37,30 @@ export default function TermsPage() {
           </Card>
           <Card icon={<AlertTriangle size={16} />} title="4. Games, YouTube, proxy — no warranties">
             <ul>
-              <li>Games in <code>/public/games</code> are provided as-is. We try to keep them working but we don't own them. If a creator wants theirs removed, we remove within 48h of DMCA.</li>
+              <li>Games in <code>/public/games</code> are provided as-is. We try to keep them working but we don't own them.</li>
               <li>YouTube via Piped: we re-serve metadata/streams from community Piped instances (`tokhmi.xyz`, `moomoo.me`, etc). If a Piped instance serves wrong data, not our fault. School Mode proxies bytes same-origin — slower but unblockable.</li>
               <li>Proxy (Ultraviolet/Bare) rewrites sites. Some sites break (banking, SSO). Don't use proxy for sensitive logins if you don't trust the rewrite.</li>
               <li>No uptime promise. Free Bare/Piped can be down. We fallback automatically but not guaranteed.</li>
             </ul>
           </Card>
-          <Card icon={<Scale size={16} />} title="5. DMCA & takedown">
-            <p>If you own a game/video and want it removed or credited differently, email <code>dmca@gg-lounge.local</code> with: (a) your ID, (b) URL on gg-lounge, (c) original URL/proof. We act within 48h. Counter-notice follows AU/US DMCA. We may replace a removed game with a similar open-source alternative.</p>
-            <p style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(255,190,70,.08)', border: '1px solid rgba(255,190,70,.2)', fontSize: 12 }}><strong>You said you waive copyright?</strong> We noted you waive <em>your</em> claims, but third-party creators don't. This clause protects you from their claims by promising fast takedown.</p>
-          </Card>
-          <Card icon={<Shield size={16} />} title="6. Liability & age">
+          <Card icon={<Shield size={16} />} title="5. Liability & age">
             <ul>
               <li>Service is free, as-is, no warranty. To the extent permitted in South Australia, we are not liable for indirect loss, school discipline, or data loss if `DATABASE_URL` is unset (local JSON mode — deploys wipe guest progress).</li>
               <li>Under 13: guest only. 13-18: need parent/teacher permission per your school.</li>
               <li>We may change, throttle, or sunset any game/proxy/Piped instance at any time to keep the lounge fast.</li>
             </ul>
           </Card>
-          <Card icon={<Mail size={16} />} title="7. Contact & changes">
-            <p>Operator: <strong>Kai Chauhan — GG-Lounge Studios™</strong>, Adelaide SA, AU. Support: `support@gg-lounge.local` (replace with real email via `NEXT_PUBLIC_SITE_URL`). We post material term changes as a banner for 7 days + bump this date. Continued use = acceptance.</p>
+          <Card icon={<Mail size={16} />} title="6. Contact & changes">
+            <p>Operator: <strong>Kai Chauhan — GG-Lounge Studios™</strong>, Adelaide SA, AU. We post material term changes as a banner for 7 days + bump this date. Continued use = acceptance.</p>
           </Card>
-          <Card icon={<FileText size={16} />} title="8. Privacy">
+          <Card icon={<FileText size={16} />} title="7. Privacy">
             <p>See <a href="/privacy" style={{ color: 'var(--lime)', textDecoration: 'underline' }}>Privacy Policy</a> for what we store (gate cookie, anon ID, optional account, playCounts) and how to delete. By using the lounge you agree to that too.</p>
           </Card>
         </div>
 
         <div style={{ marginTop: 28, padding: 16, borderRadius: 16, border: '1px solid var(--line)', background: 'var(--panel)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <Scale size={18} color="var(--lime)" />
-          <span style={{ fontWeight: 800 }}>TL;DR: Don't abuse proxy/gate, don't be a jerk, we can remove any game fast on DMCA, no warranty, AU law.</span>
+          <span style={{ fontWeight: 800 }}>TL;DR: Don't abuse proxy/gate, don't be a jerk, no warranty, AU law.</span>
           <a href="/privacy" style={{ marginLeft: 'auto', padding: '8px 14px', borderRadius: 999, background: 'var(--panel)', border: '1px solid var(--line)', fontWeight: 800, textDecoration: 'none' }}>Privacy →</a>
         </div>
       </section>
