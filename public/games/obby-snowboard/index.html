@@ -7,13 +7,16 @@
   var id="obby-snowboard";
   var slug="handless-millionaire-2";
   var title="Handless Millionaire 2";
-  var targets=[
-    "https://sites.google.com/view/html5gamesunblocked/"+slug,
-    "https://sites.google.com/view/classroom6x/"+slug,
-    "https://sites.google.com/site/classroom6x/"+slug,
-    "https://sites.google.com/view/html5gamesunblocked/"+id,
-    "https://ubg76.gitlab.io/game/"+slug+".html"
-  ];
+    var _hosts=["https://ubg76.github.io/game/","https://unblockedgames76.github.io/game/","https://ubg100.github.io/game/","https://classroom6x.github.io/game/","https://classroom6x.github.io/","https://gnhustgames.github.io/","https://html5gamesunblocked.github.io/game/"];
+  var _slugs=[id, id+"-online", id.replace(/-/g,"_"), id.replace(/-/g,""), id+"-unblocked"];
+  var targets=[];
+  for(var _hi=0;_hi<_hosts.length;_hi++){for(var _si=0;_si<_slugs.length;_si++){targets.push(_hosts[_hi]+_slugs[_si]+".html");targets.push(_hosts[_hi]+_slugs[_si]+"/index.html");}}
+  targets.push("https://sites.google.com/view/classroom6x/"+id);
+  targets.push("https://sites.google.com/view/html5gamesunblocked/"+id);
+  targets.push("https://sites.google.com/site/classroom6x/"+id);
+  targets.push("https://sites.google.com/view/unblockedgames6x/"+id);
+  // dedupe
+  targets=[...new Set(targets)];
   var frame=document.getElementById('frame');
   var loader=document.getElementById('loader');
   var errEl=document.getElementById('err');
@@ -107,7 +110,7 @@
         bootTimer=setTimeout(function(){
           try{
             var d=frame.contentDocument;
-            if(d && (!d.body || d.body.innerHTML.length<900 || /404|Page Not Found|unable to open|not found|sign in/i.test(d.body.innerText.slice(0,900)))){
+            if(d && (!d.body || d.body.innerHTML.length<900 || /404|Page Not Found|unable to open|not found|sign in|game files missing|file not found|drive.google|googleusercontent|Sorry.*unable/i.test(d.body.innerText.slice(0,900)))){
               if(curIdx+1 < targets.length){ curIdx++; boot(true); } else { showErr('All mirrors blocked — try Proxy', bare); }
             }
           }catch(e){}
