@@ -170,7 +170,9 @@ export default function Page() {
   )
   const paginatedGames = useMemo(()=> visibleGames.slice(0, visibleCount), [visibleGames, visibleCount])
 
+  // Fix 6: shelves grouping only when actually showing shelves (avoid wasted 192 scan in grid/search)
   const grouped = useMemo(()=>{
+    if (view !== 'shelves' || filter !== 'All games' || debouncedQuery) return [] as [string, Game[]][]
     const map: Record<string, Game[]> = {}
     for(const g of visibleGames){
       const k = g.genre
@@ -178,7 +180,7 @@ export default function Page() {
       map[k].push(g)
     }
     return Object.entries(map).sort((a,b)=> b[1].length - a[1].length)
-  }, [visibleGames])
+  }, [visibleGames, view, filter, debouncedQuery])
   const staffGames = useMemo(()=> allGames.filter(g=> STAFF_PICKS.includes(g.id)), [allGames])
 
   const spotlight = featuredGames[spotIdx] || games[0]

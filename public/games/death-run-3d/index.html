@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html>
     <script>
-        if (window.parent !== window.self) window.parent.postMessage("bonk", "*");
+        // GG Lounge: bonk suppressed for iframe — GameModal traps it
+  // GG Lounge: bonk fully suppressed — prevents breakout when inside GameModal iframe
+  // window.parent.postMessage("bonk","*") disabled
         window.addEventListener("DOMContentLoaded", function () {
             document.body.style.margin = "0";
             document.body.style.height = "100vh";

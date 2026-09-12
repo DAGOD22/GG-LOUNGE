@@ -4,6 +4,22 @@ import { MAX_ICON_BYTES, createRequest, createSimpleRequest, listRequests, upvot
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Fix 10: rate limits for game requests — 5 creates/min + 10 upvotes/min per IP
+const reqRate = new Map<string, { count: number; reset: number }>();
+const upvoteRate = new Map<string, { count: number; reset: number }>();
+function hitLimit(map: Map<string,{count:number;reset:number}>, ip: string, max: number): boolean {
+  const now = Date.now();
+  const e = map.get(ip);
+  if (!e || now > e.reset) {
+    map.set(ip, { count: 1, reset: now + 60_000 });
+    if (map.size > 5000) for (const [k,v] of map) if (now > v.reset) map.delete(k);
+    return true;
+  }
+  if (e.count >= max) return false;
+  e.count++;
+  return true;
+}
+
 export async function GET() {
   try {
     const requests = await listRequests();
@@ -24,12 +40,19 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(()=> ({}));
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip")?.trim() || "0.0.0.0";
     // upvote shortcut
     if (typeof (body as any).upvoteId === "string" && (body as any).upvoteId.trim()) {
+      if (!hitLimit(upvoteRate, ip, 10)) {
+        return NextResponse.json({ error: "Too many votes — wait a minute and try again." }, { status: 429, headers: { "Retry-After": "60" } });
+      }
       const id = (body as any).upvoteId.trim();
       const updated = await upvoteRequest(id);
       if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
       return NextResponse.json({ ok: true, request: updated });
+    }
+    if (!hitLimit(reqRate, ip, 5)) {
+      return NextResponse.json({ error: "Too many requests — please wait a minute." }, { status: 429, headers: { "Retry-After": "60" } });
     }
     const title = typeof (body as any).title === "string" ? (body as any).title.trim().slice(0, 80) : "";
     const html = typeof (body as any).html === "string" ? (body as any).html : "";

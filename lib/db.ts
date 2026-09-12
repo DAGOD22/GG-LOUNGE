@@ -264,6 +264,22 @@ async function writeLocal(store: LocalStore): Promise<void> {
   writeQueue = task.catch(() => {});
   return task;
 }
+// Fix 7: serialize read-modify-write for local JSON to prevent lost updates
+async function withLocalLock<T>(fn: (store: LocalStore) => Promise<T> | T): Promise<T> {
+  let result!: T
+  const task = writeQueue.then(async () => {
+    const store = await readLocal();
+    result = await fn(store);
+    await writeLocalRaw(store);
+  });
+  writeQueue = task.catch(() => {});
+  await task;
+  return result;
+}
+async function readLocalLocked(): Promise<LocalStore> {
+  // For pure reads, just read without lock (ok to be slightly stale)
+  return readLocal();
+}
 
 /* ---------------- Bans & kicks ---------------- */
 
@@ -294,17 +310,18 @@ export async function addBan(
     );
     return rows[0];
   }
-  const s = await readLocal();
-  s.bans = s.bans.filter((b) => b.identifier !== identifier);
-  const ban: Ban = {
-    id,
-    identifier,
-    reason,
-    createdAt: new Date().toISOString(),
-    expiresAt: expiresAt ? expiresAt.toISOString() : null,
-  };
-  s.bans.push(ban);
-  await writeLocal(s);
+  let ban!: Ban
+  await withLocalLock(async (s) => {
+    s.bans = s.bans.filter((b) => b.identifier !== identifier);
+    ban = {
+      id,
+      identifier,
+      reason,
+      createdAt: new Date().toISOString(),
+      expiresAt: expiresAt ? expiresAt.toISOString() : null,
+    };
+    s.bans.push(ban);
+  });
   return ban;
 }
 
@@ -313,9 +330,9 @@ export async function removeBan(id: string): Promise<void> {
     await pgQuery('DELETE FROM "banned_user" WHERE "id"=$1', [id]);
     return;
   }
-  const s = await readLocal();
-  s.bans = s.bans.filter((b) => b.id !== id);
-  await writeLocal(s);
+  await withLocalLock(async (s) => {
+    s.bans = s.bans.filter((b) => b.id !== id);
+  });
 }
 
 /** Returns the active ban for an identifier (null when clean/expired). Prunes expired rows. */
@@ -331,9 +348,15 @@ export async function findActiveBan(identifier: string): Promise<Ban | null> {
   }
   const s = await readLocal();
   const before = s.bans.length;
-  s.bans = s.bans.filter((b) => !b.expiresAt || new Date(b.expiresAt) > now);
-  if (s.bans.length !== before) await writeLocal(s);
-  return s.bans.find((b) => b.identifier === identifier) ?? null;
+  const filtered = s.bans.filter((b) => !b.expiresAt || new Date(b.expiresAt) > now);
+  if (filtered.length !== before) {
+    await withLocalLock(async (store) => {
+      store.bans = store.bans.filter((b) => !b.expiresAt || new Date(b.expiresAt) > now);
+    });
+  }
+  // re-read after prune? keep simple: read again
+  const s2 = await readLocal();
+  return s2.bans.find((b) => b.identifier === identifier) ?? null;
 }
 
 /* ---------------- Visits ---------------- */
@@ -354,16 +377,16 @@ export async function logVisit(ip: string, ua: string, visitPath: string): Promi
       }
       return;
     }
-    const s = await readLocal();
-    s.visits.push({
-      id: randomUUID(),
-      ip: ip.slice(0, 80),
-      ua: ua.slice(0, 300),
-      path: visitPath.slice(0, 200),
-      createdAt: new Date().toISOString(),
+    await withLocalLock(async (s) => {
+      s.visits.push({
+        id: randomUUID(),
+        ip: ip.slice(0, 80),
+        ua: ua.slice(0, 300),
+        path: visitPath.slice(0, 200),
+        createdAt: new Date().toISOString(),
+      });
+      s.visits = s.visits.slice(-500);
     });
-    s.visits = s.visits.slice(-500);
-    await writeLocal(s);
   } catch {
     // visit logging must never break page loads
   }
@@ -408,9 +431,9 @@ export async function createRequest(
       1,
     ]);
   } else {
-    const s = await readLocal();
-    s.requests.push({ id, title, icon, html: html||"", status: "pending", createdAt, votes: 1 });
-    await writeLocal(s);
+    await withLocalLock(async (s) => {
+      s.requests.push({ id, title, icon, html: html||"", status: "pending", createdAt, votes: 1 });
+    });
   }
   return { id, title, icon, status: "pending", createdAt, votes: 1 };
 }
@@ -423,12 +446,14 @@ export async function upvoteRequest(id: string): Promise<GameRequest | null> {
     const rows = await pgQuery<GameRequest>('SELECT "id","title","icon","status","createdAt","votes" FROM "game_request" WHERE "id"=$1', [id]);
     return rows[0] ?? null;
   }
-  const s = await readLocal();
-  const r = s.requests.find(x=> x.id===id);
-  if(!r) return null;
-  r.votes = (r.votes||0)+1;
-  await writeLocal(s);
-  return r;
+  let out: GameRequest | null = null
+  await withLocalLock(async (s) => {
+    const r = s.requests.find(x=> x.id===id);
+    if(!r){ out=null; return; }
+    r.votes = (r.votes||0)+1;
+    out = r;
+  });
+  return out;
 }
 export async function addReport(gameId: string, title: string): Promise<Report> {
   const id = randomUUID();
@@ -437,11 +462,11 @@ export async function addReport(gameId: string, title: string): Promise<Report> 
   if (getMode() === "postgres") {
     try{ await pgQuery('INSERT INTO "reports" ("id","gameId","title") VALUES ($1,$2,$3)', [id, gameId, title]); }catch{}
   } else {
-    const s = await readLocal();
-    s.reports = s.reports || [];
-    s.reports.push(rep);
-    s.reports = s.reports.slice(-200);
-    await writeLocal(s);
+    await withLocalLock(async (s) => {
+      s.reports = s.reports || [];
+      s.reports.push(rep);
+      s.reports = s.reports.slice(-200);
+    });
   }
   return rep;
 }
@@ -503,10 +528,10 @@ export async function setUserState(id:string, state: Omit<UserState,'id'|'update
     }catch{}
     return full
   }
-  const store = await readLocal() as any
-  store.userStates = store.userStates || {}
-  store.userStates[id]=full
-  await writeLocal(store)
+  await withLocalLock(async (store:any)=>{
+    store.userStates = store.userStates || {}
+    store.userStates[id]=full
+  })
   return full
 }
 
@@ -563,16 +588,17 @@ export async function createAuthUser(username:string, password:string, favoriteF
     await pgQuery('INSERT INTO auth_user (id, username, username_lower, password_hash, favorite_food_hash, favorite_food_norm, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',[id, usernameTrim, usernameLower, passwordHash, favoriteFoodHash, favoriteFoodNorm, createdAt])
     return { id, username: usernameTrim, usernameLower, passwordHash, favoriteFoodHash, favoriteFoodNorm, createdAt }
   }
-  const s = await readLocal() as any
-  if(s.users.find((u:any)=> u.usernameLower===usernameLower)) throw new Error('Username taken')
-  const id=randomUUID()
-  const passwordHash=hashPassword(password)
-  const favoriteFoodHash=hashFood(favoriteFood)
-  const favoriteFoodNorm=normFood(favoriteFood)
-  const createdAt=new Date().toISOString()
-  const user:AuthUser={ id, username: usernameTrim, usernameLower, passwordHash, favoriteFoodHash, favoriteFoodNorm, createdAt }
-  s.users.push(user)
-  await writeLocal(s)
+  let user!: AuthUser
+  await withLocalLock(async (s:any) => {
+    if(s.users.find((u:any)=> u.usernameLower===usernameLower)) throw new Error('Username taken')
+    const id=randomUUID()
+    const passwordHash=hashPassword(password)
+    const favoriteFoodHash=hashFood(favoriteFood)
+    const favoriteFoodNorm=normFood(favoriteFood)
+    const createdAt=new Date().toISOString()
+    user={ id, username: usernameTrim, usernameLower, passwordHash, favoriteFoodHash, favoriteFoodNorm, createdAt }
+    s.users.push(user)
+  })
   return user
 }
 export async function findAuthUserByUsername(username:string): Promise<AuthUser|null>{
@@ -614,9 +640,10 @@ export async function resetAuthPassword(username:string, newPassword:string): Pr
     await pgQuery('UPDATE auth_user SET password_hash=$2 WHERE username_lower=$1',[username.trim().toLowerCase(), hash])
     return
   }
-  const s=await readLocal() as any
-  const u=s.users.find((x:any)=> x.usernameLower===username.trim().toLowerCase())
-  if(u){ u.passwordHash=hash; await writeLocal(s) }
+  await withLocalLock(async (s:any)=>{
+    const u=s.users.find((x:any)=> x.usernameLower===username.trim().toLowerCase())
+    if(u) u.passwordHash=hash
+  })
 }
 export async function createSession(userId:string): Promise<AuthSession>{
   const token=randomBytes(32).toString('hex')
@@ -628,10 +655,10 @@ export async function createSession(userId:string): Promise<AuthSession>{
     await pgQuery('INSERT INTO auth_session (token, user_id, created_at, expires_at) VALUES ($1,$2,$3,$4)',[token, userId, createdAt, expiresAt])
     return sess
   }
-  const s=await readLocal() as any
-  s.sessions.push(sess)
-  s.sessions=s.sessions.slice(-500)
-  await writeLocal(s)
+  await withLocalLock(async (s:any) => {
+    s.sessions.push(sess)
+    s.sessions=s.sessions.slice(-500)
+  })
   return sess
 }
 export async function getSession(token:string): Promise<AuthSession|null>{
@@ -652,9 +679,9 @@ export async function getSession(token:string): Promise<AuthSession|null>{
 }
 export async function deleteSession(token:string): Promise<void>{
   if(getMode()==="postgres"){ await migrate(); await pgQuery('DELETE FROM auth_session WHERE token=$1',[token]); return }
-  const s=await readLocal() as any
-  s.sessions=s.sessions.filter((x:any)=> x.token!==token)
-  await writeLocal(s)
+  await withLocalLock(async (s:any)=>{
+    s.sessions=s.sessions.filter((x:any)=> x.token!==token)
+  })
 }
 export async function getUserFromToken(token:string): Promise<AuthUser|null>{
   const sess=await getSession(token)
@@ -678,12 +705,12 @@ export async function setSave(userId:string, gameId:string, data:string): Promis
     await pgQuery('INSERT INTO game_save (user_id, game_id, data, updated_at) VALUES ($1,$2,$3,$4) ON CONFLICT (user_id, game_id) DO UPDATE SET data=EXCLUDED.data, updated_at=EXCLUDED.updated_at',[userId, gameId, save.data, updatedAt])
     return save
   }
-  const s=await readLocal() as any
-  const idx=s.saves.findIndex((x:any)=> x.userId===userId && x.gameId===gameId)
-  if(idx>=0) s.saves[idx]=save
-  else s.saves.push(save)
-  if(s.saves.length>5000) s.saves=s.saves.slice(-5000)
-  await writeLocal(s)
+  await withLocalLock(async (s:any) => {
+    const idx=s.saves.findIndex((x:any)=> x.userId===userId && x.gameId===gameId)
+    if(idx>=0) s.saves[idx]=save
+    else s.saves.push(save)
+    if(s.saves.length>5000) s.saves=s.saves.slice(-5000)
+  })
   return save
 }
 export async function listSaves(userId:string): Promise<GameSave[]>{
@@ -728,10 +755,10 @@ export async function setRequestStatus(id: string, status: string): Promise<void
     await pgQuery('UPDATE "game_request" SET "status"=$2 WHERE "id"=$1', [id, status]);
     return;
   }
-  const s = await readLocal();
-  const r = s.requests.find((x) => x.id === id);
-  if (r) r.status = status;
-  await writeLocal(s);
+  await withLocalLock(async (s) => {
+    const r = s.requests.find((x) => x.id === id);
+    if (r) r.status = status;
+  });
 }
 
 export async function deleteRequest(id: string): Promise<void> {
@@ -739,9 +766,9 @@ export async function deleteRequest(id: string): Promise<void> {
     await pgQuery('DELETE FROM "game_request" WHERE "id"=$1', [id]);
     return;
   }
-  const s = await readLocal();
-  s.requests = s.requests.filter((x) => x.id !== id);
-  await writeLocal(s);
+  await withLocalLock(async (s) => {
+    s.requests = s.requests.filter((x) => x.id !== id);
+  });
 }
 
 export async function publishFromRequest(id: string): Promise<PublishedGame | null> {
@@ -763,10 +790,10 @@ export async function publishDirect(
       [id, title, icon, html],
     );
   } else {
-    const s = await readLocal();
-    s.games = s.games.filter((g) => g.id !== id);
-    s.games.push({ id, title, icon, html, createdAt });
-    await writeLocal(s);
+    await withLocalLock(async (s) => {
+      s.games = s.games.filter((g) => g.id !== id);
+      s.games.push({ id, title, icon, html, createdAt });
+    });
   }
   return { id, title, icon, createdAt };
 }
@@ -800,9 +827,9 @@ export async function deleteGame(id: string): Promise<void> {
     await pgQuery('DELETE FROM "published_game" WHERE "id"=$1', [id]);
     return;
   }
-  const s = await readLocal();
-  s.games = s.games.filter((g) => g.id !== id);
-  await writeLocal(s);
+  await withLocalLock(async (s) => {
+    s.games = s.games.filter((g) => g.id !== id);
+  });
 }
 
 /* ---------------- Chunked uploads ---------------- */
