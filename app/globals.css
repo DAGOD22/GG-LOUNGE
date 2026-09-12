@@ -298,3 +298,11 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--lime)}
 .skeleton-line{height:12px;margin:8px 0}
 mark.hl{background:rgba(215,243,74,.35);color:inherit;padding:0 2px;border-radius:4px}
 /* preconnect hint placeholders - actual links in layout */
+
+/* God-level a11y: shelf keyboard focus & high contrast */
+.shelf-track:focus-visible{ outline:2px solid var(--lime); outline-offset: 2px }
+[data-theme="light"] .header-nav.mobile-open{ background:#fff; border-color: rgba(0,0,0,.12); box-shadow:0 20px 60px rgba(0,0,0,.15) }
+.mark.hl{ background: rgba(215,243,74,.45); color:#0b0d12; padding:0 3px; border-radius:4px; font-weight:800 }
+/* high contrast for light mode muted */
+[data-theme="light"] .game-info p{ color:#4b5563 }
+[data-theme="light"] .card-kicker{ color:#6b7280 }

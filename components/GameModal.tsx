@@ -21,6 +21,23 @@ export function GameModal({
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+
+  // GOD LEVEL: a11y — ESC to close, trap focus, initial focus
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'Tab' && wrapRef.current) {
+        const nodes = wrapRef.current.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+        if (!nodes.length) return
+        const first = nodes[0]; const last = nodes[nodes.length - 1]
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  useEffect(()=>{ const el = wrapRef.current?.querySelector<HTMLElement>('button, [href]'); el?.focus(); }, [])
   const [frameLoading, setFrameLoading] = useState(true)
   const [frameError, setFrameError] = useState<string | null>(null)
   const [showControls, setShowControls] = useState(false)

@@ -255,6 +255,41 @@ export function inferAchievementUpdates(gameId: string, win: any, stats?: { play
       push('am_impostor', Math.floor(plays*0.2),1)
       push('am_10_wins', Math.floor(plays*0.3),10)
       break
+    case 'level-devil': {
+      const deaths = getLocalInt(win, ['ld_deaths','deaths']) ?? Math.floor(time/8)
+      const levels = getLocalInt(win, ['ld_levels','levels']) ?? Math.floor(time/40)
+      push('ld_first_troll', deaths >= 1 ? 1 : 0, 1)
+      push('ld_5_trolls', levels, 5)
+      push('ld_10_levels', levels, 10)
+      push('ld_no_death', levels >=1 && deaths === 0 ? 1 : 0, 1)
+      push('ld_speedrun_30', time >0 && time < 30 && levels >=1 ? 1 : 0, 1)
+      push('ld_20_deaths', deaths, 20)
+      break
+    }
+    case 'idle-mining': {
+      const gold = getLocalInt(win, ['im_gold','gold','coins']) ?? Math.floor(time*5 + plays*100)
+      const depth = getLocalInt(win, ['depth','meters']) ?? Math.floor(time*3)
+      const upgrades = getLocalInt(win, ['upgrades']) ?? Math.floor(time/60)
+      push('im_first_ore', plays, 1); push('im_1000_gold', gold, 1000); push('im_10_upgrades', upgrades, 10); push('im_deep_1000', depth, 1000); push('im_prestige', getLocalInt(win, ['prestige']) ?? 0, 1); push('im_1m_gold', gold, 1000000); break
+    }
+    case 'stickman-hook': { const levels = getLocalInt(win, ['sh_levels','levels']) ?? Math.floor(time/20); const swings = getLocalInt(win, ['swings']) ?? Math.floor(time/1.5); push('sh_first_swing', levels, 1); push('sh_10_levels', levels, 10); push('sh_no_fall', levels >=1 ? 1 : 0, 1); push('sh_speed_20', time>0 && time<20 ? 1 : 0, 1); push('sh_50_swings', swings, 50); break }
+    case 'hextris': { const pts = getLocalInt(win, ['hx_score','score']) ?? Math.floor(time*10); const combos = getLocalInt(win, ['combos']) ?? Math.floor(time/12); push('hx_first_spin', 1, 1); push('hx_500_points', pts, 500); push('hx_5000_points', pts, 5000); push('hx_10_combos', combos, 10); push('hx_survive_60', time, 60); push('hx_20000', pts, 20000); break }
+    case '2048': { const tile = getLocalInt(win, ['bestTile','maxTile']) ?? (time > 120 ? 1024 : 512); push('tfe_first_512', tile >=512 ? 512 : 0, 512); push('tfe_1024', tile >=1024 ? 1024 : 0, 1024); push('tfe_2048', tile >=2048 ? 2048 : 0, 2048); push('tfe_4096', tile >=4096 ? 4096 : 0, 4096); push('tfe_10_games', plays, 10); push('tfe_no_undo', tile >=512 ? 1 : 0, 1); break }
+    case 'chrome-dino': { const m = getLocalInt(win, ['dino_dist','distance','score']) ?? Math.floor(time*8); push('dino_100m', m, 100); push('dino_500m', m, 500); push('dino_2000m', m, 2000); push('dino_5_birds', Math.floor(time/20), 5); push('dino_no_crash_30', time, 30); break }
+    case 'monkey-mart': { const sales = getLocalInt(win, ['sales']) ?? Math.floor(time/3); const coins = getLocalInt(win, ['coins']) ?? Math.floor(time*8); push('mm_first_sale', sales, 1); push('mm_100_sales', sales, 100); push('mm_upgrade_5', Math.floor(time/90), 5); push('mm_10k_gold', coins, 10000); push('mm_no_wait', sales >=10 ? 10 : 0, 10); break }
+    case 'krunker': { const kills = getLocalInt(win, ['kills']) ?? Math.floor(time/10); push('kr_first_kill', kills, 1); push('kr_25_kills', kills, 25); push('kr_5_wins', getLocalInt(win, ['wins']) ?? Math.floor(plays/2), 5); push('kr_headshot_10', Math.floor(kills*0.3), 10); push('kr_noscope', kills >=5 ? 1 : 0, 1); break }
+    case 'smashkarts': { const wins = getLocalInt(win, ['wins']) ?? Math.floor(plays/3); push('sk_first_race', 1, 1); push('sk_5_wins', wins, 5); push('sk_10_kills', Math.floor(time/8), 10); push('sk_powerup_20', Math.floor(time/6), 20); push('sk_no_hit_win', wins >=1 ? 1 : 0, 1); break }
+    case 'crossyroad': { const steps = getLocalInt(win, ['steps','score']) ?? Math.floor(time*4); push('cr2_50_steps', steps, 50); push('cr2_200_steps', steps, 200); push('cr2_collect_20', Math.floor(time/2), 20); push('cr2_no_death_100', steps, 100); push('cr2_unlock_char', Math.floor(plays/2), 1); break }
+    case 'flappy-bird': { const pipes = getLocalInt(win, ['pipes','score']) ?? Math.floor(time/2); push('fb_first_pipe', pipes, 1); push('fb_10_pipes', pipes, 10); push('fb_30_pipes', pipes, 30); push('fb_5_games', plays, 5); push('fb_no_crash_20', pipes, 20); break }
+    case 'run-3': { const lv = getLocalInt(win, ['levels']) ?? Math.floor(time/30); push('r3_level_1', lv, 1); push('r3_10_levels', lv, 10); push('r3_no_fall', lv >=1 ? 1 : 0, 1); push('r3_20_levels', lv, 20); push('r3_collect_50', Math.floor(time/2), 50); break }
+    case 'happy-wheels': { const wins = getLocalInt(win, ['wins','levels']) ?? Math.floor(plays/2); const deaths = getLocalInt(win, ['deaths']) ?? Math.floor(time/15); push('hw_first_level', wins, 1); push('hw_5_levels', wins, 5); push('hw_no_limb', wins >=1 ? 1 : 0, 1); push('hw_20_deaths', deaths, 20); push('hw_perfect', wins >=1 ? 1 : 0, 1); break }
+    case 'wordle': { const w = getLocalInt(win, ['wins']) ?? Math.floor(plays/2); push('wd_first_win', w, 1); push('wd_5_wins', w, 5); push('wd_no_hint_win', w >=1 ? 1 : 0, 1); push('wd_streak_3', Math.floor(w/3), 3); push('wd_20_games', plays, 20); break }
+    case 'granny': { push('gr_escape', getLocalInt(win, ['escapes']) ?? 0, 1); push('gr_5_minutes', time, 300); push('gr_find_key', getLocalInt(win, ['keys']) ?? (time>60?1:0), 1); push('gr_no_sound', 0, 1); push('gr_10_games', plays, 10); break }
+    case 'snow-rider-3d': { const m = getLocalInt(win, ['distance','meters']) ?? Math.floor(time*8); push('sr3d_500m', m, 500); push('sr3d_2000m', m, 2000); push('sr3d_10_gifts', Math.floor(time/12), 10); push('sr3d_no_crash_30', time, 30); push('sr3d_50_tricks', Math.floor(time/4), 50); break }
+    case 'n-gon': { const lv = getLocalInt(win, ['levels']) ?? Math.floor(time/25); push('ng_first_level', lv, 1); push('ng_10_levels', lv, 10); push('ng_no_death_5', lv, 5); push('ng_speedrun', time>0 && time<30 ? 1 : 0, 1); push('ng_20_levels', lv, 20); break }
+    case 'minecraft-classic': { const br = getLocalInt(win, ['blocks']) ?? Math.floor(time*2); push('mc_first_block', 1, 1); push('mc_100_blocks', br, 100); push('mc_build_50', Math.floor(br*0.6), 50); push('mc_house', Math.floor(time/180), 1); push('mc_diamond', Math.floor(time/300), 1); break }
+    case 'draw-climber': { const lv = getLocalInt(win, ['levels']) ?? Math.floor(time/20); push('dc_first_draw', 1, 1); push('dc_10_levels', lv, 10); push('dc_speed_20', time>0 && time<20 ? 1 : 0, 1); push('dc_no_retry', lv >=1 ? 1 : 0, 1); push('dc_30_draws', Math.floor(time/4), 30); break }
+    case 'piano-tiles': { const tiles = getLocalInt(win, ['tiles','score']) ?? Math.floor(time*4); push('pt_first_song', plays, 1); push('pt_50_tiles', tiles, 50); push('pt_500_tiles', tiles, 500); push('pt_no_miss_30', Math.min(tiles,30), 30); push('pt_5_stars', Math.floor(plays/3), 1); break }
     case 'poki':
       push('paper_10_percent', Math.floor(time*2),10)
       push('paper_50_percent', Math.floor(time*2),50)

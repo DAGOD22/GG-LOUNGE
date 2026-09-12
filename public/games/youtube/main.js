@@ -36,7 +36,9 @@
     "https://pipedapi.codespace.cz",
     "https://pipedapi.orangenet.cc",
     "https://pipedapi.owo.si",
-    "https://pipedapi.darkness.services"
+    "https://pipedapi.darkness.services",
+    "https://iv.ggtyler.dev",
+    "https://invidious.privacydev.net"
   ];
   var REGIONS = [
     ["AU", "Australia"], ["US", "United States"], ["GB", "United Kingdom"],

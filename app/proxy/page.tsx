@@ -127,14 +127,19 @@ export default function ProxyPage() {
             }
           }
         } catch {}
-        const localChecks = await Promise.all(LOCAL_BARES.slice(0,2).map(u => probeBare(u, 3000)));
-        localChecks.forEach(r => setBareHealth(h => ({ ...h, [r.url]: { ok: r.ok, ms: r.ms } })));
+        // GOD LEVEL: probe with blacklist for 10min if bare failed last time, and sort by ms
+        const blacklist: Record<string, number> = (()=>{ try{ return JSON.parse(localStorage.getItem('gg_bare_blacklist')||'{}')}catch{return{}} })()
+        const isBlacklisted = (u:string)=> blacklist[u] && blacklist[u] > Date.now()
+        const localCandidates = LOCAL_BARES.filter(u=> !isBlacklisted(u)).slice(0,3)
+        const localChecks = await Promise.all((localCandidates.length?localCandidates: [...LOCAL_BARES].slice(0,2)).map(u => probeBare(u, 3000)));
+        localChecks.forEach(r => { setBareHealth(h => ({ ...h, [r.url]: { ok: r.ok, ms: r.ms } })); if(!r.ok){ blacklist[r.url]=Date.now()+10*60*1000; try{ localStorage.setItem('gg_bare_blacklist', JSON.stringify(blacklist)) }catch{} } });
         let chosen = localChecks.filter(r => r.ok).sort((a, b) => a.ms - b.ms)[0]?.url;
         let ms = localChecks.find(r => r.url === chosen)?.ms ?? null;
         if (!chosen) {
           setStatus('Connecting…');
-          const publicChecks = await Promise.all(PUBLIC_BARES.slice(0, 2).map(u => probeBare(u, 3000)));
-          publicChecks.forEach(r => setBareHealth(h => ({ ...h, [r.url]: { ok: r.ok, ms: r.ms } })));
+          const pubCandidates = PUBLIC_BARES.filter(u=> !isBlacklisted(u)).slice(0,3)
+          const publicChecks = await Promise.all((pubCandidates.length?pubCandidates:PUBLIC_BARES.slice(0, 2)).map(u => probeBare(u, 3000)));
+          publicChecks.forEach(r => { setBareHealth(h => ({ ...h, [r.url]: { ok: r.ok, ms: r.ms } })); if(!r.ok){ blacklist[r.url]=Date.now()+10*60*1000; try{ localStorage.setItem('gg_bare_blacklist', JSON.stringify(blacklist)) }catch{} } });
           chosen = publicChecks.filter(r => r.ok).sort((a, b) => a.ms - b.ms)[0]?.url;
           ms = publicChecks.find(r => r.url === chosen)?.ms ?? null;
           if (!chosen) {
@@ -294,7 +299,7 @@ export default function ProxyPage() {
           {address && <button type="button" onClick={() => setAddress('')} style={{ border:0, background:'rgba(255,255,255,.12)', color:'#f4f2ec', width:20, height:20, borderRadius:99, display:'grid', placeItems:'center', cursor:'pointer', flex:'none' }}><X size={10} /></button>}
         </form>
         <div style={{ display:'flex', gap:6, alignItems:'center', flex:'none' }}>
-          <span style={{ fontSize:11, display:'flex', alignItems:'center', gap:6, opacity:.7, whiteSpace:'nowrap', padding:'6px 10px', borderRadius:999, border:'1px solid rgba(255,255,255,.08)', background:'rgba(255,255,255,.04)' }}>{ready ? <Wifi size={12}/> : <Clock size={12}/>} {ready ? 'Ready' : status}</span>
+          <span title={ready ? `Route: ${bare} — ${bareHealth[bare]?.ms ? bareHealth[bare].ms+'ms' : 'auto'}` : status} style={{ fontSize:11, display:'flex', alignItems:'center', gap:6, opacity:.7, whiteSpace:'nowrap', padding:'6px 10px', borderRadius:999, border:'1px solid rgba(255,255,255,.08)', background:'rgba(255,255,255,.04)' }}>{ready ? <Wifi size={12}/> : <Clock size={12}/>} {ready ? (bareHealth[bare]?.ms ? `Ready • ${bareHealth[bare].ms}ms` : 'Ready') : status}</span>
           <button title="Copy" onClick={() => { if (activeTab.raw) navigator.clipboard.writeText(activeTab.raw); }} style={sIconSmall}><Copy size={12} /></button>
           <button title="Open" onClick={() => { if (activeTab.raw) window.open(activeTab.raw, '_blank'); else if (activeTab.encoded) window.open(activeTab.encoded, '_blank'); }} style={sIconSmall}><ExternalLink size={12} /></button>
           <button title="Fullscreen" onClick={() => frame.current?.requestFullscreen()} style={sIconSmall}><Maximize2 size={12} /></button>

@@ -50,7 +50,7 @@
     var m=MIRRORS[curIdx];
     fillSel(curIdx);
     statusTxt.textContent='CONNECTING — '+m.label.toUpperCase()+' — UNBLOCKED';
-    subTxt.textContent='Target: '+m.url+' • '+ (forceSwitch?'switching mirror…':'bare: '+getBare());
+    subTxt.textContent='Target: '+m.url+' • '+(forceSwitch?'switching mirror…':'private route • auto');
     errEl.style.display='none';
     loader.classList.remove('hidden');
     tries++;

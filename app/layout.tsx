@@ -14,14 +14,14 @@ export const metadata: Metadata = {
   creator: 'GG-Lounge Studios',
   publisher: 'GG-Lounge Studios',
   formatDetection: { email: false, address: false, telephone: false },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://gg-lounge.example.com'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://gg-lounge.vercel.app'),
   alternates: { canonical: '/' },
   openGraph: {
     title: 'GG-Lounge — 200+ Unblocked Games',
     description: '200+ unblocked games for school — fast, proxy-powered, no login.',
     url: '/',
     siteName: 'GG-Lounge',
-    images: [{ url: '/placeholder-logo.png', width: 1200, height: 630, alt: 'GG Lounge' }],
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'GG Lounge — 200+ Unblocked Games' }],
     locale: 'en_US',
     type: 'website',
   },
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'GG-Lounge — 200+ Unblocked Games',
     description: '200+ unblocked games, proxy-powered.',
-    images: ['/placeholder-logo.png'],
+    images: ['/og-image.png'],
   },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large' } },
   verification: { google: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION || undefined },
@@ -52,6 +52,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" className="bg-background" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="preconnect" href="https://www.bing.com" />
         <link rel="preconnect" href="https://tomphttp.outv1.workers.dev" />
         <link rel="preconnect" href="https://pipedapi.tokhmi.xyz" />

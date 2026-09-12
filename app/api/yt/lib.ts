@@ -40,6 +40,8 @@ export const PIPED_INSTANCES = [
   "https://pipedapi.orangenet.cc",
   "https://pipedapi.owo.si",
   "https://pipedapi.darkness.services",
+  "https://iv.ggtyler.dev",
+  "https://invidious.privacydev.net",
 ] as const;
 
 // Hosts we are willing to proxy bytes for (video/audio/images).

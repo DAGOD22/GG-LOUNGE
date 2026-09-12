@@ -5,6 +5,7 @@ import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sp
 import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, CONTROLS_LEGEND, hashDay, gameOfDayIndex, PROXY_TILES } from '@/lib/games'
 import type { Game } from '@/lib/games'
 import { GameCard, ShelfCard } from '@/components/GameCard'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { GameModal } from '@/components/GameModal'
 import { AuthDialog } from '@/components/AuthDialog'
 import { AchievementsHub } from '@/components/AchievementsHub'
@@ -43,6 +44,7 @@ export default function Page() {
   const [showAchievementsHub, setShowAchievementsHub] = useState(false)
   const [achSummary, setAchSummary] = useState<{total:number, unlocked:number, points:number} | null>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [dbMode, setDbMode] = useState<'postgres'|'local'|null>(null)
 
   const featuredGames = useMemo(()=> games.filter(g=> FEATURED_IDS.includes(g.id)), [])
 
@@ -122,6 +124,19 @@ export default function Page() {
     window.addEventListener('ggl:open-auth' as any, h as any)
     return ()=> window.removeEventListener('ggl:open-auth' as any, h as any)
   }, [])
+  // detect DB mode for warning (if local JSON, guest data is ephemeral)
+  useEffect(()=>{
+    fetch('/api/achievements').then(r=> {
+      const mode = r.headers.get('x-db-mode') as any
+      if(mode) setDbMode(mode)
+      return r.json()
+    }).catch(()=>{})
+    fetch('/api/gate').then(r=> {
+      const m = r.headers.get('x-db-mode')
+      if(m) setDbMode(m as any)
+    }).catch(()=>{})
+  },[])
+
   // anonymous id for cloud sync + username-linked cloud (favorites sync across devices)
   const anonIdRef = useRef<string>('')
   useEffect(()=>{
@@ -379,6 +394,7 @@ export default function Page() {
 
   return (
     <main className="lounge-shell">
+      <ErrorBoundary>
       <a href="#games" className="sr-only focus:not-sr-only" style={{position:'absolute',left:12,top:12,zIndex:50,padding:'8px 12px',background:'var(--lime)',color:'#0b0d12',borderRadius:999,fontWeight:900}}>Skip to games</a>
       <script type="application/ld+json" dangerouslySetInnerHTML={{__html: JSON.stringify(jsonLd)}} />
       <div className="noise" aria-hidden="true" />
@@ -435,6 +451,7 @@ export default function Page() {
         />
       )}
       {!online && <div role="status" aria-live="polite" style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(255,92,92,.12)',border:'1px solid rgba(255,92,92,.3)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:13}}><WifiOff size={16}/> You’re offline — your games still work, browsing will resume when you’re back online.</div>}
+      {dbMode==='local' && !authUser && <div role="note" style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(255,190,70,.14)',border:'1px solid rgba(255,190,70,.3)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:12}}><AlertCircle size={14}/> Guest mode: progress saves locally. <button onClick={()=> setShowAuth('register')} style={{marginLeft:4, textDecoration:'underline', background:'none', border:0, color:'var(--foreground)', fontWeight:800, cursor:'pointer'}}>Sign in to keep it forever</button> — survives deploys.</div>}
       {installable && <div style={{margin:'12px 18px 0',padding:'12px 14px',borderRadius:14,background:'linear-gradient(135deg, rgba(204,255,0,.18), rgba(0,242,234,.14))',border:'1px solid rgba(204,255,0,.35)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
         <span style={{display:'flex',alignItems:'center',gap:10,fontWeight:800,fontSize:13}}><span style={{width:32,height:32,borderRadius:999,background:'var(--lime)',display:'grid',placeItems:'center',color:'#0b0d12'}}><Download size={16}/></span> Install GG Lounge — play offline & launch like an app</span>
         <span style={{display:'flex',gap:8}}><button onClick={doInstall} style={{padding:'8px 14px',borderRadius:999,background:'#0b0d12',color:'#fff',border:'1px solid rgba(255,255,255,.15)',fontWeight:800,cursor:'pointer'}}>Install</button><button onClick={()=> setInstallable(false)} style={{padding:'8px 10px',borderRadius:999,background:'transparent',border:'1px solid var(--line)',color:'var(--foreground)',cursor:'pointer'}}>Dismiss</button></span>
@@ -798,6 +815,7 @@ export default function Page() {
           authUser={authUser}
         />
       )}
-    </main>
+          </ErrorBoundary>
+</main>
   )
 }

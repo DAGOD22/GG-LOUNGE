@@ -14,11 +14,14 @@ import { Pool } from "pg";
 let writeQueue: Promise<void> = Promise.resolve();
 
 // ---- Fix 2: auth hardening helpers ----
-const COMMON_PASSWORDS = new Set(['password','123456','qwerty','letmein','admin','aaaa','abcd','1234','password1','qwerty123'])
+const COMMON_PASSWORDS = new Set(['password','123456','qwerty','letmein','admin','aaaa','abcd','1234','password1','qwerty123','12345678','111111','123123','abc123','password123','letmein123','welcome','monkey','dragon','master','football','iloveyou','admin123','gg-lounge','gg lounge'])
 function isStrongPassword(pw: string): string | null {
-  if (pw.length < 6 || pw.length > 64) return 'Password must be 6-64 characters'
+  if (pw.length < 8 || pw.length > 64) return 'Password must be 8-64 characters'
+  if (pw.length < 12 && !/(?=.*[a-z])(?=.*[A-Z])|(?=.*\d)(?=.*[a-zA-Z])/.test(pw)) return 'Use 8+ chars with mix of cases or letters+numbers'
   if (COMMON_PASSWORDS.has(pw.toLowerCase())) return 'Password too common — choose another'
   if (/^([a-zA-Z0-9])\1{3,}$/.test(pw)) return 'Password too simple'
+  if (/(.)\1{4,}/.test(pw)) return 'Too many repeated characters'
+  // block username-like passwords will be checked in createAuthUser
   return null
 }
 const rateMap = new Map<string, { count:number, reset:number }>()

@@ -16,6 +16,8 @@ export async function POST(req: Request){
     if(!checkRateLimit('register:'+ip, 5, 15*60*1000)) return NextResponse.json({ error: "Too many accounts — try again later." }, { status: 429 })
     const { username, password, favoriteFood } = await req.json() as any
     if(!username || !password || !favoriteFood) return NextResponse.json({ error: "Username, password and favorite food required." }, { status: 400 })
+    const usernameLower = String(username).trim().toLowerCase()
+    if(!checkRateLimit('register:user:'+usernameLower, 3, 60*60*1000)) return NextResponse.json({ error: "Too many attempts for this username — wait an hour." }, { status: 429 })
     const user = await createAuthUser(String(username), String(password), String(favoriteFood))
     const sess = await createSession(user.id)
     const res = NextResponse.json({ ok: true, user: { id: user.id, username: user.username } })
