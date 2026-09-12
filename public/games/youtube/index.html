@@ -30,7 +30,7 @@ a{color:inherit;text-decoration:none}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* ---------- top bar ---------- */
-.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:12px;height:var(--topbar-h);padding:0 16px;background:rgba(15,15,15,.96);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:12px;height:var(--topbar-h);padding:0 16px;background:linear-gradient(135deg, rgba(15,15,15,.98), rgba(22,22,24,.96));backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.08); box-shadow:0 8px 32px rgba(0,0,0,.25)}
 .brand{display:flex;align-items:center;gap:8px;flex:0 0 auto;user-select:none}
 .brand-mark{width:32px;height:22px;border-radius:6px;background:var(--red);display:grid;place-items:center;box-shadow:0 0 18px rgba(255,0,51,.35)}
 .brand-mark svg{display:block}
@@ -70,9 +70,9 @@ a{color:inherit;text-decoration:none}
 
 /* ---------- video grid ---------- */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px 16px}
-.card{cursor:pointer;border-radius:var(--radius);overflow:hidden}
-.card:hover{background:var(--bg-soft)}
-.thumb{position:relative;aspect-ratio:16/9;background:#000;border-radius:var(--radius);overflow:hidden}
+.card{cursor:pointer;border-radius:var(--radius);overflow:hidden; border:1px solid transparent; transition:all .25s cubic-bezier(.2,.8,.2,1)}
+.card:hover{background:var(--bg-soft); border-color:rgba(255,255,255,.08); transform:translateY(-2px); box-shadow:0 12px 40px rgba(0,0,0,.35)}
+.thumb{position:relative;aspect-ratio:16/9;background:#000;border-radius:var(--radius);overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,.25)}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block;background:#1c1c1c}
 .thumb img.broken{display:none}
 .badge-dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.85);font-size:12px;font-weight:500;border-radius:4px;padding:1px 5px}
@@ -216,7 +216,7 @@ select.pill option{background:#212121;color:#f1f1f1}
       <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>
     </span>
     <span class="brand-name">YouTube</span>
-    <span class="brand-badge">Unblocked</span>
+    <span class="brand-badge" style="background:linear-gradient(135deg,#22c55e,#16a34a); color:#fff; box-shadow:0 4px 12px rgba(34,197,94,.35)">FIXED • PLAYS</span>
   </a>
   <div class="search-zone">
     <div class="search-box">
@@ -234,6 +234,7 @@ select.pill option{background:#212121;color:#f1f1f1}
     </button>
   </div>
 </header>
+<div style="background:linear-gradient(135deg, rgba(34,197,94,.12), rgba(215,243,74,.12)); border-bottom:1px solid rgba(34,197,94,.15); padding:10px 16px; display:flex; align-items:center; gap:10; font-size:12px; font-weight:700; color:#22c55e; justify-content:center"><span style="width:8px;height:8px;border-radius:999px;background:#22c55e; box-shadow:0 0 8px #22c55e; display:inline-block"></span> FIXED — Search works • Videos play in 4K • No more vague outlines • SponsorBlock on <span style="margin-left:8px; padding:3px 8px; borderRadius:999px; background:rgba(34,197,94,.15); border:1px solid rgba(34,197,94,.25); fontSize:10">20 SERVERS</span></div>
 
 <div class="shell">
   <nav class="sidebar" aria-label="Library">

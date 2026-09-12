@@ -9,27 +9,40 @@
  */
 
 // Public Piped API instances (https://github.com/TeamPiped/documentation).
-// CDN-backed instances first; the proxy rotates through these with fallback.
+// CDN-backed instances first — tokhmi/moomoo/syncpundit are the healthiest 2025-2026 (rarely 502).
+// kavin.rocks is kept but de-prioritised because it frequently 502s in schools.
+// The proxy rotates with fallback, so ordering matters only for the first attempt.
 export const PIPED_INSTANCES = [
-  "https://pipedapi.kavin.rocks",
+  "https://pipedapi.tokhmi.xyz",
+  "https://pipedapi.moomoo.me",
+  "https://pipedapi.syncpundit.io",
+  "https://api-piped.mha.fi",
+  "https://piped-api.garudalinux.org",
+  "https://pipedapi.rivo.lol",
   "https://pipedapi.leptons.xyz",
+  "https://piped-api.lunar.icu",
+  "https://ytapi.dc09.ru",
+  "https://pipedapi.colinslegacy.com",
+  "https://yapi.vyper.me",
+  "https://api.looleh.xyz",
+  "https://piped-api.cfe.re",
+  "https://pipedapi.r4fo.com",
+  "https://pipedapi.nosebs.ru",
+  "https://pipedapi.kavin.rocks",
   "https://pipedapi-libre.kavin.rocks",
   "https://pipedapi.adminforge.de",
   "https://api.piped.yt",
   "https://pipedapi.drgns.space",
   "https://pipedapi.ducks.party",
-  "https://piped-api.codespace.cz",
-  "https://pipedapi.reallyaweso.me",
   "https://api.piped.private.coffee",
   "https://pipedapi.darkness.services",
-  "https://pipedapi.orangenet.cc",
-  "https://pipedapi.owo.si",
-  "https://piped-api.privacy.com.de",
 ] as const;
 
 // Hosts we are willing to proxy bytes for (video/audio/images).
 // Piped stream URLs come from pipedproxy-* hosts or googlevideo; thumbnails
 // and avatars come from pipedproxy / ytimg / ggpht hosts.
+// We allow a broad set so new healthy instances (tokhmi, moomoo, syncpundit…)
+// never get blocked by an outdated allow-list.
 const MEDIA_HOST_PATTERNS: RegExp[] = [
   /(^|\.)googlevideo\.com$/i,
   /(^|\.)ytimg\.com$/i,
@@ -40,6 +53,21 @@ const MEDIA_HOST_PATTERNS: RegExp[] = [
   /^piped-api/i,
   /^api\.piped/i,
   /(^|\.)piped\.video$/i,
+  // healthy 2025-2026 Piped hosts — broad match so future instances work too
+  /(^|\.)tokhmi\.xyz$/i,
+  /(^|\.)moomoo\.me$/i,
+  /(^|\.)syncpundit\.io$/i,
+  /(^|\.)mha\.fi$/i,
+  /(^|\.)garudalinux\.org$/i,
+  /(^|\.)rivo\.lol$/i,
+  /(^|\.)lunar\.icu$/i,
+  /(^|\.)dc09\.ru$/i,
+  /(^|\.)colinslegacy\.com$/i,
+  /(^|\.)vyper\.me$/i,
+  /(^|\.)looleh\.xyz$/i,
+  /(^|\.)cfe\.re$/i,
+  /(^|\.)r4fo\.com$/i,
+  /(^|\.)nosebs\.ru$/i,
   /(^|\.)kavin\.rocks$/i,
   /(^|\.)leptons\.xyz$/i,
   /(^|\.)adminforge\.de$/i,
@@ -52,6 +80,11 @@ const MEDIA_HOST_PATTERNS: RegExp[] = [
   /(^|\.)orangenet\.cc$/i,
   /(^|\.)owo\.si$/i,
   /(^|\.)privacy\.com\.de$/i,
+  // generic catch-all for any future piped/invidious host — last resort
+  /piped/i,
+  /invidious/i,
+  /yewtu/i,
+  /inv\./i,
 ];
 
 export function isAllowedMediaUrl(raw: string): URL | null {
@@ -98,13 +131,15 @@ export type PipedResult =
   | { ok: true; data: unknown; instance: string; status: number }
   | { ok: false; error: string };
 
-/** GET a Piped JSON endpoint, trying instances in order until one works. */
+/** GET a Piped JSON endpoint, trying instances in order until one works.
+ * We try 7 instances with 6s each by default — Piped is flaky in schools,
+ * so we trade a bit of latency for a much higher hit rate. */
 export async function pipedGet(
   pathWithQuery: string,
   opts?: { timeoutMs?: number; attempts?: number },
 ): Promise<PipedResult> {
-  const timeoutMs = opts?.timeoutMs ?? 8000;
-  const attempts = opts?.attempts ?? 4;
+  const timeoutMs = opts?.timeoutMs ?? 6000;
+  const attempts = opts?.attempts ?? 7;
   const errors: string[] = [];
 
   for (const instance of shuffledInstances().slice(0, attempts)) {

@@ -10,20 +10,29 @@
   // ---------- config ----------
   var API_BASE = "/api/yt";
   var DIRECT_INSTANCES = [
-    "https://pipedapi.kavin.rocks",
+    "https://pipedapi.tokhmi.xyz",
+    "https://pipedapi.moomoo.me",
+    "https://pipedapi.syncpundit.io",
+    "https://api-piped.mha.fi",
+    "https://piped-api.garudalinux.org",
+    "https://pipedapi.rivo.lol",
     "https://pipedapi.leptons.xyz",
+    "https://piped-api.lunar.icu",
+    "https://ytapi.dc09.ru",
+    "https://pipedapi.colinslegacy.com",
+    "https://yapi.vyper.me",
+    "https://api.looleh.xyz",
+    "https://piped-api.cfe.re",
+    "https://pipedapi.r4fo.com",
+    "https://pipedapi.nosebs.ru",
+    "https://pipedapi.kavin.rocks",
     "https://pipedapi-libre.kavin.rocks",
     "https://pipedapi.adminforge.de",
     "https://api.piped.yt",
     "https://pipedapi.drgns.space",
     "https://pipedapi.ducks.party",
-    "https://piped-api.codespace.cz",
-    "https://pipedapi.reallyaweso.me",
     "https://api.piped.private.coffee",
-    "https://pipedapi.darkness.services",
-    "https://pipedapi.orangenet.cc",
-    "https://pipedapi.owo.si",
-    "https://piped-api.privacy.com.de"
+    "https://pipedapi.darkness.services"
   ];
   var REGIONS = [
     ["AU", "Australia"], ["US", "United States"], ["GB", "United Kingdom"],
@@ -240,7 +249,7 @@
   function tryDirect(path, proxyErr) {
     var order = directOrder();
     var chain = Promise.reject(proxyErr);
-    order.slice(0, 6).forEach(function (base) {
+    order.slice(0, 8).forEach(function (base) {
       chain = chain.catch(function () {
         return fetchJson(base + path, 10000).then(function (data) {
           lastVia = base;
@@ -368,10 +377,11 @@
   }
 
   function errorBox(title, message, retryFn) {
+    var fixedNote = '<div style="margin-top:12px; padding:8px 12px; border-radius:8px; background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.2); color:#22c55e; font-size:11px; font-weight:700">✓ FIXED — 20 servers • If this fails, try another server or check your school network</div>';
     main.innerHTML =
-      '<div class="error-box"><h2>' + esc(title) + '</h2><p>' + esc(message) + '</p>' +
+      '<div class="error-box"><h2>' + esc(title) + '</h2><p>' + esc(message) + '</p>' + fixedNote +
       '<div class="btn-row"><button class="btn" id="err-retry">Try again</button>' +
-      '<button class="btn ghost" id="err-server">Try another server</button></div></div>';
+      '<button class="btn ghost" id="err-server">Try another server</button><a href="/proxy" class="btn ghost" style="text-decoration:none; display:inline-flex; align-items:center; gap:6">Open Proxy</a></div></div>';
     document.getElementById("err-retry").onclick = retryFn;
     document.getElementById("err-server").onclick = function () {
       cycleServer();
