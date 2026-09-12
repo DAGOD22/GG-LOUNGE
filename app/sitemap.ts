@@ -1,20 +1,22 @@
 import type { MetadataRoute } from 'next'
+import { games } from '@/lib/games'
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://gg-lounge.example.com'
-  const staticRoutes = ['', '/proxy', '/apps', '/request-game', '/admin'].map(p=> ({
-    url: base + p,
-    lastModified: new Date(),
-    changeFrequency: 'daily' as const,
-    priority: p==='' ? 1 : 0.6,
-  }))
-  // 200 games for SEO - list top 30 as example, full sitemap would be dynamic
-  const gameIds = ['cookie-clicker','stack','drive-mad','slope','retro-bowl','among-us','hole-io','moto-x3m','1v1-lol','ovo','geometry-dash','paper-minecraft','eaglercraftx','subway-surfers','drift-boss','tunnel-rush','cluster-rush','temple-run-2']
-  const gameRoutes = gameIds.map(id=> ({
-    url: `${base}/#${id}`,
-    lastModified: new Date(),
+  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://gg-lounge.vercel.app'
+  const now = new Date()
+  const staticPages: MetadataRoute.Sitemap = [
+    { url: `${base}/`, lastModified: now, changeFrequency: 'daily', priority: 1 },
+    { url: `${base}/privacy`, lastModified: now, changeFrequency: 'monthly', priority: 0.3 },
+    { url: `${base}/terms`, lastModified: now, changeFrequency: 'monthly', priority: 0.3 },
+    { url: `${base}/proxy`, lastModified: now, changeFrequency: 'weekly', priority: 0.6 },
+    { url: `${base}/apps`, lastModified: now, changeFrequency: 'weekly', priority: 0.6 },
+    { url: `${base}/games/youtube`, lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
+  ]
+  const gameUrls: MetadataRoute.Sitemap = games.slice(0, 100).map(g => ({
+    url: `${base}${g.path}`,
+    lastModified: now,
     changeFrequency: 'weekly' as const,
-    priority: 0.5,
+    priority: 0.7,
   }))
-  return [...staticRoutes, ...gameRoutes]
+  return [...staticPages, ...gameUrls]
 }

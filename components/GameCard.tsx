@@ -28,8 +28,9 @@ export function GameCard({
   variant?: 'grid' | 'shelf'
   query?: string
 }) {
+  const [imgSrc, setImgSrc] = useState(game.icon || '')
   const [imgError, setImgError] = useState(false)
-  const showIcon = !!game.icon && !imgError
+  const showIcon = !!imgSrc && !imgError
 
   return (
     <article className={`game-card ${game.color}`} style={{ contentVisibility: 'auto' as any }}>
@@ -52,11 +53,14 @@ export function GameCard({
         {showIcon ? (
           <img
             className="game-icon game-icon--cover"
-            src={game.icon}
+            src={imgSrc}
             alt={`${game.title} icon`}
             loading="lazy"
             decoding="async"
-            onError={() => setImgError(true)}
+            onError={() => {
+              if (imgSrc.endsWith('.webp')) setImgSrc(imgSrc.replace('.webp', '.png'))
+              else setImgError(true)
+            }}
           />
         ) : (
           <div className="game-cover-fallback" aria-hidden="true">
@@ -107,8 +111,9 @@ export function ShelfCard({
   onLaunch: (g: Game) => void
   query?: string
 }) {
+  const [imgSrc, setImgSrc] = useState(game.icon || '')
   const [imgError, setImgError] = useState(false)
-  const showIcon = !!game.icon && !imgError
+  const showIcon = !!imgSrc && !imgError
   return (
     <article className={`shelf-card-art ${game.color}`} style={{ contentVisibility: 'auto' as any }}>
       <button className="favorite-button" onClick={() => onToggle(game.id)} aria-label={`${isFavorite ? 'Remove' : 'Add'} ${game.title}`}>
@@ -125,10 +130,14 @@ export function ShelfCard({
         {showIcon ? (
           <img
             className="game-icon game-icon--cover"
-            src={game.icon}
+            src={imgSrc}
             alt={`${game.title} icon`}
             loading="lazy"
-            onError={() => setImgError(true)}
+            decoding="async"
+            onError={() => {
+              if (imgSrc.endsWith('.webp')) setImgSrc(imgSrc.replace('.webp', '.png'))
+              else setImgError(true)
+            }}
           />
         ) : (
           <div className="game-cover-fallback" aria-hidden="true">

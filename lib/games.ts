@@ -303,12 +303,15 @@ const DOMAIN_COUNTS: Record<string, number> = (() => {
 })()
 
 export function getGameIconUrl(id: string): string {
-  // High-res generated covers in /game-icons/ — crisp, correct, not blurry favicons
-  // All 192 games have a bespoke 512px cover; missing files fall back to premium typography cover via onError
-  return `/game-icons/${id}.png`
+  // Prefer WebP (75% smaller: 8-45KB vs 200KB png), fallback to png via <img onError> in GameCard
+  // All 192 games have both; webp generated via PIL quality=75
+  return `/game-icons/${id}.webp`
 }
 
 export function getFaviconFallback(id: string): string {
+  return `/game-icons/${id}.webp`
+}
+export function getGameIconFallbackPng(id: string): string {
   return `/game-icons/${id}.png`
 }
 export const games: Game[] = [

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import Fuse from 'fuse.js'
 import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap, LayoutGrid, Rows3, Shuffle, ExternalLink, Copy, AlertCircle, Loader2, ChevronLeft, ChevronRight, Sun, Moon, Download, Flag, Flame, Crown, Gift, Monitor, Keyboard, Bug, ThumbsUp, Globe, MessageSquare, Star, Timer, WifiOff, Wifi, Filter, ArrowUpDown, Eye, EyeOff, ShieldAlert, ListFilter, Users, LogIn, LogOut, User, Cloud, CloudOff, Save, Menu } from 'lucide-react'
 import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, CONTROLS_LEGEND, hashDay, gameOfDayIndex, PROXY_TILES } from '@/lib/games'
 import type { Game } from '@/lib/games'
@@ -45,6 +46,7 @@ export default function Page() {
   const [achSummary, setAchSummary] = useState<{total:number, unlocked:number, points:number} | null>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [dbMode, setDbMode] = useState<'postgres'|'local'|null>(null)
+  const [streak, setStreak] = useState(1)
 
   const featuredGames = useMemo(()=> games.filter(g=> FEATURED_IDS.includes(g.id)), [])
 
@@ -102,6 +104,22 @@ export default function Page() {
     const handler = (e:any)=>{ e.preventDefault(); setInstallPrompt(e); setInstallable(true) }
     window.addEventListener('beforeinstallprompt', handler as any)
     return ()=> { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); window.removeEventListener('ggl:installable', onInstallable as any); window.removeEventListener('beforeinstallprompt', handler as any) }
+  },[])
+  // streak: consecutive days visited (retention)
+  useEffect(()=>{
+    try{
+      const today = new Date().toISOString().slice(0,10)
+      const last = localStorage.getItem('ggl_last_visit')
+      let s = parseInt(localStorage.getItem('ggl_streak')||'0',10)
+      if(last !== today){
+        const yest = new Date(Date.now()-86400000).toISOString().slice(0,10)
+        s = last===yest ? (s||1)+1 : (s||0)+1
+        if(s>1 || !last) s = Math.max(1,s)
+        localStorage.setItem('ggl_streak', String(s))
+        localStorage.setItem('ggl_last_visit', today)
+      }
+      setStreak(s||1)
+    }catch{}
   },[])
   useEffect(()=>{ try{localStorage.setItem('ggl_fav', JSON.stringify(favorites))}catch{} },[favorites])
   useEffect(()=>{ try{localStorage.setItem('ggl_recent', JSON.stringify(recentlyPlayed.slice(0,12)))}catch{} },[recentlyPlayed])
@@ -213,6 +231,7 @@ export default function Page() {
   const allGames = useMemo(() => [...games, ...published], [published])
   // Fix 1: precomputed search index to avoid re-concatting strings on every keystroke
   const searchIndex = useMemo(() => new Map(allGames.map((g) => [g.id, `${g.title} ${g.genre} ${g.tone} ${g.description}`.toLowerCase()] as const)), [allGames])
+  const fuse = useMemo(() => new Fuse(allGames, { keys: [{ name: 'title', weight: 0.5 }, { name: 'genre', weight: 0.2 }, { name: 'tone', weight: 0.15 }, { name: 'description', weight: 0.15 }], threshold: 0.35, distance: 80, ignoreLocation: true, minMatchCharLength: 2 }), [allGames])
   const visibleGames = useMemo(
     () => {
       const q = query.trim().toLowerCase()
@@ -225,6 +244,18 @@ export default function Page() {
         if(filter === 'Favorites') return favorites.includes(game.id)
         return game.genre === filter
       })
+      // typo-tolerant fallback: if exact gave 0, try Fuse (handles stak -> stack)
+      if (q && base.length === 0) {
+        const results = fuse.search(query.trim(), { limit: 24 })
+        let fuzzy = results.map(r => r.item).filter(g => {
+          if(filter === 'All games') return true
+          if(filter === 'Favorites') return favorites.includes(g.id)
+          return g.genre === filter
+        })
+        if (hideLow) fuzzy = fuzzy.filter(g=> !LOW_QUALITY_HINTS.has(g.id))
+        if (showStaffOnly) fuzzy = fuzzy.filter(g=> STAFF_PICKS.includes(g.id))
+        if (fuzzy.length > 0) base = fuzzy
+      }
       if (hideLow) base = base.filter(g=> !LOW_QUALITY_HINTS.has(g.id))
       if (showStaffOnly) base = base.filter(g=> STAFF_PICKS.includes(g.id))
       // sorting
@@ -235,7 +266,7 @@ export default function Page() {
       else base = [...base].sort((a,b)=> (b.featured?1:0) - (a.featured?1:0))
       return base
     },
-    [allGames, favorites, filter, query, playCounts, sortBy, hideLow, showStaffOnly, searchIndex],
+    [allGames, favorites, filter, query, playCounts, sortBy, hideLow, showStaffOnly, searchIndex, fuse],
   )
   const paginatedGames = useMemo(()=> visibleGames.slice(0, visibleCount), [visibleGames, visibleCount])
 
@@ -490,6 +521,7 @@ export default function Page() {
             <span>
               <strong>∞</strong> replay value
             </span>
+            <span style={{display:'flex',alignItems:'center',gap:6}}><Flame size={12} color={streak>2?'var(--lime)':'inherit'}/> <strong>{streak}</strong> day streak</span>
             <span>
               <strong>01</strong> lounge
             </span>
@@ -802,7 +834,7 @@ export default function Page() {
         </div>
         <div className="footer-bottom">
           <span>© 2026 GG-LOUNGE STUDIOS™. All rights reserved.</span>
-          <span>A Production of GG-LOUNGE STUDIOS™</span>
+          <span style={{ display: 'flex', gap: 12, alignItems: 'center' }}><a href="/privacy" style={{ textDecoration: 'underline', color: 'inherit' }}>Privacy</a> <a href="/terms" style={{ textDecoration: 'underline', color: 'inherit' }}>Terms</a> <a href="/api/health" style={{ textDecoration: 'underline', color: 'inherit' }}>Health</a></span>
           <span>Games remain property of their respective creators.</span>
         </div>
       </footer>

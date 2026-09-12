@@ -1,5 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+// ——— Simple in-memory rate limit for API abuse (per-IP, per-route) ———
+const _rlBuckets = new Map<string, { count: number; resetAt: number }>()
+function _rl(key: string, limit: number, windowMs: number) {
+  const now = Date.now()
+  const b = _rlBuckets.get(key)
+  if (!b || b.resetAt <= now) {
+    const nb = { count: 1, resetAt: now + windowMs }
+    _rlBuckets.set(key, nb)
+    return { ok: true, remaining: limit - 1, resetAt: nb.resetAt }
+  }
+  if (b.count >= limit) return { ok: false, remaining: 0, resetAt: b.resetAt }
+  b.count++
+  return { ok: true, remaining: limit - b.count, resetAt: b.resetAt }
+}
+
 /**
  * GOD GATE + Ban enforcement
  * - Entire site password protected (except /gate, /banned, /api/gate, static)
@@ -19,6 +34,26 @@ export async function middleware(request: NextRequest) {
   const isFavicon = pathname === "/favicon.ico" || pathname === "/icon.svg" || pathname === "/apple-icon.png";
   const isUv = pathname.startsWith("/uv") || pathname.startsWith("/service");
   const isHealth = pathname === "/api/visit" || pathname === "/api/yt" || pathname.startsWith("/api/yt/");
+  const isPublicPath = pathname === "/" || pathname === "/privacy" || pathname.startsWith("/privacy/") || pathname === "/terms" || pathname.startsWith("/terms/") || pathname === "/manifest.json" || pathname === "/robots.txt" || pathname === "/sitemap.xml" || pathname === "/api/health" || pathname === "/api/games" || pathname === "/api/games/search";
+  // ——— Rate limit high-abuse APIs before anything else (even public) ———
+  const _ipRL = (request.headers.get("x-forwarded-for") || "").split(",")[0].trim() || request.headers.get("x-real-ip") || "unknown";
+  if (pathname.startsWith("/api/yt")) {
+    const r = _rl(`yt:${_ipRL}`, 60, 60_000);
+    if (!r.ok) return new NextResponse(JSON.stringify({ error: "Rate limited — slow down", retryAfter: Math.ceil((r.resetAt - Date.now()) / 1000) }), { status: 429, headers: { "content-type": "application/json", "retry-after": String(Math.ceil((r.resetAt - Date.now()) / 1000)), "x-ratelimit-limit": "60", "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(Math.ceil(r.resetAt / 1000)) } });
+  }
+  if (pathname.startsWith("/api/bare") || pathname.startsWith("/api/edu") || pathname.startsWith("/api/learn") || pathname.startsWith("/api/t")) {
+    const r = _rl(`bare:${_ipRL}`, 120, 60_000);
+    if (!r.ok) return new NextResponse(JSON.stringify({ error: "Rate limited — bare busy", retryAfter: Math.ceil((r.resetAt - Date.now()) / 1000) }), { status: 429, headers: { "content-type": "application/json", "retry-after": String(Math.ceil((r.resetAt - Date.now()) / 1000)), "x-ratelimit-limit": "120", "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(Math.ceil(r.resetAt / 1000)) } });
+  }
+  if (pathname === "/api/visit" || pathname.startsWith("/api/visit")) {
+    const r = _rl(`visit:${_ipRL}`, 30, 60_000);
+    if (!r.ok) return new NextResponse(JSON.stringify({ error: "Rate limited" }), { status: 429, headers: { "retry-after": String(Math.ceil((r.resetAt - Date.now()) / 1000)) } });
+  }
+  if (pathname.startsWith("/api/game-requests")) {
+    const r = _rl(`req:${_ipRL}`, 20, 60_000);
+    if (!r.ok) return new NextResponse(JSON.stringify({ error: "Rate limited" }), { status: 429, headers: { "retry-after": String(Math.ceil((r.resetAt - Date.now()) / 1000)) } });
+  }
+  if (isPublicPath) return NextResponse.next();
 
   // For non-navigate fetches (assets, XHR), let through but still check banned for navigations only? We want gate to protect navigations only for API performance.
   // However for full site lock, we need to block page navigations, not API asset fetches that are needed for gate page itself.
@@ -94,7 +129,8 @@ export async function middleware(request: NextRequest) {
   const hasGateCookie = (request.cookies.get("gg_gate")?.value || "").length > 10;
   const isGatePathFallback = pathname === "/gate" || pathname.startsWith("/gate");
   const isBannedFallback = pathname === "/banned";
-  if (!hasGateCookie && !isGatePathFallback && !isBannedFallback && !isNext && !isStaticFile && !isFavicon && !isUv && !pathname.startsWith("/api/")) {
+  const isPublicFallback = pathname === "/" || pathname === "/privacy" || pathname.startsWith("/privacy/") || pathname === "/terms" || pathname.startsWith("/terms/") || pathname === "/manifest.json" || pathname === "/robots.txt" || pathname === "/sitemap.xml" || pathname === "/api/health" || pathname === "/api/games" || pathname === "/api/games/search";
+  if (!hasGateCookie && !isGatePathFallback && !isBannedFallback && !isPublicFallback && !isNext && !isStaticFile && !isFavicon && !isUv && !pathname.startsWith("/api/")) {
     const fetchMode2 = request.headers.get("sec-fetch-mode");
     if (!fetchMode2 || fetchMode2 === "navigate") {
       const url = new URL("/gate", request.url);

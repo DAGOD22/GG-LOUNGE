@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Allow: /privacy
+Allow: /terms
+Allow: /api/games/search
+Disallow: /proxy
+Disallow: /apps
+Disallow: /api/bare/
+Disallow: /api/yt/
+Disallow: /admin
+Disallow: /gate
+Disallow: /banned
+Sitemap: https://gg-lounge.vercel.app/sitemap.xml

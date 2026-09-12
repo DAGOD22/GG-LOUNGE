@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { getGateState, isGateBanned, recordGateFailure, recordGateSuccess } from "@/lib/db";
 import { GATE_PASSWORD, GATE_COOKIE, GATE_MAX_AGE, createGateValue, GATE_SECRET } from "@/lib/gate";
 import { createHmac } from "node:crypto";
+import { rateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +30,16 @@ function safeEqual(a: string, b: string): boolean {
 
 export async function POST(req: Request) {
   const ip = getIp(req);
+  // 5 tries per minute per IP — stops brute force before ban escalates
+  const rl = rateLimit(`gate:verify:${ip}`, 5, 60_000);
+  if (!rl.ok) {
+    const retryAfter = Math.ceil((rl.resetAt - Date.now()) / 1000);
+    const res = NextResponse.json({ ok: false, error: "RATE_LIMITED", retryAfter }, { status: 429 });
+    const hdr = rateLimitResponse(5, 0, rl.resetAt);
+    Object.entries(hdr).forEach(([k, v]) => res.headers.set(k, v));
+    res.headers.set("Retry-After", String(retryAfter));
+    return res;
+  }
   // check if already banned
   const ban = await isGateBanned(ip);
   if (ban.banned) {
