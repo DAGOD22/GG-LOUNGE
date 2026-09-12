@@ -5,7 +5,7 @@
  * - Falls back to a local JSON file store when it isn't (local dev / preview).
  * - Auto-creates tables on first use, so there is no manual migration step.
  */
-import { randomUUID } from "node:crypto";
+import { randomUUID, scryptSync, randomBytes, timingSafeEqual } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { Pool } from "pg";
@@ -122,6 +122,29 @@ export function migrate(): Promise<void> {
           "title" TEXT NOT NULL,
           "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
+        CREATE TABLE IF NOT EXISTS "auth_user" (
+          "id" TEXT PRIMARY KEY,
+          "username" TEXT NOT NULL,
+          "username_lower" TEXT UNIQUE NOT NULL,
+          "password_hash" TEXT NOT NULL,
+          "favorite_food_hash" TEXT NOT NULL,
+          "favorite_food_norm" TEXT NOT NULL,
+          "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS "auth_session" (
+          "token" TEXT PRIMARY KEY,
+          "user_id" TEXT NOT NULL REFERENCES "auth_user"("id") ON DELETE CASCADE,
+          "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "expires_at" TIMESTAMPTZ NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS "game_save" (
+          "user_id" TEXT NOT NULL REFERENCES "auth_user"("id") ON DELETE CASCADE,
+          "game_id" TEXT NOT NULL,
+          "data" TEXT NOT NULL,
+          "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY ("user_id", "game_id")
+        );
+        CREATE INDEX IF NOT EXISTS "game_save_user_idx" ON "game_save" ("user_id");
       `);
       // Tolerate tables created by older schemas.
       await p.query(`ALTER TABLE "banned_user" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMPTZ`);
@@ -154,6 +177,9 @@ interface LocalStore {
   games: PublishedGame[];
   reports: Report[];
   userStates: Record<string, UserState>;
+  users: AuthUser[];
+  sessions: AuthSession[];
+  saves: GameSave[];
 }
 
 let localDir: string | null = null;
@@ -189,9 +215,12 @@ async function readLocal(): Promise<LocalStore> {
       games: parsed.games ?? [],
       reports: (parsed as any).reports ?? [],
       userStates: (parsed as any).userStates ?? {},
+      users: (parsed as any).users ?? [],
+      sessions: (parsed as any).sessions ?? [],
+      saves: (parsed as any).saves ?? [],
     };
   } catch {
-    return { bans: [], visits: [], requests: [], games: [], reports: [], userStates: {} };
+    return { bans: [], visits: [], requests: [], games: [], reports: [], userStates: {}, users: [], sessions: [], saves: [] };
   }
 }
 
@@ -414,6 +443,9 @@ export function scanHtmlForRisks(html:string): string[] {
   return risks
 }
 export interface UserState { id:string; favorites:string[]; playCounts:Record<string,number>; updatedAt:string }
+export interface AuthUser { id:string; username:string; usernameLower:string; passwordHash:string; favoriteFoodHash:string; favoriteFoodNorm:string; createdAt:string }
+export interface AuthSession { token:string; userId:string; createdAt:string; expiresAt:string }
+export interface GameSave { userId:string; gameId:string; data:string; updatedAt:string }
 export async function getUserState(id:string): Promise<UserState|null>{
   if(getMode()==="postgres"){
     try{
@@ -442,6 +474,188 @@ export async function setUserState(id:string, state: Omit<UserState,'id'|'update
   return full
 }
 
+function hashPassword(password:string): string {
+  const salt = randomBytes(16).toString('hex')
+  const hash = scryptSync(password, salt, 64).toString('hex')
+  return salt + ':' + hash
+}
+function verifyPassword(password:string, stored:string): boolean {
+  try {
+    const [salt, hash] = stored.split(':')
+    if(!salt || !hash) return false
+    const derived = scryptSync(password, salt, 64).toString('hex')
+    const a = Buffer.from(hash, 'hex')
+    const b = Buffer.from(derived, 'hex')
+    if(a.length !== b.length) return false
+    return timingSafeEqual(a,b)
+  } catch { return false }
+}
+function normFood(s:string){ return s.trim().toLowerCase().replace(/\s+/g,' ') }
+function hashFood(food:string): string {
+  const n = normFood(food)
+  const salt = randomBytes(8).toString('hex')
+  const hash = scryptSync(n, salt, 32).toString('hex')
+  return salt+':'+hash
+}
+function verifyFood(food:string, stored:string, norm:string|undefined): boolean {
+  const n = normFood(food)
+  if(norm && n===norm) return true
+  try{
+    const [salt, hash] = stored.split(':')
+    if(!salt||!hash) return false
+    const derived = scryptSync(n, salt, 32).toString('hex')
+    return timingSafeEqual(Buffer.from(hash,'hex'), Buffer.from(derived,'hex'))
+  }catch{ return false }
+}
+
+export async function createAuthUser(username:string, password:string, favoriteFood:string): Promise<AuthUser>{
+  const usernameTrim = username.trim()
+  const usernameLower = usernameTrim.toLowerCase()
+  if(!/^[a-z0-9_]{3,20}$/.test(usernameLower)) throw new Error('Username must be 3-20 letters, numbers or _')
+  if(password.length<4 || password.length>64) throw new Error('Password must be 4-64 characters')
+  if(!favoriteFood.trim()) throw new Error('Favorite food is required')
+  if(getMode()==="postgres"){
+    await migrate()
+    const exists = await pgQuery<{id:string}>('SELECT id FROM auth_user WHERE username_lower=$1 LIMIT 1',[usernameLower])
+    if(exists.length) throw new Error('Username taken')
+    const id=randomUUID()
+    const passwordHash=hashPassword(password)
+    const favoriteFoodHash=hashFood(favoriteFood)
+    const favoriteFoodNorm=normFood(favoriteFood)
+    const createdAt=new Date().toISOString()
+    await pgQuery('INSERT INTO auth_user (id, username, username_lower, password_hash, favorite_food_hash, favorite_food_norm, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',[id, usernameTrim, usernameLower, passwordHash, favoriteFoodHash, favoriteFoodNorm, createdAt])
+    return { id, username: usernameTrim, usernameLower, passwordHash, favoriteFoodHash, favoriteFoodNorm, createdAt }
+  }
+  const s = await readLocal() as any
+  if(s.users.find((u:any)=> u.usernameLower===usernameLower)) throw new Error('Username taken')
+  const id=randomUUID()
+  const passwordHash=hashPassword(password)
+  const favoriteFoodHash=hashFood(favoriteFood)
+  const favoriteFoodNorm=normFood(favoriteFood)
+  const createdAt=new Date().toISOString()
+  const user:AuthUser={ id, username: usernameTrim, usernameLower, passwordHash, favoriteFoodHash, favoriteFoodNorm, createdAt }
+  s.users.push(user)
+  await writeLocal(s)
+  return user
+}
+export async function findAuthUserByUsername(username:string): Promise<AuthUser|null>{
+  const lower=username.trim().toLowerCase()
+  if(getMode()==="postgres"){
+    await migrate()
+    const rows=await pgQuery<any>('SELECT id, username, username_lower as "usernameLower", password_hash as "passwordHash", favorite_food_hash as "favoriteFoodHash", favorite_food_norm as "favoriteFoodNorm", created_at as "createdAt" FROM auth_user WHERE username_lower=$1 LIMIT 1',[lower])
+    return rows[0] as AuthUser || null
+  }
+  const s=await readLocal() as any
+  return s.users.find((u:any)=> u.usernameLower===lower) || null
+}
+export async function findAuthUserById(id:string): Promise<AuthUser|null>{
+  if(getMode()==="postgres"){
+    await migrate()
+    const rows=await pgQuery<any>('SELECT id, username, username_lower as "usernameLower", password_hash as "passwordHash", favorite_food_hash as "favoriteFoodHash", favorite_food_norm as "favoriteFoodNorm", created_at as "createdAt" FROM auth_user WHERE id=$1 LIMIT 1',[id])
+    return rows[0] as AuthUser || null
+  }
+  const s=await readLocal() as any
+  return s.users.find((u:any)=> u.id===id) || null
+}
+export async function verifyAuthUser(username:string, password:string): Promise<AuthUser|null>{
+  const u=await findAuthUserByUsername(username)
+  if(!u) return null
+  if(!verifyPassword(password, u.passwordHash)) return null
+  return u
+}
+export async function verifyFavoriteFood(username:string, food:string): Promise<boolean>{
+  const u=await findAuthUserByUsername(username)
+  if(!u) return false
+  return verifyFood(food, u.favoriteFoodHash, u.favoriteFoodNorm)
+}
+export async function resetAuthPassword(username:string, newPassword:string): Promise<void>{
+  if(newPassword.length<4 || newPassword.length>64) throw new Error('Password must be 4-64 characters')
+  const hash=hashPassword(newPassword)
+  if(getMode()==="postgres"){
+    await migrate()
+    await pgQuery('UPDATE auth_user SET password_hash=$2 WHERE username_lower=$1',[username.trim().toLowerCase(), hash])
+    return
+  }
+  const s=await readLocal() as any
+  const u=s.users.find((x:any)=> x.usernameLower===username.trim().toLowerCase())
+  if(u){ u.passwordHash=hash; await writeLocal(s) }
+}
+export async function createSession(userId:string): Promise<AuthSession>{
+  const token=randomBytes(32).toString('hex')
+  const createdAt=new Date().toISOString()
+  const expiresAt=new Date(Date.now()+ 30*24*3600*1000).toISOString()
+  const sess:AuthSession={ token, userId, createdAt, expiresAt }
+  if(getMode()==="postgres"){
+    await migrate()
+    await pgQuery('INSERT INTO auth_session (token, user_id, created_at, expires_at) VALUES ($1,$2,$3,$4)',[token, userId, createdAt, expiresAt])
+    return sess
+  }
+  const s=await readLocal() as any
+  s.sessions.push(sess)
+  s.sessions=s.sessions.slice(-500)
+  await writeLocal(s)
+  return sess
+}
+export async function getSession(token:string): Promise<AuthSession|null>{
+  if(!token) return null
+  if(getMode()==="postgres"){
+    await migrate()
+    const rows=await pgQuery<any>('SELECT token, user_id as "userId", created_at as "createdAt", expires_at as "expiresAt" FROM auth_session WHERE token=$1 LIMIT 1',[token])
+    const r=rows[0] as AuthSession
+    if(!r) return null
+    if(new Date(r.expiresAt) < new Date()){ await pgQuery('DELETE FROM auth_session WHERE token=$1',[token]); return null }
+    return r
+  }
+  const s=await readLocal() as any
+  const sess=s.sessions.find((x:any)=> x.token===token) as AuthSession|null
+  if(!sess) return null
+  if(new Date(sess.expiresAt) < new Date()){ s.sessions=s.sessions.filter((x:any)=> x.token!==token); await writeLocal(s); return null }
+  return sess
+}
+export async function deleteSession(token:string): Promise<void>{
+  if(getMode()==="postgres"){ await migrate(); await pgQuery('DELETE FROM auth_session WHERE token=$1',[token]); return }
+  const s=await readLocal() as any
+  s.sessions=s.sessions.filter((x:any)=> x.token!==token)
+  await writeLocal(s)
+}
+export async function getUserFromToken(token:string): Promise<AuthUser|null>{
+  const sess=await getSession(token)
+  if(!sess) return null
+  return findAuthUserById(sess.userId)
+}
+export async function getSave(userId:string, gameId:string): Promise<GameSave|null>{
+  if(getMode()==="postgres"){
+    await migrate()
+    const rows=await pgQuery<any>('SELECT user_id as "userId", game_id as "gameId", data, updated_at as "updatedAt" FROM game_save WHERE user_id=$1 AND game_id=$2 LIMIT 1',[userId, gameId])
+    return rows[0] as GameSave||null
+  }
+  const s=await readLocal() as any
+  return s.saves.find((x:any)=> x.userId===userId && x.gameId===gameId) || null
+}
+export async function setSave(userId:string, gameId:string, data:string): Promise<GameSave>{
+  const updatedAt=new Date().toISOString()
+  const save:GameSave={ userId, gameId, data: data.slice(0, 500_000), updatedAt }
+  if(getMode()==="postgres"){
+    await migrate()
+    await pgQuery('INSERT INTO game_save (user_id, game_id, data, updated_at) VALUES ($1,$2,$3,$4) ON CONFLICT (user_id, game_id) DO UPDATE SET data=EXCLUDED.data, updated_at=EXCLUDED.updated_at',[userId, gameId, save.data, updatedAt])
+    return save
+  }
+  const s=await readLocal() as any
+  const idx=s.saves.findIndex((x:any)=> x.userId===userId && x.gameId===gameId)
+  if(idx>=0) s.saves[idx]=save
+  else s.saves.push(save)
+  if(s.saves.length>5000) s.saves=s.saves.slice(-5000)
+  await writeLocal(s)
+  return save
+}
+export async function listSaves(userId:string): Promise<GameSave[]>{
+  if(getMode()==="postgres"){
+    await migrate()
+    return pgQuery<any>('SELECT user_id as "userId", game_id as "gameId", updated_at as "updatedAt" FROM game_save WHERE user_id=$1 ORDER BY updated_at DESC',[userId]) as Promise<GameSave[]>
+  }
+  const s=await readLocal() as any
+  return s.saves.filter((x:any)=> x.userId===userId).map((x:any)=> ({ userId:x.userId, gameId:x.gameId, updatedAt:x.updatedAt }))
+}
 
 export async function listRequests(): Promise<GameRequest[]> {
   if (getMode() === "postgres") {

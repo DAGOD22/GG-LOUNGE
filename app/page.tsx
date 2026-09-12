@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap, LayoutGrid, Rows3, Shuffle, ExternalLink, Copy, AlertCircle, Loader2, ChevronLeft, ChevronRight, Sun, Moon, Download, Flag, Flame, Crown, Gift, Monitor, Keyboard, Bug, ThumbsUp, Globe, MessageSquare, Star, Timer, WifiOff, Wifi, Filter, ArrowUpDown, Eye, EyeOff, ShieldAlert, ListFilter, Users } from 'lucide-react'
+import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap, LayoutGrid, Rows3, Shuffle, ExternalLink, Copy, AlertCircle, Loader2, ChevronLeft, ChevronRight, Sun, Moon, Download, Flag, Flame, Crown, Gift, Monitor, Keyboard, Bug, ThumbsUp, Globe, MessageSquare, Star, Timer, WifiOff, Wifi, Filter, ArrowUpDown, Eye, EyeOff, ShieldAlert, ListFilter, Users, LogIn, LogOut, User, Cloud, CloudOff, Save } from 'lucide-react'
 
 type Game = { id: string; title: string; subtitle: string; description: string; genre: string; tone: string; mark: string; color: string; path: string; icon?: string; featured?: boolean }
 
@@ -98,16 +98,16 @@ const games: Game[] = [
   { id: 'plants-vs-zombies', title: 'Plants vs Zombies', subtitle: 'Hold the lawn.', description: 'The classic lawn defense — pea-shooters vs the horde.', genre: 'Arcade', tone: 'Strategy', mark: 'PV', color: 'mining', path: '/games/plants-vs-zombies/index.html' },
   { id: 'snow-rider-3d', title: 'Snow Rider 3D', subtitle: 'Shred the mountain.', description: 'Dodge trees and grab gifts on an endless snowy ride.', genre: 'Arcade', tone: 'Reflex', mark: 'SN', color: 'hextris', path: '/games/snow-rider-3d/index.html' },
   { id: 'granny', title: 'Granny', subtitle: 'Don’t make a sound.', description: 'Escape Granny’s house in 5 days — quietly.', genre: 'Arcade', tone: 'Horror', mark: 'GR', color: 'twenty', path: '/games/granny/index.html' },
-  { id: 'hole-io', title: 'Hole.io', subtitle: 'Eat the city.', description: 'Local unblocked hole-eater — swallow buildings, grow huge, own the map. No CDN, pure canvas.', genre: 'Arcade', tone: 'Battle', mark: 'HO', color: 'mining', path: '/games/hole-io/index.html', featured: true },
-  { id: '1v1-lol', title: '1v1.LOL', subtitle: 'Build. Aim. Eliminate.', description: 'Proxied 1v1.LOL — full building & shooting, via lounge tunnel. Hidden proxy, no block shown.', genre: 'Arcade', tone: 'Battle', mark: '1V', color: 'devil', path: '/games/1v1-lol/index.html' },
-  { id: 'krunker', title: 'Krunker', subtitle: 'FPS in a tab.', description: 'Proxied Krunker.io — fast FPS multiplayer via encrypted tunnel. WS & all features.', genre: 'Arcade', tone: 'Battle', mark: 'KR', color: 'stack', path: '/games/krunker/index.html' },
-  { id: 'smashkarts', title: 'SmashKarts', subtitle: 'Drive. Smash. Win.', description: 'Proxied SmashKarts.io — kart chaos with weapons, full multiplayer.', genre: 'Racing', tone: 'Battle', mark: 'SK', color: 'drive', path: '/games/smashkarts/index.html' },
-  { id: 'ev-io', title: 'Ev.io', subtitle: 'Sci-fi shooter.', description: 'Proxied Ev.io — halo-style FPS, ranked & all maps, tunnelled.', genre: 'Arcade', tone: 'Battle', mark: 'EV', color: 'hextris', path: '/games/ev-io/index.html' },
-  { id: 'shell-shockers', title: 'Shell Shockers', subtitle: 'Egg warfare.', description: 'Proxied Shell Shockers — egg FPS, all eggs & weapons, via lounge.', genre: 'Arcade', tone: 'Battle', mark: 'SS', color: 'cookie', path: '/games/shell-shockers/index.html' },
-  { id: 'agar-io', title: 'Agar.io', subtitle: 'Eat or be eaten.', description: 'Proxied Agar.io — eat cells, split, full multiplayer unblocked.', genre: 'Arcade', tone: 'Battle', mark: 'AG', color: 'hextris', path: '/games/agar-io/index.html' },
-  { id: 'slither-io', title: 'Slither.io', subtitle: 'Slither big.', description: 'Proxied Slither.io — grow the snake, trap others, full online.', genre: 'Arcade', tone: 'Battle', mark: 'SL', color: 'mining', path: '/games/slither-io/index.html' },
-  { id: 'paper-io-2-3d', title: 'Paper.io 3D', subtitle: 'Paint the map.', description: 'Proxied Paper.io territory — capture land, cut tails, via tunnel.', genre: 'Arcade', tone: 'Battle', mark: 'PA', color: 'youtube', path: '/games/paper-io-2-3d/index.html' },
-  { id: 'stumble-guys', title: 'Stumble Guys', subtitle: 'Fall, run, win.', description: 'Proxied Stumble Guys — 32-player knockout chaos, all maps.', genre: 'Arcade', tone: 'Battle', mark: 'SG', color: 'devil', path: '/games/stumble-guys/index.html' },
+  { id: 'hole-io', title: 'Hole.io', subtitle: 'Eat the city.', description: 'Local unblocked hole-eater — swallow buildings, grow huge, own the map. Play instantly — no downloads.', genre: 'Arcade', tone: 'Battle', mark: 'HO', color: 'mining', path: '/games/hole-io/index.html', featured: true },
+  { id: '1v1-lol', title: '1v1.LOL', subtitle: 'Build. Aim. Eliminate.', description: 'Fast multiplayer — build, shoot and win.', genre: 'Arcade', tone: 'Battle', mark: '1V', color: 'devil', path: '/games/1v1-lol/index.html' },
+  { id: 'krunker', title: 'Krunker', subtitle: 'FPS in a tab.', description: 'Fast FPS multiplayer — join and play.', genre: 'Arcade', tone: 'Battle', mark: 'KR', color: 'stack', path: '/games/krunker/index.html' },
+  { id: 'smashkarts', title: 'SmashKarts', subtitle: 'Drive. Smash. Win.', description: 'SmashKarts.io — kart chaos with weapons, full multiplayer.', genre: 'Racing', tone: 'Battle', mark: 'SK', color: 'drive', path: '/games/smashkarts/index.html' },
+  { id: 'ev-io', title: 'Ev.io', subtitle: 'Sci-fi shooter.', description: 'Sci-fi FPS — all maps, ranked.', genre: 'Arcade', tone: 'Battle', mark: 'EV', color: 'hextris', path: '/games/ev-io/index.html' },
+  { id: 'shell-shockers', title: 'Shell Shockers', subtitle: 'Egg warfare.', description: 'Shell Shockers — egg FPS, all eggs & weapons, via lounge.', genre: 'Arcade', tone: 'Battle', mark: 'SS', color: 'cookie', path: '/games/shell-shockers/index.html' },
+  { id: 'agar-io', title: 'Agar.io', subtitle: 'Eat or be eaten.', description: 'Agar.io — eat cells, split, full multiplayer unblocked.', genre: 'Arcade', tone: 'Battle', mark: 'AG', color: 'hextris', path: '/games/agar-io/index.html' },
+  { id: 'slither-io', title: 'Slither.io', subtitle: 'Slither big.', description: 'Slither.io — grow the snake, trap others, full online.', genre: 'Arcade', tone: 'Battle', mark: 'SL', color: 'mining', path: '/games/slither-io/index.html' },
+  { id: 'paper-io-2-3d', title: 'Paper.io 3D', subtitle: 'Paint the map.', description: 'Capture territory — cut tails, paint the map.', genre: 'Arcade', tone: 'Battle', mark: 'PA', color: 'youtube', path: '/games/paper-io-2-3d/index.html' },
+  { id: 'stumble-guys', title: 'Stumble Guys', subtitle: 'Fall, run, win.', description: 'Stumble Guys — 32-player knockout chaos, all maps.', genre: 'Arcade', tone: 'Battle', mark: 'SG', color: 'devil', path: '/games/stumble-guys/index.html' },
   { id: 'dune-dash', title: 'Dune Dash', subtitle: 'Sand sprint.', description: 'Desert runner — dash over dunes, dodge rocks. Classroom Center hit.', genre: 'Racing', tone: 'Desert', mark: 'DD', color: 'drive', path: '/games/dune-dash/index.html' },
   { id: 'vibes', title: 'Vibes', subtitle: 'Chill flow.', description: 'Vibes — rhythmic dodge, stay in the pulse.', genre: 'Arcade', tone: 'Flow', mark: 'VB', color: 'hextris', path: '/games/vibes/index.html' },
   { id: 'vortex-tunnel', title: 'Vortex Tunnel', subtitle: 'Spin fast.', description: 'Vortex Tunnel — spin through the neon vortex.', genre: 'Arcade', tone: 'Reflex', mark: 'VT', color: 'hextris', path: '/games/vortex-tunnel/index.html' },
@@ -257,6 +257,14 @@ export default function Page() {
   const [newReqTitle, setNewReqTitle] = useState('')
   const [reportSent, setReportSent] = useState(false)
   const [leaderTab, setLeaderTab] = useState<'today'|'week'>('today')
+  const [authUser, setAuthUser] = useState<{id:string; username:string}|null>(null)
+  const [showAuth, setShowAuth] = useState<null|'login'|'register'|'reset'>(null)
+  const [authForm, setAuthForm] = useState({ username:'', password:'', favoriteFood:'', newPassword:'' })
+  const [authError, setAuthError] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle'|'saving'|'saved'|'offline'>('idle')
+  const pendingSaveRef = useRef<string|null>(null)
+  const saveAppliedRef = useRef(false)
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [sortBy, setSortBy] = useState<'featured'|'popular'|'newest'|'az'>('featured')
   const [visibleCount, setVisibleCount] = useState(36)
@@ -325,6 +333,10 @@ export default function Page() {
   useEffect(()=>{ try{ localStorage.setItem('ggl_playcounts', JSON.stringify(playCounts))}catch{}},[playCounts])
   useEffect(()=>{ try{ localStorage.setItem('ggl_req_votes', JSON.stringify(requestVotes))}catch{}},[requestVotes])
   useEffect(()=>{ try{ localStorage.setItem('ggl_theme', theme); document.documentElement.setAttribute('data-theme', theme); }catch{}},[theme])
+  // auth: fetch me
+  useEffect(()=>{
+    fetch('/api/auth/me').then(r=> r.ok? r.json():null).then((d:any)=> { if(d?.user) setAuthUser(d.user) }).catch(()=>{})
+  },[])
   // anonymous id for cloud sync
   const anonIdRef = useRef<string>('')
   useEffect(()=>{
@@ -438,10 +450,75 @@ export default function Page() {
     setShowControls(false)
     setShowLegend(false)
     setReportSent(false)
+    saveAppliedRef.current=false
+    pendingSaveRef.current=null
     setRecentlyPlayed(prev=> [game.id, ...prev.filter(x=> x!==game.id)].slice(0,12))
     setPlayCounts(prev=> ({ ...prev, [game.id]: (prev[game.id]||0)+1 }))
-    // also fire visit beacon best-effort
     try{ fetch('/api/visit', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ gameId: game.id }) }).catch(()=>{}) }catch{}
+    if(authUser){
+      setSaveStatus('idle')
+      fetch('/api/save/'+encodeURIComponent(game.id)).then(r=> r.ok? r.json():null).then((d:any)=>{
+        if(d?.save?.data){
+          pendingSaveRef.current = d.save.data
+          // if frame already loaded, apply now
+          try{ applySaveToFrame(d.save.data) }catch{}
+        }
+      }).catch(()=>{})
+    }
+  }
+  function applySaveToFrame(dataStr:string){
+    const iframe = frameRef.current
+    if(!iframe?.contentWindow) return
+    try{
+      const win = iframe.contentWindow as any
+      const doc = iframe.contentDocument
+      if(!doc) return
+      const parsed = JSON.parse(dataStr)
+      if(parsed && typeof parsed==='object'){
+        // parsed is {localStorage:{key:val}, indexedDB? ...} or flat
+        const ls = parsed.localStorage || parsed
+        for(const [k,v] of Object.entries(ls)){
+          try{ win.localStorage.setItem(k, String(v)) }catch{}
+          try{ doc.defaultView?.localStorage.setItem(k, String(v)) }catch{}
+        }
+        // also try to write directly via iframe's localStorage
+        saveAppliedRef.current=true
+        setSaveStatus('saved')
+      }
+    }catch{}
+  }
+  function collectSaveFromFrame(): string | null{
+    const iframe = frameRef.current
+    if(!iframe?.contentWindow) return null
+    try{
+      const win = iframe.contentWindow as any
+      const ls: Record<string,string> = {}
+      const len = win.localStorage.length
+      for(let i=0;i<len;i++){
+        const k = win.localStorage.key(i)
+        if(k) ls[k]= win.localStorage.getItem(k) || ''
+      }
+      // if no keys, try document
+      if(Object.keys(ls).length===0){
+        const docLs = iframe.contentDocument?.defaultView?.localStorage
+        if(docLs){
+          for(let i=0;i<docLs.length;i++){ const k=docLs.key(i); if(k) ls[k]=docLs.getItem(k)||'' }
+        }
+      }
+      if(Object.keys(ls).length===0) return null
+      return JSON.stringify({ localStorage: ls, _ts: Date.now() })
+    }catch{ return null }
+  }
+  async function pushSave(){
+    if(!authUser || !activeGame) return
+    const data = collectSaveFromFrame()
+    if(!data) return
+    setSaveStatus('saving')
+    try{
+      const r = await fetch('/api/save/'+encodeURIComponent(activeGame.id), { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ data }) })
+      if(r.ok) setSaveStatus('saved')
+      else setSaveStatus('offline')
+    }catch{ setSaveStatus('offline') }
   }
   function toggleFavorite(id: string) {
     setFavorites((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
@@ -493,12 +570,60 @@ export default function Page() {
   }
   function openProxyTile(url:string){ window.location.href = '/proxy?url='+encodeURIComponent(url) }
   function copyGameLink(path:string){ try{ navigator.clipboard.writeText(location.origin+path); }catch{} }
+  // autosave every 7s while playing and on hide
+  useEffect(()=>{
+    if(!authUser || !activeGame) return
+    const id = setInterval(()=> { pushSave() }, 7000)
+    const onVis = ()=> { if(document.visibilityState==='hidden') pushSave() }
+    const onBeforeUnload = ()=> { pushSave() }
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return ()=> { clearInterval(id); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('beforeunload', onBeforeUnload) }
+  },[authUser, activeGame])
+  async function doAuth(mode:'login'|'register'|'reset'){
+    setAuthError(''); setAuthLoading(true)
+    try{
+      let url='', body:any={}
+      if(mode==='login'){ url='/api/auth/login'; body={ username: authForm.username, password: authForm.password } }
+      else if(mode==='register'){ url='/api/auth/register'; body={ username: authForm.username, password: authForm.password, favoriteFood: authForm.favoriteFood } }
+      else { url='/api/auth/reset'; body={ username: authForm.username, favoriteFood: authForm.favoriteFood, newPassword: authForm.newPassword } }
+      const r = await fetch(url, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body) })
+      const d = await r.json().catch(()=> ({}))
+      if(!r.ok) throw new Error(d.error || 'Failed')
+      if(mode==='reset'){ setShowAuth('login'); setAuthError('Password reset — now log in.'); return }
+      // fetch me
+      const me = await fetch('/api/auth/me').then(x=> x.json()).catch(()=>null)
+      if(me?.user) setAuthUser(me.user)
+      setShowAuth(null); setAuthForm({ username:'', password:'', favoriteFood:'', newPassword:'' })
+    }catch(e:any){ setAuthError(e.message || 'Error') } finally{ setAuthLoading(false) }
+  }
+  async function doLogout(){
+    await fetch('/api/auth/logout', { method:'POST' }).catch(()=>{})
+    setAuthUser(null); setSaveStatus('idle')
+  }
 
   function handleFrameLoad(){
     setFrameLoading(false)
     setFrameError(null)
     const iframe = frameRef.current
     if(!iframe) return
+    // apply pending cloud save before game reads it (if not yet applied)
+    if(pendingSaveRef.current && !saveAppliedRef.current){
+      try{
+        const dataStr = pendingSaveRef.current
+        const parsed = JSON.parse(dataStr)
+        const ls = parsed.localStorage || parsed
+        for(const [k,v] of Object.entries(ls)){
+          try{ iframe.contentWindow?.localStorage.setItem(k, String(v)) }catch{}
+        }
+        saveAppliedRef.current=true
+        setSaveStatus('saved')
+        // reload once so game picks up save from start
+        pendingSaveRef.current=null
+        setTimeout(()=> { try{ iframe.contentWindow?.location.reload() }catch{} }, 80)
+        return
+      }catch{}
+    }
     // focus iframe for keyboard immediately
     try{ iframe.focus() }catch{}
     try{
@@ -560,7 +685,7 @@ export default function Page() {
           const txt = (doc.body?.innerText||'').slice(0,2500)
           const hasCanvas = !!doc.querySelector('canvas')
           if(!hasCanvas && /404|Failed to download|NOT FOUND|cdn|blocked|cannot fetch|NetworkError/i.test(txt) && txt.length<2500){
-            setFrameError('This game failed to load its files. Try switching its mirror ( ⋮ → CDN inside the game), or open it in the Lounge Proxy.')
+            setFrameError('This game didn’t load. Try again or open in a new tab.')
           } else if(!hasCanvas && txt.trim().length>0 && txt.trim().length<400 && /unavailable|updating|missing/i.test(txt)){
             // let game own overlay handle it
           } else if(!hasCanvas && doc.body && doc.body.children.length===0){
@@ -621,12 +746,49 @@ export default function Page() {
             {online ? <Wifi size={12}/> : <WifiOff size={12} color="var(--coral)"/>}
             <span className="live-dot" style={{background: online?'var(--lime)':'var(--coral)'}} /> {allGames.length} titles
           </div>
+          {authUser ? (
+            <span style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',fontSize:12,fontWeight:800}}>
+              <User size={14}/> {authUser.username}
+              <span style={{display:'flex',alignItems:'center',gap:4,padding:'2px 6px',borderRadius:999,background: saveStatus==='saved'?'rgba(34,197,94,.14)': saveStatus==='saving'?'rgba(215,243,74,.14)':'transparent',border:'1px solid var(--line)',fontSize:10}}>{saveStatus==='saved'?<Cloud size={10}/>: saveStatus==='saving'?<Save size={10}/>:<CloudOff size={10}/>} {saveStatus==='saved'?'Saved': saveStatus==='saving'?'Saving…':'Sync'}</span>
+              <button onClick={doLogout} aria-label="Log out" title="Log out" style={{width:24,height:24,display:'grid',placeItems:'center',borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',cursor:'pointer'}}><LogOut size={12}/></button>
+            </span>
+          ) : (
+            <button onClick={()=> setShowAuth('login')} style={{padding:'7px 12px',borderRadius:999,border:'1px solid var(--lime)',background:'var(--lime)',color:'#0b0d12',fontWeight:900,fontSize:12,display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}><LogIn size={14}/> Sign in</button>
+          )}
           <button onClick={toggleTheme} aria-label="Toggle theme" title={theme==='dark'?'Switch to light mode':'Switch to dark mode'} style={{width:36,height:36,borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',display:'grid',placeItems:'center',cursor:'pointer'}}>
             {theme==='dark' ? <Sun size={16}/> : <Moon size={16}/>}
           </button>
           {installable && <button onClick={doInstall} style={{padding:'7px 10px',borderRadius:999,border:'1px solid var(--lime)',background:'var(--lime)',color:'#0b0d12',fontWeight:900,fontSize:12,display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}><Download size={14}/> Install</button>}
         </div>
       </header>
+      {showAuth && (
+        <div role="dialog" aria-modal="true" aria-label="Sign in" onClick={e=> { if(e.target===e.currentTarget) setShowAuth(null) }} style={{position:'fixed',inset:0,zIndex:40,display:'grid',placeItems:'center',background:'rgba(6,7,10,.72)',backdropFilter:'blur(8px)',padding:16}}>
+          <div style={{width:'100%',maxWidth:380,background:'var(--panel)',border:'1px solid var(--line)',borderRadius:18,padding:18,boxShadow:'0 20px 60px rgba(0,0,0,.4)'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+              <h3 style={{margin:0,fontSize:18,letterSpacing:'-0.02em',display:'flex',alignItems:'center',gap:8}}><User size={16}/> {showAuth==='login'?'Sign in': showAuth==='register'?'Create account':'Reset password'}</h3>
+              <button onClick={()=> setShowAuth(null)} aria-label="Close" style={{width:30,height:30,display:'grid',placeItems:'center',borderRadius:999,border:'1px solid var(--line)',background:'transparent',cursor:'pointer'}}><X size={14}/></button>
+            </div>
+            {showAuth!=='reset' && <p style={{margin:'0 0 12px',color:'var(--muted)',fontSize:12,lineHeight:1.5}}>Sign in with just username & password. Your progress saves to the cloud and works on any device.</p>}
+            {showAuth==='reset' && <p style={{margin:'0 0 12px',color:'var(--muted)',fontSize:12}}>Answer your security question to reset your password.</p>}
+            <div style={{display:'grid',gap:10}}>
+              <label style={{display:'grid',gap:6,fontSize:11,fontWeight:800,letterSpacing:'.06em'}}>USERNAME<input value={authForm.username} onChange={e=> setAuthForm({...authForm, username:e.target.value})} placeholder="e.g. kai123" maxLength={20} style={{padding:'10px 12px',borderRadius:10,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',outline:'none'}}/></label>
+              {showAuth!=='reset' && <label style={{display:'grid',gap:6,fontSize:11,fontWeight:800,letterSpacing:'.06em'}}>PASSWORD<input type="password" value={authForm.password} onChange={e=> setAuthForm({...authForm, password:e.target.value})} placeholder="••••" style={{padding:'10px 12px',borderRadius:10,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',outline:'none'}}/></label>}
+              {showAuth==='register' && <label style={{display:'grid',gap:6,fontSize:11,fontWeight:800,letterSpacing:'.06em'}}>FAVORITE FOOD — security question<input value={authForm.favoriteFood} onChange={e=> setAuthForm({...authForm, favoriteFood:e.target.value})} placeholder="e.g. pizza" style={{padding:'10px 12px',borderRadius:10,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',outline:'none'}}/><span style={{fontSize:10,color:'var(--muted)',fontWeight:500}}>Asked once when you create your account. Needed to reset password.</span></label>}
+              {showAuth==='reset' && <>
+                <label style={{display:'grid',gap:6,fontSize:11,fontWeight:800,letterSpacing:'.06em'}}>FAVORITE FOOD<input value={authForm.favoriteFood} onChange={e=> setAuthForm({...authForm, favoriteFood:e.target.value})} placeholder="Your answer" style={{padding:'10px 12px',borderRadius:10,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',outline:'none'}}/></label>
+                <label style={{display:'grid',gap:6,fontSize:11,fontWeight:800,letterSpacing:'.06em'}}>NEW PASSWORD<input type="password" value={authForm.newPassword} onChange={e=> setAuthForm({...authForm, newPassword:e.target.value})} placeholder="New password" style={{padding:'10px 12px',borderRadius:10,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',outline:'none'}}/></label>
+              </>}
+              {authError && <div role="alert" style={{padding:'8px 10px',borderRadius:10,background:'rgba(255,92,92,.12)',border:'1px solid rgba(255,92,92,.3)',color:'var(--foreground)',fontSize:12}}>{authError}</div>}
+              <button disabled={authLoading} onClick={()=> doAuth(showAuth==='register'?'register': showAuth==='reset'?'reset':'login')} style={{padding:'11px 14px',borderRadius:999,background:'var(--lime)',color:'#0b0d12',border:'1px solid var(--lime)',fontWeight:900,cursor:'pointer',opacity: authLoading? .6:1}}>{authLoading?'Please wait…': showAuth==='login'?'Sign in': showAuth==='register'?'Create account':'Reset password'}</button>
+              <div style={{display:'flex',gap:8,justifyContent:'center',fontSize:11}}>
+                {showAuth==='login' && <><button onClick={()=> setShowAuth('register')} style={{background:'none',border:0,color:'var(--foreground)',textDecoration:'underline',cursor:'pointer'}}>Create account</button><span style={{color:'var(--muted)'}}>•</span><button onClick={()=> setShowAuth('reset')} style={{background:'none',border:0,color:'var(--foreground)',textDecoration:'underline',cursor:'pointer'}}>Forgot password?</button></>}
+                {showAuth==='register' && <button onClick={()=> setShowAuth('login')} style={{background:'none',border:0,color:'var(--foreground)',textDecoration:'underline',cursor:'pointer'}}>Already have an account? Sign in</button>}
+                {showAuth==='reset' && <button onClick={()=> setShowAuth('login')} style={{background:'none',border:0,color:'var(--foreground)',textDecoration:'underline',cursor:'pointer'}}>Back to sign in</button>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {!online && <div style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(255,92,92,.12)',border:'1px solid rgba(255,92,92,.3)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:13}}><WifiOff size={16}/> You’re offline — installed games and cached pages still work.</div>}
       {installable && <div style={{margin:'12px 18px 0',padding:'12px 14px',borderRadius:14,background:'linear-gradient(135deg, rgba(204,255,0,.18), rgba(0,242,234,.14))',border:'1px solid rgba(204,255,0,.35)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
         <span style={{display:'flex',alignItems:'center',gap:10,fontWeight:800,fontSize:13}}><span style={{width:32,height:32,borderRadius:999,background:'var(--lime)',display:'grid',placeItems:'center',color:'#0b0d12'}}><Download size={16}/></span> Install GG Lounge — play offline & launch like an app</span>
@@ -1000,6 +1162,7 @@ export default function Page() {
               </div>
             </div>
             <div className="modal-actions">
+              {authUser && <button onClick={pushSave} title="Save now to cloud" aria-label="Save to cloud" style={{width:'auto',padding:'0 10px',fontSize:11,fontWeight:800,display:'flex',alignItems:'center',gap:6,border:'1px solid var(--line)',background: saveStatus==='saved'?'rgba(34,197,94,.14)':'rgba(215,243,74,.14)',color:'var(--foreground)',borderRadius:999,cursor:'pointer'}}><Save size={14}/> {saveStatus==='saved'?'Saved': saveStatus==='saving'?'Saving…':'Save'}</button>}
               <button className={`controls-toggle ${showControls?'active':''}`} onClick={()=> setShowControls(v=>!v)} title="Toggle touch controls" aria-label="Toggle touch controls" style={{width:'auto',padding:'0 12px',fontSize:11,fontWeight:900,letterSpacing:'.06em'}}><Gamepad2 size={14}/> {showControls?'Hide':'Controls'}</button>
               <button onClick={()=> setShowLegend(v=>!v)} title="Controls legend" aria-label="Controls legend" style={{width:'auto',padding:'0 10px',fontSize:11,fontWeight:800,display:'flex',alignItems:'center',gap:6,border: showLegend?'1px solid var(--lime)':'1px solid var(--line)',background: showLegend?'var(--lime)':'rgba(255,255,255,.06)',color: showLegend?'#0b0d12':'var(--foreground)',borderRadius:999,cursor:'pointer'}}><Keyboard size={14}/> {showLegend?'Hide':'How to play'}</button>
               <button onClick={reportBroken} disabled={reportSent} title={reportSent?'Reported':'Report broken'} aria-label="Report broken" style={{width:'auto',padding:'0 10px',fontSize:11,fontWeight:800,display:'flex',alignItems:'center',gap:6,border:'1px solid var(--line)',background: reportSent?'rgba(255,92,92,.18)':'rgba(255,255,255,.06)',color: reportSent?'var(--coral)':'var(--foreground)',borderRadius:999,cursor: reportSent?'default':'pointer',opacity: reportSent?.6:1}}><Bug size={14}/> {reportSent?'Reported':'Report'}</button>
@@ -1019,14 +1182,14 @@ export default function Page() {
             )}
             {reportSent && (
               <div style={{position:'absolute',top: showLegend? 66:10, left:'50%', transform:'translateX(-50%)', zIndex:6, padding:'8px 12px', borderRadius:999, background:'rgba(255,92,92,.16)', border:'1px solid rgba(255,92,92,.35)', fontSize:12, fontWeight:800, display:'flex',alignItems:'center',gap:6}}>
-                <Flag size={12}/> Thanks — reported as broken. We’ll check the mirror.
+                <Flag size={12}/> Thanks — we’ll fix it soon.
               </div>
             )}
             {frameLoading && (
               <div className="frame-loader">
                 <Loader2 size={28} className="spin"/>
                 <p>Loading {activeGame.title}…</p>
-                <span>This game fills the lounge window. If it hangs, try “Open in new tab” or the Proxy — some school networks block game CDNs.</span>
+                <span>If it hangs, try opening in a new tab.</span>
               </div>
             )}
             {frameError && (

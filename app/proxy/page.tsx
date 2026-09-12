@@ -88,7 +88,7 @@ export default function ProxyPage() {
   const [tabs, setTabs] = useState<Tab[]>([{ id: 't0', encoded: null, raw: null, title: 'New Tab' }]);
   const [activeId, setActiveId] = useState('t0');
   const [address, setAddress] = useState('');
-  const [status, setStatus] = useState('Booting encrypted tunnel…');
+  const [status, setStatus] = useState('Starting browser…');
   const [ready, setReady] = useState(false);
   const [bare, setBare] = useState<string>('/api/bare/');
   const [bareMs, setBareMs] = useState<number | null>(null);
@@ -152,7 +152,7 @@ export default function ProxyPage() {
     let cancelled = false;
     async function boot() {
       try {
-        setStatus('Probing lounge tunnel…');
+        setStatus('Starting browser…');
         // Check local aliases first (evade keyword block)
         const localChecks = await Promise.all(LOCAL_BARES.map(u => probeBare(u)));
         localChecks.forEach(r => setBareHealth(h => ({ ...h, [r.url]: { ok: r.ok, ms: r.ms } })));
@@ -160,7 +160,7 @@ export default function ProxyPage() {
         let ms = localChecks.find(r => r.url === chosen)?.ms ?? null;
 
         if (!chosen) {
-          setStatus('Local tunnel blocked — trying public mirrors…');
+          setStatus('Connecting…');
           const publicChecks = await Promise.all(PUBLIC_BARES.slice(0, 4).map(u => probeBare(u)));
           publicChecks.forEach(r => setBareHealth(h => ({ ...h, [r.url]: { ok: r.ok, ms: r.ms } })));
           chosen = publicChecks.filter(r => r.ok).sort((a, b) => a.ms - b.ms)[0]?.url;
@@ -178,7 +178,7 @@ export default function ProxyPage() {
         if (!chosen) {
           chosen = '/api/bare/';
           ms = null;
-          if (!cancelled) setStatus('All probes blocked — using lounge tunnel (may still work via same-origin)');
+          if (!cancelled) setStatus('Connecting…');
         }
 
         if (cancelled) return;
@@ -233,7 +233,7 @@ export default function ProxyPage() {
           setStatus(`${isLocal ? '✓ Lounge' : '✓ Mirror'} tunnel — ${ms != null ? ms + 'ms' : 'ready'} • YouTube & Google ready`);
         }
       } catch (err) {
-        if (!cancelled) setStatus('Proxy error: ' + (err instanceof Error ? err.message : 'failed') + ' — retrying');
+        if (!cancelled) setStatus('Connection hiccup: ' + (err instanceof Error ? err.message : 'failed') + ' — retrying');
         setTimeout(() => { if (!cancelled) boot(); }, 2200);
       }
     }
@@ -284,7 +284,7 @@ export default function ProxyPage() {
       const w = window as unknown as { __uv$config?: { bare?: string } };
       if (w.__uv$config) w.__uv$config.bare = nextBare.endsWith('/') ? nextBare : nextBare + '/';
     } catch {}
-    setStatus(`Switched to ${nextBare.includes('/api/') ? 'lounge' : 'mirror'} — ${nextBare}`);
+    setStatus(`Connection updated`);
     if (opts?.reload) {
       setTimeout(() => location.reload(), 420);
     } else {
@@ -296,7 +296,7 @@ export default function ProxyPage() {
   const go = useCallback(async (raw: string, opts?: { bareOverride?: string; retry?: number }) => {
     const cfg = window.__uv$config;
     const enc = cfg?.encodeUrl;
-    if (!enc || !cfg?.bare) { setFrameError('Proxy warming — wait 1s and retry. If stuck, open Settings → Proxy Health and tap a green dot.'); return; }
+    if (!enc || !cfg?.bare) { setFrameError('Just a moment — starting up. Try again in a second.'); return; }
     const bareToUse = opts?.bareOverride || bare;
     if (bareToUse && cfg.bare !== bareToUse) try { cfg.bare = bareToUse.endsWith('/') ? bareToUse : bareToUse + '/'; } catch {}
     let url = raw.trim();
@@ -359,15 +359,15 @@ export default function ProxyPage() {
     const nextCandidates = allBares.slice(idx + 1).concat(allBares.slice(0, idx)).filter(b => bareHealth[b]?.ok);
     const next = nextCandidates[0] || allBares.find(b => b !== bare);
     if (next && next !== bare) {
-      setStatus(`Bare ${bare} failed — auto-switching to ${next}…`);
+      setStatus(`Connection issue — retrying…`);
       switchBare(next, { reload: false })
       // Retry the same URL with new bare after short delay
       setTimeout(() => {
         if (activeTab.raw) go(activeTab.raw, { bareOverride: next });
       }, 700);
-      setFrameError(`Lounge tunnel hiccup — switched to ${next.includes('/api/') ? 'alternate lounge path' : 'public mirror'} and retrying…`);
+      setFrameError(`Retrying…`);
     } else {
-      setFrameError('The proxy frame failed to load. Try switching bare in Settings (tap a green dot) or open in a new tab.');
+      setFrameError('Page didn’t load. Try again or open in a new tab.');
     }
   }, [bare, bareHealth, activeTab.raw, go, switchBare]);
 
@@ -418,7 +418,7 @@ export default function ProxyPage() {
         <button onClick={newTab} aria-label="New tab" style={{ width: 30, height: 30, display: 'grid', placeItems: 'center', borderRadius: 9, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f4f2ec', cursor: 'pointer', flex: 'none' }}><Plus size={14} /></button>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className={`proxy-status ${ready ? 'ok' : ''}`} style={{ fontSize: 11, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
-            {ready ? <Wifi size={12} /> : <Clock size={12} />} {status} {bareMs != null && `• ${bareMs}ms`}
+            {ready ? <Wifi size={12} /> : <Clock size={12} />} {ready ? 'Ready' : status}
           </span>
           <button onClick={() => setShowSettings(v => !v)} aria-label="Settings" style={{ width: 30, height: 30, display: 'grid', placeItems: 'center', borderRadius: 9, border: '1px solid rgba(255,255,255,.12)', background: ready ? 'rgba(215,243,74,.14)' : 'rgba(255,255,255,.06)', color: ready ? '#d7f34a' : '#f4f2ec', cursor: 'pointer' }}><Settings2 size={14} /></button>
         </div>
@@ -438,7 +438,7 @@ export default function ProxyPage() {
             ref={addressRef}
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder={ready ? `Search with ${SEARCH_ENGINES[engine].name} or enter URL — e.g. youtube.com` : 'Booting encrypted tunnel…'}
+            placeholder={ready ? `Search with ${SEARCH_ENGINES[engine].name} or enter URL — e.g. youtube.com` : 'Starting browser…'}
             disabled={!ready}
             aria-label="URL or search"
             onKeyDown={e => { if (e.key === 'Escape') (e.target as HTMLInputElement).blur(); }}
@@ -455,23 +455,9 @@ export default function ProxyPage() {
 
       {showSettings && (
         <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,.03)', borderBottom: '1px solid rgba(255,255,255,.08)', display: 'grid', gap: 14 }}>
-          {/* Health grid */}
           <div>
-            <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: '.06em', display: 'flex', alignItems: 'center', gap: 6 }}><ShieldCheck size={14} color="#d7f34a" /> PROXY HEALTH — tap a green dot to switch instantly</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-              {[...LOCAL_BARES as unknown as string[], ...PUBLIC_BARES].map(u => {
-                const h = bareHealth[u];
-                const isActive = bare === u;
-                const color = !h ? 'rgba(255,255,255,.15)' : h.ok ? (h.ms < 600 ? '#22c55e' : h.ms < 1200 ? '#eab308' : '#f97316') : '#ef4444';
-                const bg = isActive ? 'rgba(215,243,74,.14)' : 'rgba(255,255,255,.06)';
-                return (
-                  <button key={u} onClick={() => switchBare(u, { reload: true })} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 99, border: '1px solid', borderColor: isActive ? 'rgba(215,243,74,.5)' : 'rgba(255,255,255,.12)', background: bg, color: isActive ? '#d7f34a' : '#f4f2ec', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>
-                    <span style={{ width: 8, height: 8, borderRadius: 99, background: color, boxShadow: h?.ok ? `0 0 8px ${color}` : 'none', display: 'inline-block' }} /> {u.replace('https://', '').replace('/api/', 'lounge:').slice(0, 28)} {h ? `${h.ms}ms` : '…'}
-                  </button>
-                );
-              })}
-            </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', marginTop: 6 }}>Lounge paths <code>/api/bare/</code> <code>/api/edu/</code> <code>/api/learn/</code> are same-origin — use them first on school Wi-Fi that blocks bare domains.</div>
+            <div style={{ fontSize: 12, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 6 }}><ShieldCheck size={14} color="#d7f34a" /> Connection — automatic</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', marginTop: 6, lineHeight: 1.5 }}>Your connection is handled automatically. If a site is slow, try the <strong>Retry</strong> button or pick another search engine below.</div>
           </div>
 
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -489,18 +475,18 @@ export default function ProxyPage() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ padding: '6px 10px', borderRadius: 99, border: '1px solid rgba(215,243,74,.25)', background: 'rgba(215,243,74,.1)', color: '#d7f34a', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6 }}><Lock size={12} /> Encrypted • Cookies isolated • Range streaming on</span>
-            <span style={{ padding: '6px 10px', borderRadius: 99, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: 'rgba(244,242,236,.75)', fontSize: 11 }}>YouTube • Google • Discord • TikTok • full POST/WS/SSE</span>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent:'center' }}>
+            <span style={{ padding: '6px 10px', borderRadius: 99, border: '1px solid rgba(215,243,74,.25)', background: 'rgba(215,243,74,.1)', color: '#d7f34a', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6 }}><Lock size={12} /> Private browsing</span>
+            <span style={{ padding: '6px 10px', borderRadius: 99, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: 'rgba(244,242,236,.75)', fontSize: 11 }}>Works with YouTube, Google, Discord, TikTok</span>
           </div>
         </div>
       )}
 
       {!encodedCurrent ? (
         <section className="proxy-home" style={{ position: 'relative' }}>
-          <p className="eyebrow" style={{ color: '#d7f34a' }}><Zap size={14} /> UNBLOCKED BROWSER — HARSH NETWORK MODE</p>
+          <p className="eyebrow" style={{ color: '#d7f34a' }}><Zap size={14} /> FAST & PRIVATE BROWSING</p>
           <h1>Go anywhere.</h1>
-          <p>Ultraviolet + streaming Bare — same-origin tunnel for YouTube, Google, Discord, TikTok. Auto-rotates through lounge aliases <code>/api/bare/</code> <code>/api/edu/</code> if the network blocks keywords, then public mirrors. Cookies & Range requests stream — video never buffers to memory.</p>
+          <p>Browse YouTube, Google, Discord, TikTok and more — right here. Use tabs, search or enter any address.</p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 6 }}>
             <span style={{ padding: '6px 10px', borderRadius: 99, border: '1px solid rgba(215,243,74,.25)', background: 'rgba(215,243,74,.1)', color: '#d7f34a', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6 }}><ShieldCheck size={12} /> End-to-end encrypted</span>
             <span style={{ padding: '6px 10px', borderRadius: 99, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: 'rgba(244,242,236,.75)', fontSize: 11, fontWeight: 700 }}>Tabs • Panic `×3 • about:blank</span>
@@ -515,12 +501,12 @@ export default function ProxyPage() {
           </div>
           <div style={{ marginTop: 18, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 12, maxWidth: 760, width: '100%' }}>
             <div style={{ padding: 14, borderRadius: 14, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', textAlign: 'left' }}>
-              <div style={{ fontWeight: 900, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={14} color="#ffbe46" /> YouTube not playing?</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', marginTop: 6, lineHeight: 1.5 }}>It uses <code>googlevideo.com</code> range streams — our bare streams 206 partial content. If black, tap a green lounge dot above (try <code>/api/edu/</code>), then reload. No mock — real video bytes.</div>
+              <div style={{ fontWeight: 900, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={14} color="#ffbe46" /> Video not playing?</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', marginTop: 6, lineHeight: 1.5 }}>Try refreshing the page. If it stays black, try again in a few seconds.</div>
             </div>
             <div style={{ padding: 14, borderRadius: 14, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', textAlign: 'left' }}>
-              <div style={{ fontWeight: 900, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}><EyeOff size={14} /> Stealth & cloak</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', marginTop: 6, lineHeight: 1.5 }}>Eye = <code>about:blank</code> with Classroom icon. Cloak picker above spoofs title/favicon. Panic: press <code>`</code> or <code>Esc</code> 3× to jump to Classroom.</div>
+              <div style={{ fontWeight: 900, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}><EyeOff size={14} /> Quick hide</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', marginTop: 6, lineHeight: 1.5 }}>Need to hide quickly? Press <code>`</code> three times to go to Classroom. You can also change the tab look in settings.</div>
             </div>
           </div>
           {historyStack.length > 0 && (
@@ -542,18 +528,18 @@ export default function ProxyPage() {
           {frameLoading && (
             <div style={{ position: 'absolute', inset: 0, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, background: 'rgba(11,13,18,.88)', color: '#f4f2ec', textAlign: 'center', padding: 20 }}>
               <div style={{ width: 34, height: 34, borderRadius: '50%', border: '3px solid rgba(255,255,255,.15)', borderTopColor: '#d7f34a', animation: 'spin .8s linear infinite' }} />
-              <div style={{ fontWeight: 900 }}>Tunnelling…</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', maxWidth: 520 }}>Proxying <code style={{ background: 'rgba(255,255,255,.08)', padding: '2px 6px', borderRadius: 6 }}>{activeTab.raw}</code> via {bare.includes('/api/') ? 'lounge ' + bare : 'mirror ' + new URL(bare).hostname}. Harsh networks: auto-switches if blocked.</div>
+              <div style={{ fontWeight: 900 }}>Loading…</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', maxWidth: 520 }}>Opening <code style={{ background: 'rgba(255,255,255,.08)', padding: '2px 6px', borderRadius: 6 }}>{activeTab.raw}</code>. If it gets stuck, try refreshing.</div>
             </div>
           )}
           {frameError && (
             <div style={{ position: 'absolute', inset: 0, zIndex: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, background: 'rgba(11,13,18,.92)', color: '#f4f2ec', textAlign: 'center', padding: 24 }}>
               <AlertTriangle size={28} color="#ffbe46" />
-              <div style={{ fontWeight: 900, fontSize: 16 }}>Tunnel hiccup</div>
+              <div style={{ fontWeight: 900, fontSize: 16 }}>Couldn’t load</div>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,.65)', maxWidth: 560, lineHeight: 1.6 }}>{frameError}</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
                 <button onClick={() => { setFrameError(null); setFrameLoading(true); if (frame.current) frame.current.src = frame.current.src; }} style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(215,243,74,.4)', background: 'rgba(215,243,74,.14)', color: '#d7f34a', fontWeight: 800, cursor: 'pointer' }}>Retry</button>
-                <button onClick={() => { const next = [...(LOCAL_BARES as unknown as string[]), ...PUBLIC_BARES].find(b => b !== bare && bareHealth[b]?.ok) || PUBLIC_BARES[0]; switchBare(next, { reload: false }); if (activeTab.raw) setTimeout(() => go(activeTab.raw!, { bareOverride: next }), 500); }} style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f4f2ec', fontWeight: 800, cursor: 'pointer' }}>Switch tunnel</button>
+                <button onClick={() => { const next = [...(LOCAL_BARES as unknown as string[]), ...PUBLIC_BARES].find(b => b !== bare && bareHealth[b]?.ok) || PUBLIC_BARES[0]; switchBare(next, { reload: false }); if (activeTab.raw) setTimeout(() => go(activeTab.raw!, { bareOverride: next }), 500); }} style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f4f2ec', fontWeight: 800, cursor: 'pointer' }}>Try again</button>
                 <button onClick={() => { if (activeTab.raw) window.open(activeTab.raw, '_blank'); }} style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f4f2ec', fontWeight: 800, cursor: 'pointer' }}>Open direct</button>
                 <button onClick={() => setTabs(prev => prev.map(t => t.id === activeId ? { ...t, encoded: null, raw: null, title: 'New Tab' } : t))} style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f4f2ec', fontWeight: 800, cursor: 'pointer' }}>Home</button>
               </div>
