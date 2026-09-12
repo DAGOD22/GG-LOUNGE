@@ -1,106 +1,126 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>SPIRAL ROLL — GG-Lounge</title><style>
-html,body{margin:0;height:100%;overflow:hidden;background:#0b0d12;color:#f4f2ec;font-family:system-ui,Segoe UI,Arial}
-#c{width:100%;height:100%;display:block;background:radial-gradient(ellipse at 50% 0%, 1a0a12 0%, #0b0d12 68%)}
-#hud{position:absolute;inset:12px 12px auto 12px;display:flex;justify-content:space-between;align-items:center;pointer-events:none;gap:10px}
-.pill{font-weight:900;font-size:13px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);padding:7px 12px;border-radius:99px;backdrop-filter:blur(6px)}
-#score{font-size:18px;background:none;border:0;padding:0}
-#score small{display:block;font-size:10px;opacity:.6;letter-spacing:.08em}
-#center{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;padding:18px}
-#card{pointer-events:auto;width:min(420px,94vw);padding:20px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(10px);text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.45)}
-#card h1{margin:0;font-size:24px;letter-spacing:-.02em}
-#card p{margin:8px 0 0;opacity:.75;font-size:13px;line-height:1.55}
-#card button{margin-top:14px;padding:11px 22px;border-radius:99px;border:0;background:#d7f34a;color:#0b0d12;font-weight:900;cursor:pointer;font-size:14px;box-shadow:0 6px 18px rgba(215,243,74,.35)}
-#bar{position:absolute;left:14px;right:14px;bottom:14px;height:8px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden}
-#fill{height:100%;width:0%;background:linear-gradient(90deg,#d7f34a,#7d6bff);transition:width .25s}
-#controls{position:absolute;left:12px;right:12px;bottom:28px;display:flex;justify-content:space-between;gap:12px;pointer-events:none}
-.pad{display:grid;grid-template-columns:56px 56px 56px;grid-template-rows:56px 56px;gap:7px;pointer-events:auto}
-.pad button{width:56px;height:56px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.09);color:#fff;font-size:18px;display:grid;place-items:center;backdrop-filter:blur(8px);touch-action:manipulation}
-.pad button:active{background:rgba(215,243,74,.28)}
-.act{display:flex;gap:10px;align-items:flex-end;pointer-events:auto}
-.act button{width:72px;height:72px;border-radius:16px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.09);color:#fff;font-weight:900;backdrop-filter:blur(8px)}
-.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:99px;background:rgba(215,243,74,.12);border:1px solid rgba(215,243,74,.28);color:#d7f34a;font-size:11px;font-weight:900;letter-spacing:.06em;margin-bottom:10px}
-@media(pointer:fine){#controls{display:none}}
-</style></head><body>
-<canvas id="c"></canvas>
-<div id="hud"><div id="score" class="pill" style="background:none;border:0;padding:0;line-height:1">0<small>Roll spiral.</small></div><div class="pill" id="timer">02:00</div><div class="pill" id="lvl">LVL 1</div></div>
-<div id="bar"><div id="fill"></div></div>
-<div id="center"><div id="card"><div class="badge">CLASSROOM CENTER • HTML ONLY • NO EMBED</div><h1>SPIRAL ROLL</h1><p>Spiral Roll — roll ball down spiral.<br><strong>Spiral — roll & collect</strong></p><button id="play">Play Now</button><p style="font-size:11px;opacity:.55;margin-top:10px">Local file • Works offline • No proxy needed • GG-Lounge™</p></div></div>
-<div id="controls"><div class="pad"><span></span><button data-k="w">▲</button><span></span><button data-k="a">◀</button><button data-k="s">▼</button><button data-k="d">▶</button></div><div class="act"><button data-k=" ">JUMP</button><button data-k="shift">DASH</button></div></div>
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>Doodle Dunk — GG Lounge</title><style>html,body{margin:0;height:100%;overflow:hidden;background:#0b0d12;color:#f4f2ec;font-family:system-ui,Segoe UI,Arial}*{box-sizing:border-box}#bar{position:absolute;top:0;left:0;right:0;height:34px;display:flex;align-items:center;gap:8;padding:0 10px;background:rgba(11,13,18,.92);border-bottom:1px solid rgba(255,255,255,.08);z-index:20;font-size:11px;font-weight:800;letter-spacing:.04em}#bar span{opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#bar button{margin-left:auto;padding:5px 10px;border-radius:99px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.08);color:#fff;font-size:11px;font-weight:800;cursor:pointer}#frame{position:absolute;inset:34px 0 0 0;border:0;width:100%;height:calc(100% - 34px);background:#000}#loader{position:absolute;inset:34px 0 0 0;display:grid;place-items:center;background:#0b0d12;z-index:10;text-align:center;padding:20px}#loader.hidden{display:none}.spin{width:36px;height:36px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:#d7f34a;animation:spin .8s linear infinite;margin:0 auto 12px}@keyframes spin{to{transform:rotate(360deg)}}#err{display:none;margin-top:12px;padding:10px 14px;border-radius:10px;background:rgba(255,190,70,.12);border:1px solid rgba(255,190,70,.25);font-size:12px;max-width:520px;text-align:left}#err b{color:#ffbe46}</style><script src="/uv/uv.bundle.js"></script><script src="/uv/uv.config.js"></script></head><body>
+<div id="bar"><span>DOODLE DUNK • Unblocked • Game-only</span><button id="fs">Fullscreen</button><button id="openProxy">Proxy</button></div>
+<div id="loader"><div><div class="spin"></div><div style="font-weight:900;letter-spacing:.04em">LOADING — DOODLE DUNK</div><div style="opacity:.6;font-size:12px;margin-top:4px">Google Sites • Game-only • same-origin /service/</div><div id="err"></div></div></div>
+<iframe id="frame" allow="fullscreen; autoplay; clipboard-read; clipboard-write; encrypted-media; picture-in-picture; gamepad; keyboard-map" allowfullscreen></iframe>
 <script>
 (function(){
-  const c=document.getElementById('c'),ctx=c.getContext('2d'),fill=document.getElementById('fill'),scoreEl=document.getElementById('score').firstChild,timerEl=document.getElementById('timer'),lvlEl=document.getElementById('lvl'),card=document.getElementById('card'),center=document.getElementById('center');
-  let W,H,playing=false,score=0,time=120,level=1,last=0,raf;
-  const player={x:0,y:0,r:17,vx:0,vy:0};
-  let tx=0,ty=0,stars=[],enemies=[],particles=[],keys={};
-  const THEME={bg1:"1a0a12",player:"#f43f5e",accent:"#fda4af"};
-  function resize(){ const dpr=Math.min(2,devicePixelRatio||1); W=c.width=innerWidth*dpr; H=c.height=innerHeight*dpr; c.style.width=innerWidth+'px'; c.style.height=innerHeight+'px'; ctx.setTransform(dpr,0,0,dpr,0,0); player.x=innerWidth/2; player.y=innerHeight/2; tx=player.x; ty=player.y; }
-  addEventListener('resize',resize); resize();
-  function spawn(){ stars=[]; enemies=[]; const sc=5+level*2; const ec=4+Math.floor(level*1.2); for(let i=0;i<sc;i++) stars.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:9+Math.random()*5,rot:Math.random()*Math.PI}); for(let i=0;i<ec;i++) enemies.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:15+Math.random()*4,vx:(Math.random()-.5)* (1.6+level*0.12),vy:(Math.random()-.5)*(1.6+level*0.12)}); }
-  function dist(a,b){ return Math.hypot(a.x-b.x,a.y-b.y); }
-  addEventListener('keydown',e=>{ keys[e.key.toLowerCase()]=true; if(e.key===' ') e.preventDefault();}); addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
-  document.querySelectorAll('#controls button').forEach(b=>{ const k=b.getAttribute('data-k')||''; const kk=k.toLowerCase(); b.addEventListener('touchstart',e=>{e.preventDefault(); keys[kk]=true;}); b.addEventListener('touchend',e=>{e.preventDefault(); keys[kk]=false;}); b.addEventListener('mousedown',()=>keys[kk]=true); b.addEventListener('mouseup',()=>keys[kk]=false); });
-  c.addEventListener('pointermove',e=>{ if(playing){ tx=e.clientX; ty=e.clientY; }});
-  let mouseDown=false; c.addEventListener('pointerdown',()=>mouseDown=true); c.addEventListener('pointerup',()=>mouseDown=false);
-  function spawnParticles(x,y,col){ for(let i=0;i<10;i++) particles.push({x,y,vx:(Math.random()-.5)*6,vy:(Math.random()-.5)*6,life:1,dec:0.06+Math.random()*0.05,col});}
-  function update(dt){
-    // input
-    let ax=0,ay=0;
-    if(keys['w']||keys['arrowup']) ay-=1;
-    if(keys['s']||keys['arrowdown']) ay+=1;
-    if(keys['a']||keys['arrowleft']) ax-=1;
-    if(keys['d']||keys['arrowright']) ax+=1;
-    if(ax||ay){ let m=Math.hypot(ax,ay)||1; ax/=m; ay/=m; tx+=ax*280*dt; ty+=ay*280*dt; }
-    if(keys['shift']){ let dx=tx-player.x, dy=ty-player.y, m=Math.hypot(dx,dy)||1; player.x+=dx/m*5; player.y+=dy/m*5; }
-    // mouse follow with smoothing
-    tx=Math.max(player.r,Math.min(innerWidth-player.r,tx));
-    ty=Math.max(player.r,Math.min(innerHeight-player.r,ty));
-    player.x+=(tx-player.x)*Math.min(1,dt*7.2);
-    player.y+=(ty-player.y)*Math.min(1,dt*7.2);
-    // enemies
-    for(const e of enemies){ e.x+=e.vx; e.y+=e.vy; if(e.x<e.r||e.x>innerWidth-e.r) e.vx*=-1; if(e.y<e.r||e.y>innerHeight-e.r) e.vy*=-1; e.x=Math.max(e.r,Math.min(innerWidth-e.r,e.x)); e.y=Math.max(e.r,Math.min(innerHeight-e.r,e.y)); }
-    // stars collect
-    for(let i=stars.length-1;i>=0;i--){ const s=stars[i]; if(dist(player,s) < player.r+s.r){ stars.splice(i,1); score+=10; player.r+=0.09; spawnParticles(s.x,s.y,'#ffd54a'); if(score%70===0) level++; } }
-    // collisions
-    for(const e of enemies){ if(dist(player,e) < player.r+e.r*0.72){ playing=false; spawnParticles(player.x,player.y,THEME.player); endGame(false); return; } }
-    if(stars.length===0){ level++; lvlEl.textContent='LVL '+level; spawn(); }
-    // particles
-    for(let i=particles.length-1;i>=0;i--){ const p=particles[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.18; p.life-=p.dec; if(p.life<=0) particles.splice(i,1); }
-    fill.style.width=((score%100))+'%';
-    scoreEl.textContent=score;
-    lvlEl.textContent='LVL '+level;
-    time-=dt; if(time<=0){ time=0; playing=false; endGame(true); return; }
-    timerEl.textContent=String(Math.floor(time/60)).padStart(2,'0')+':'+String(Math.floor(time%60)).padStart(2,'0');
+  var id="spiral-roll";
+  var slug="doodle-dunk";
+  var title="Doodle Dunk";
+  var targets=[
+    "https://sites.google.com/view/html5gamesunblocked/"+slug,
+    "https://sites.google.com/view/classroom6x/"+slug,
+    "https://sites.google.com/site/classroom6x/"+slug,
+    "https://sites.google.com/view/html5gamesunblocked/"+id,
+    "https://ubg76.gitlab.io/game/"+slug+".html"
+  ];
+  var frame=document.getElementById('frame');
+  var loader=document.getElementById('loader');
+  var errEl=document.getElementById('err');
+  var PUBLIC_BARES=['https://tomphttp.outv1.workers.dev/','https://bare.noblocc.uk/','https://bare.undercover.goatse.cx/','https://bare.zorip.eu.org/','https://bare.holy.how/','https://tomphttp-2x.ayayay.workers.dev/'];
+  function getBare(){try{var v=localStorage.getItem('gg_bare');if(v) return v;}catch(e){} try{var m=document.cookie.match(/(?:^|; )gg_bare=([^;]*)/);if(m) return decodeURIComponent(m[1]);}catch(e){} return '/api/bare/';}
+  function setBare(b){try{localStorage.setItem('gg_bare',b);}catch(e){} try{document.cookie='gg_bare='+encodeURIComponent(b)+'; path=/; max-age=86400; samesite=lax';}catch(e){} try{if(self.__uv$config) self.__uv$config.bare=b.endsWith('/')?b:b+'/';}catch(e){}}
+  async function probeBare(u){try{var r=await fetch(u,{cache:'no-store',signal:AbortSignal.timeout(3500)});return r.ok;}catch(e){return false;}}
+  async function chooseBare(target){var cur=getBare(); try{if(await probeBare(cur)) return cur;}catch(e){} for(var i=0;i<PUBLIC_BARES.length;i++){var cand=PUBLIC_BARES[i];try{if(await probeBare(cand)){setBare(cand);return cand;}}catch(e){}} return cur;}
+  function showErr(msg,bare){if(errEl){errEl.style.display='block';errEl.innerHTML='<b>'+(msg||'waiting')+'</b>'+(bare?'<br><span style="opacity:.7">bare: '+bare+'</span>':'')+'<br><span style="opacity:.6">Trying next mirror — only the game will be shown fullscreen.</span>';}}
+  async function ensureSW(){
+    if(!('serviceWorker' in navigator)) return false;
+    if(navigator.serviceWorker.controller) return true;
+    var cands=[{script:'/uv/uv.sw.js',scope:'/service/'},{script:'/uv/uv.sw.js',scope:'/' },{script:'/service/uv.sw.js',scope:'/service/'},{script:'/uv.sw.js',scope:'/'}];
+    for(var i=0;i<cands.length;i++){var c=cands[i];try{var reg=await navigator.serviceWorker.register(c.script,{scope:c.scope,updateViaCache:'none'});try{await reg.update();}catch(e){} await Promise.race([navigator.serviceWorker.ready,new Promise(function(_,rej){setTimeout(function(){rej(new Error('ready timeout'))},2200)})]); if(navigator.serviceWorker.controller||(reg&&reg.active)) return true; await new Promise(function(r){setTimeout(r,300)}); if(navigator.serviceWorker.controller) return true;}catch(e){continue;}}
+    return !!navigator.serviceWorker.controller;
   }
-  function draw(){
-    ctx.clearRect(0,0,innerWidth,innerHeight);
-    // subtle grid + vignette
-    ctx.strokeStyle='rgba(255,255,255,.035)'; ctx.lineWidth=1;
-    for(let x=0;x<innerWidth;x+=42){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,innerHeight); ctx.stroke();}
-    for(let y=0;y<innerHeight;y+=42){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(innerWidth,y); ctx.stroke();}
-    // stars (collectibles) with sparkle
-    for(const s of stars){ ctx.save(); ctx.translate(s.x,s.y); s.rot+=0.04; ctx.rotate(s.rot); ctx.fillStyle='#ffd54a'; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=1; // star shape
-      ctx.beginPath(); for(let i=0;i<5;i++){ const ang=i*Math.PI*2/5 - Math.PI/2; const x=Math.cos(ang)*s.r, y=Math.sin(ang)*s.r; const ix=Math.cos(ang+Math.PI/5)*s.r*0.5, iy=Math.sin(ang+Math.PI/5)*s.r*0.5; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); ctx.lineTo(ix,iy);} ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();}
-    // enemies
-    for(const e of enemies){ ctx.save(); ctx.translate(e.x,e.y); ctx.fillStyle='#ff3b6b'; ctx.beginPath(); ctx.arc(0,0,e.r,0,Math.PI*2); ctx.fill(); ctx.fillStyle='rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(2,3,e.r*0.55,e.r*0.32,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-5,-4,3.2,0,Math.PI*2); ctx.arc(5,-4,3.2,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#0b0d12'; ctx.beginPath(); ctx.arc(-5,-4,1.5,0,Math.PI*2); ctx.arc(5,-4,1.5,0,Math.PI*2); ctx.fill(); ctx.restore();}
-    // particles
-    for(const p of particles){ ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=p.col; ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill();} ctx.globalAlpha=1;
-    // player with theme color
-    ctx.save(); ctx.translate(player.x,player.y);
-    const g=ctx.createRadialGradient(0,0,player.r*0.2,0,0,player.r*1.45); g.addColorStop(0,'rgba(0,0,0,0.9)'); g.addColorStop(0.5, THEME.player); g.addColorStop(1,'rgba(0,0,0,0)');
-    // glow
-    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,player.r*1.6,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle=THEME.player; ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=2.2; ctx.beginPath(); ctx.arc(0,0,player.r,0,Math.PI*2); ctx.fill(); ctx.stroke();
-    // eyes
-    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-player.r*0.28,-player.r*0.16,player.r*0.22,0,Math.PI*2); ctx.arc(player.r*0.28,-player.r*0.16,player.r*0.22,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#0b0d12'; ctx.beginPath(); ctx.arc(-player.r*0.28+1,-player.r*0.16,player.r*0.1,0,Math.PI*2); ctx.arc(player.r*0.28+1,-player.r*0.16,player.r*0.1,0,Math.PI*2); ctx.fill();
-    // accent
-    ctx.strokeStyle=THEME.accent; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(0,0,player.r*0.62,0,Math.PI*2); ctx.stroke();
-    ctx.restore();
+  var curIdx=0; var tries=0; var booted=false; var bootTimer=null;
+  function injectAndExpand(){
+    try{
+      var doc=frame.contentDocument;
+      if(!doc) return false;
+      // inject aggressive hide
+      var st=doc.getElementById('gg-hide');
+      if(!st){
+        st=doc.createElement('style');
+        st.id='gg-hide';
+        st.textContent="html,body{margin:0!important;padding:0!important;overflow:hidden!important;background:#000!important} header,nav,footer,.header,.footer,.navbar,aside,[role='navigation'],[role='banner'],[role='contentinfo'],.ad,.ads,[id*='ad-'],[class*='ad-'],.similar,.related,.category,.logo,#header,#footer,.site-header,.site-footer,.nav-wrapper,.header-wrapper{display:none!important} body > *:not(iframe):not(canvas):not(embed):not(object):not(#gameContainer):not(.game-container):not([class*='game']){display:none!important} #gameContainer,#game-container,.game-container,iframe,canvas,embed,object{position:fixed!important;inset:34px 0 0 0!important;width:100%!important;height:calc(100% - 34px)!important;border:0!important;max-width:none!important;max-height:none!important;background:#000!important}";
+        (doc.head||doc.documentElement).appendChild(st);
+      }
+      // find inner game iframe that is NOT google sites wrapper
+      var inner = doc.querySelector('iframe[src*="drive.google.com"],iframe[src*="googleusercontent"],iframe[src*="github.io"],iframe[src*="gamedistribution"],iframe[src*="html5"],iframe[src*="storage.googleapis"],iframe[src*="cloudfront"],iframe[src*="ubg"],iframe[src*="unblocked"],iframe[src*="gefile"]');
+      if(!inner){ // fallback: any iframe not google sites
+        var all=doc.querySelectorAll('iframe');
+        for(var i=0;i<all.length;i++){ var s=all[i].src||''; if(s && !s.includes('sites.google.com') && !s.includes('google.com/url') && s.length>15){ inner=all[i]; break; } }
+      }
+      if(inner && inner.src && inner.src.length>15 && !inner.src.includes('sites.google.com')){
+        var innerUrl = inner.src;
+        try{ if(innerUrl.startsWith('/')) innerUrl = new URL(innerUrl, targets[curIdx]).href; }catch(e){}
+        // avoid loop
+        if(innerUrl && innerUrl!==targets[curIdx] && !innerUrl.includes('sites.google.com')){
+          console.log('GG redirect to inner', innerUrl);
+          var cfg=self.__uv$config;
+          if(cfg && cfg.encodeUrl){
+            // delay to avoid flicker
+            setTimeout(function(){ frame.src = cfg.prefix + cfg.encodeUrl(innerUrl); }, 400);
+            return true;
+          }
+        }
+        // else expand inner
+        try{ inner.style.cssText='position:fixed!important;inset:34px 0 0 0!important;width:100%!important;height:calc(100% - 34px)!important;border:0!important;'; }catch(e){}
+      }
+      var g=doc.querySelector('iframe,canvas,embed,object');
+      if(g){ try{ g.style.cssText='position:fixed!important;inset:34px 0 0 0!important;width:100%!important;height:calc(100% - 34px)!important;border:0!important;'; }catch(e){} }
+      // observer to keep hiding
+      try{
+        if(!doc._ggObs){
+          var obs=new MutationObserver(function(){
+            try{
+              var els=doc.querySelectorAll('header,nav,footer,.header,.footer,.navbar,aside,[role="navigation"],[role="banner"]');
+              els.forEach(function(el){ el.style.display='none'; });
+            }catch(e){}
+          });
+          obs.observe(doc.body,{childList:true, subtree:true});
+          doc._ggObs=obs;
+        }
+      }catch(e){}
+      return true;
+    }catch(e){ return false; }
   }
-  function loop(ts){ if(!last) last=ts; const dt=Math.min(0.033,(ts-last)/1000); last=ts; if(playing){ update(dt); draw(); raf=requestAnimationFrame(loop);} }
-  function start(){ score=0; time=120; level=1; player.r=17; player.x=innerWidth/2; player.y=innerHeight/2; tx=player.x; ty=player.y; particles=[]; spawn(); playing=true; center.style.display='none'; last=0; cancelAnimationFrame(raf); raf=requestAnimationFrame(loop); draw(); lvlEl.textContent='LVL 1';}
-  function endGame(win){ center.style.display='grid'; const title=win?'Time up!':'Caught!'; card.querySelector('h1').textContent=title+' — Score '+score; card.querySelector('p').innerHTML=(score>160?'Insane run! 🔥':'Keep going — collect to level up!')+'<br><strong>Mouse / WASD / Touch to move • Shift Dash</strong>'; let btn=card.querySelector('button'); if(!btn){ btn=document.createElement('button'); card.appendChild(btn);} btn.textContent='Play Again'; btn.onclick=start; }
-  document.getElementById('play').onclick=start;
-  draw();
+  async function boot(force){
+    if(bootTimer) clearTimeout(bootTimer);
+    var target=targets[curIdx];
+    errEl.style.display='none'; loader.classList.remove('hidden');
+    tries++;
+    try{
+      if(!self.Ultraviolet||!self.__uv$config||!self.__uv$config.encodeUrl) throw new Error('uv not ready');
+      var bare=await chooseBare(target); setBare(bare);
+      var hasSW=false; try{hasSW=await ensureSW();}catch(e){}
+      if(!hasSW && tries<4){showErr('ServiceWorker warming… (attempt '+tries+')',bare); bootTimer=setTimeout(function(){boot();},700+tries*300); return;}
+      var cfg=self.__uv$config; try{var fresh=await chooseBare(target); if(fresh) cfg.bare=fresh.endsWith('/')?fresh:fresh+'/';}catch(e){}
+      var url=cfg.prefix+cfg.encodeUrl(target);
+      frame.src=url;
+      frame.onload=function(){
+        loader.classList.add('hidden');
+        // try inject immediately and after delays
+        injectAndExpand();
+        setTimeout(injectAndExpand, 600);
+        setTimeout(injectAndExpand, 1500);
+        setTimeout(injectAndExpand, 2800);
+        clearTimeout(bootTimer);
+        bootTimer=setTimeout(function(){
+          try{
+            var d=frame.contentDocument;
+            if(d && (!d.body || d.body.innerHTML.length<900 || /404|Page Not Found|unable to open|not found|sign in/i.test(d.body.innerText.slice(0,900)))){
+              if(curIdx+1 < targets.length){ curIdx++; boot(true); } else { showErr('All mirrors blocked — try Proxy', bare); }
+            }
+          }catch(e){}
+        }, 4200);
+      };
+      frame.onerror=function(){ if(curIdx+1 < targets.length){curIdx++; boot(true);} else {showErr('Frame error — trying next', bare);} };
+      booted=true;
+    }catch(e){ showErr((e&&e.message)||String(e), getBare()); bootTimer=setTimeout(boot,900+tries*250); }
+  }
+  document.getElementById('fs').onclick=function(){try{if(frame.requestFullscreen) frame.requestFullscreen();}catch(e){}};
+  document.getElementById('openProxy').onclick=function(){ window.top.location.href='/proxy'; };
+  if(document.readyState==='complete') setTimeout(function(){boot();},80); else window.addEventListener('load', boot);
+  setTimeout(boot,1400);
+  setTimeout(function(){ if(!booted) boot(); },4200);
 })();
 </script></body></html>
