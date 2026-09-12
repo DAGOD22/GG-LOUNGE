@@ -76,7 +76,7 @@ export function AchievementsHub({ open, onClose, authUser, onPlayGame }: { open:
             <span style={{ fontSize:12, fontWeight:900, padding:'4px 8px', borderRadius:999, background:'var(--foreground)', color:'var(--background)' }}>{pct}%</span>
           </div>
           <div style={{ marginTop:8, fontSize:11, color:'var(--muted)', display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-            <Sparkles size={12}/> Complete sets per game to earn bonus points. Play any of the 30 featured games to progress — works guest or signed-in, syncs across devices when signed in.
+            <Sparkles size={12}/> Complete sets per game to earn bonus points. Play any of the 50 featured games to progress — works guest or signed-in, syncs across devices when signed in.
           </div>
         </div>
 
