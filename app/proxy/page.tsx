@@ -12,14 +12,14 @@ declare global {
 // Smart automatic bare — user never picks, we rotate invisibly
 const LOCAL_BARES = ['/api/bare/', '/api/edu/', '/api/learn/', '/api/t/'] as const;
 const PUBLIC_BARES = [
-  'https://tomphttp.outv1.workers.dev/',
-  'https://bare.urbetterwaittilldinneridk.workers.dev/',
   'https://bare.noblocc.uk/',
-  'https://d1o0a0r0r0c0k0.workers.dev/',
   'https://bare.holy.how/',
   'https://bare.undercover.goatse.cx/',
   'https://bare.zorip.eu.org/',
+  'https://tomphttp.outv1.workers.dev/',
+  'https://bare.urbetterwaittilldinneridk.workers.dev/',
   'https://tomphttp-2x.ayayay.workers.dev/',
+  'https://d1o0a0r0r0c0k0.workers.dev/',
 ];
 
 // BING ONLY — smart automatic search. No chooser, no confusing options.

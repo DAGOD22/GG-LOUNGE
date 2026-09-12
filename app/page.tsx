@@ -197,12 +197,12 @@ export default function Page() {
     return ()=> window.removeEventListener('keydown', onKey)
   },[])
 
-    // debounce search 300ms
+    // instant search — debounce removed for immediate feedback, keep tiny 80ms to avoid jank but visible is instant
   useEffect(()=>{
-    const id=setTimeout(()=> setDebouncedQuery(query), 280)
+    const id=setTimeout(()=> setDebouncedQuery(query), 80)
     return ()=> clearTimeout(id)
   },[query])
-  useEffect(()=>{ setVisibleCount(36) },[debouncedQuery, filter, sortBy, hideLow, showStaffOnly])
+  useEffect(()=>{ setVisibleCount(36) },[query, filter, sortBy, hideLow, showStaffOnly])
   // fetch requests for upvote list
   useEffect(()=>{
     fetch('/api/game-requests').then(r=> r.ok? r.json(): null).then((d:any)=>{
@@ -215,10 +215,15 @@ export default function Page() {
   const searchIndex = useMemo(() => new Map(allGames.map((g) => [g.id, `${g.title} ${g.genre} ${g.tone} ${g.description}`.toLowerCase()] as const)), [allGames])
   const visibleGames = useMemo(
     () => {
-      const q = debouncedQuery.toLowerCase()
+      const q = query.trim().toLowerCase()
       let base = allGames.filter((game) => {
-        const hay = searchIndex.get(game.id) || ''
-        return hay.includes(q) && (filter === 'All games' || game.genre === filter || (filter === 'Favorites' && favorites.includes(game.id)))
+        if(q){
+          const hay = searchIndex.get(game.id) || `${game.title} ${game.genre} ${game.tone} ${game.description}`.toLowerCase()
+          if(!hay.includes(q)) return false
+        }
+        if(filter === 'All games') return true
+        if(filter === 'Favorites') return favorites.includes(game.id)
+        return game.genre === filter
       })
       if (hideLow) base = base.filter(g=> !LOW_QUALITY_HINTS.has(g.id))
       if (showStaffOnly) base = base.filter(g=> STAFF_PICKS.includes(g.id))
@@ -230,13 +235,13 @@ export default function Page() {
       else base = [...base].sort((a,b)=> (b.featured?1:0) - (a.featured?1:0))
       return base
     },
-    [allGames, favorites, filter, debouncedQuery, playCounts, sortBy, hideLow, showStaffOnly],
+    [allGames, favorites, filter, query, playCounts, sortBy, hideLow, showStaffOnly, searchIndex],
   )
   const paginatedGames = useMemo(()=> visibleGames.slice(0, visibleCount), [visibleGames, visibleCount])
 
   // Fix 6: shelves grouping only when actually showing shelves (avoid wasted 192 scan in grid/search)
   const grouped = useMemo(()=>{
-    if (view !== 'shelves' || filter !== 'All games' || debouncedQuery) return [] as [string, Game[]][]
+    if (view !== 'shelves' || filter !== 'All games' || query.trim()) return [] as [string, Game[]][]
     const map: Record<string, Game[]> = {}
     for(const g of visibleGames){
       const k = g.genre
@@ -244,7 +249,7 @@ export default function Page() {
       map[k].push(g)
     }
     return Object.entries(map).sort((a,b)=> b[1].length - a[1].length)
-  }, [visibleGames, view, filter, debouncedQuery])
+  }, [visibleGames, view, filter, query])
   const staffGames = useMemo(()=> allGames.filter(g=> STAFF_PICKS.includes(g.id)), [allGames])
 
   const spotlight = featuredGames[spotIdx] || games[0]
@@ -673,10 +678,10 @@ export default function Page() {
           </div>
         </div>
         <div className="toolbar">
-          <div className="search-wrap">
+          <div className="search-wrap" style={{position:'relative'}}>
             <Search size={17} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles, genres, moods" aria-label="Search games" />
-            {query!==debouncedQuery && <span style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',fontSize:10,color:'var(--muted)',background:'var(--panel)',padding:'2px 6px',borderRadius:999,border:'1px solid var(--line)'}}>…</span>}
+            <input id="main-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search 192 titles, genres, moods" aria-label="Search games" style={{flex:1}} />
+            {query && <button onClick={()=> setQuery('')} aria-label="Clear search" style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',width:22,height:22,borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',display:'grid',placeItems:'center',cursor:'pointer',color:'var(--muted)'}}><X size={12}/></button>}
           </div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             <div style={{display:'flex',gap:6,alignItems:'center',padding:'4px 6px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.04)'}}>
@@ -706,7 +711,7 @@ export default function Page() {
         </div>
 
         {/* Content */}
-        {view === 'shelves' && filter==='All games' && !debouncedQuery ? (
+        {view === 'shelves' && filter==='All games' && !query.trim() ? (
           <div className="shelves">
             <div className="shelf">
               <div className="shelf-head">
@@ -715,7 +720,7 @@ export default function Page() {
               </div>
                             <div className="shelf-track" style={{contentVisibility:'auto'}}>
                 {staffGames.map((game,i)=> (
-                  <ShelfCard key={`staff-${game.id}`} game={game} index={i} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={debouncedQuery} />
+                  <ShelfCard key={`staff-${game.id}`} game={game} index={i} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} />
                 ))}
               </div>
             </div>
@@ -731,7 +736,7 @@ export default function Page() {
                 </div>
                                 <div className="shelf-track" style={{contentVisibility:'auto'}}>
                   {list.slice(0,14).map((game, index)=> (
-                    <ShelfCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={debouncedQuery} />
+                    <ShelfCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} />
                   ))}
                 </div>
               </div>
@@ -743,7 +748,7 @@ export default function Page() {
                         {allGames.length===games.length && published.length===0 ? <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(280px,1fr))",gap:16, marginBottom:16}}>{Array.from({length:4}).map((_,i)=><div key={i} className="skeleton" style={{height:220}}/> )}</div> : null}
             <div className="game-grid" style={{contentVisibility:'auto',containIntrinsicSize:'0 600px'}}>
               {paginatedGames.map((game, index) => (
-                <GameCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={debouncedQuery} />
+                <GameCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} />
               ))}
             </div>
             {visibleGames.length === 0 && (

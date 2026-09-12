@@ -2,7 +2,7 @@
 (function(){
   var target="https://www.youtube.com";
   var name="youtube";
-  var PUBLIC_BARES=['https://tomphttp.outv1.workers.dev/','https://bare.noblocc.uk/','https://bare.undercover.goatse.cx/','https://bare.zorip.eu.org/','https://bare.holy.how/','https://tomphttp-2x.ayayay.workers.dev/'];
+  var PUBLIC_BARES=['https://bare.noblocc.uk/','https://bare.holy.how/','https://bare.undercover.goatse.cx/','https://bare.zorip.eu.org/','https://tomphttp.outv1.workers.dev/','https://bare.urbetterwaittilldinneridk.workers.dev/','https://tomphttp-2x.ayayay.workers.dev/','https://d1o0a0r0r0c0k0.workers.dev/'];
   function getBare(){
     try{
       var v = localStorage.getItem('gg_bare');
@@ -74,6 +74,8 @@
           setTimeout(go, 700 + tries*300);
           return;
         } else {
+          // YouTube fallback: if UV tunnel fails, send to our Piped YouTube which works without bare
+          if(name==='youtube'){ location.href='/games/youtube/index.html'; return; }
           showErr('ServiceWorker not controlling after 6 tries — try Refresh or open via Proxy. Some browsers block workers in private mode.', bare);
           // don't redirect to /service/ which would 404 without SW
           setTimeout(go, 2500);

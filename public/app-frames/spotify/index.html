@@ -1,8 +1,8 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Loading — spotify — GG Lounge Tunnel</title><style>html,body{margin:0;height:100%;background:#0b0d12;color:#f4f2ec;display:grid;place-items:center;font-family:system-ui,Segoe UI,Arial;overflow:hidden}*{box-sizing:border-box}.card{text-align:center;padding:22px;max-width:520px}.spin{width:36px;height:36px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:#d7f34a;animation:spin .8s linear infinite;margin:0 auto 14px}h1{margin:0;font-size:15px;letter-spacing:.08em;font-weight:900}p{margin:6px 0 0;opacity:.65;font-size:13px;line-height:1.5}#err{display:none;margin-top:14px;padding:10px 14px;border-radius:10px;background:rgba(255,190,70,.12);border:1px solid rgba(255,190,70,.25);font-size:12px;line-height:1.5;text-align:left;max-width:520px}#err b{color:#ffbe46}a.btn{display:inline-block;margin-top:10px;padding:9px 14px;border-radius:99px;background:#d7f34a;color:#111;font-weight:900;text-decoration:none;font-size:13px}@keyframes spin{to{transform:rotate(360deg)}}</style><script src="/uv/uv.bundle.js"></script><script src="/uv/uv.config.js"></script></head><body><div class="card"><div class="spin"></div><h1 id="title">CONNECTING — SPOTIFY — LOUNGE TUNNEL</h1><p>Encrypted • Unblocked • Same-origin /service/ tunnel</p><p id="sub" style="opacity:.45;font-size:11px;margin-top:4px">Target: https://open.spotify.com</p><div id="err"></div><div id="actions" style="display:none;margin-top:12px;display:flex;gap:8;justify-content:center;flex-wrap:wrap"><a class="btn" href="/proxy">Open in Proxy</a><a class="btn" id="retry" href="javascript:void(0)">Retry</a></div></div><script>
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Loading — youtube — GG Lounge Tunnel</title><style>html,body{margin:0;height:100%;background:#0b0d12;color:#f4f2ec;display:grid;place-items:center;font-family:system-ui,Segoe UI,Arial;overflow:hidden}*{box-sizing:border-box}.card{text-align:center;padding:22px;max-width:520px}.spin{width:36px;height:36px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:#d7f34a;animation:spin .8s linear infinite;margin:0 auto 14px}h1{margin:0;font-size:15px;letter-spacing:.08em;font-weight:900}p{margin:6px 0 0;opacity:.65;font-size:13px;line-height:1.5}#err{display:none;margin-top:14px;padding:10px 14px;border-radius:10px;background:rgba(255,190,70,.12);border:1px solid rgba(255,190,70,.25);font-size:12px;line-height:1.5;text-align:left;max-width:520px}#err b{color:#ffbe46}a.btn{display:inline-block;margin-top:10px;padding:9px 14px;border-radius:99px;background:#d7f34a;color:#111;font-weight:900;text-decoration:none;font-size:13px}@keyframes spin{to{transform:rotate(360deg)}}</style><script src="/uv/uv.bundle.js"></script><script src="/uv/uv.config.js"></script></head><body><div class="card"><div class="spin"></div><h1 id="title">CONNECTING — SPOTIFY — LOUNGE TUNNEL</h1><p>Encrypted • Unblocked • Same-origin /service/ tunnel</p><p id="sub" style="opacity:.45;font-size:11px;margin-top:4px">Target: https://open.spotify.com</p><div id="err"></div><div id="actions" style="display:none;margin-top:12px;display:flex;gap:8;justify-content:center;flex-wrap:wrap"><a class="btn" href="/proxy">Open in Proxy</a><a class="btn" id="retry" href="javascript:void(0)">Retry</a></div></div><script>
 (function(){
   var target="https://open.spotify.com";
   var name="spotify";
-  var PUBLIC_BARES=['https://tomphttp.outv1.workers.dev/','https://bare.noblocc.uk/','https://bare.undercover.goatse.cx/','https://bare.zorip.eu.org/','https://bare.holy.how/','https://tomphttp-2x.ayayay.workers.dev/'];
+  var PUBLIC_BARES=['https://bare.noblocc.uk/','https://bare.holy.how/','https://bare.undercover.goatse.cx/','https://bare.zorip.eu.org/','https://tomphttp.outv1.workers.dev/','https://bare.urbetterwaittilldinneridk.workers.dev/','https://tomphttp-2x.ayayay.workers.dev/','https://d1o0a0r0r0c0k0.workers.dev/'];
   function getBare(){
     try{
       var v = localStorage.getItem('gg_bare');
@@ -68,10 +68,19 @@
       // try to ensure SW is controlling before we navigate to /service/... otherwise Next shows 404 page not found
       var hasSW = false;
       try{ hasSW = await ensureSW(); }catch(e){}
-      if(!hasSW && tries < 4) {
-        showErr('ServiceWorker warming… (attempt '+tries+')', bare);
-        setTimeout(go, 700 + tries*300);
-        return;
+      if(!hasSW) {
+        if(tries < 6){
+          showErr('ServiceWorker warming… (attempt '+tries+'/6) — hang tight', bare);
+          setTimeout(go, 700 + tries*300);
+          return;
+        } else {
+          // YouTube fallback: if UV tunnel fails, send to our Piped YouTube which works without bare
+          if(name==='youtube'){ location.href='/games/youtube/index.html'; return; }
+          showErr('ServiceWorker not controlling after 6 tries — try Refresh or open via Proxy. Some browsers block workers in private mode.', bare);
+          // don't redirect to /service/ which would 404 without SW
+          setTimeout(go, 2500);
+          return;
+        }
       }
       // final encode
       var cfg = self.__uv$config;
