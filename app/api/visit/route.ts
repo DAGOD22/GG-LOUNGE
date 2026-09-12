@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { logGamePlay } from "@/lib/db";
+import { logGamePlay, getUserFromToken } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +31,15 @@ export async function POST(req: Request) {
     if (!hitVisitLimit(ip)) {
       return NextResponse.json({ ok: true, rateLimited: true }, { status: 429, headers: { "Retry-After": "60" } });
     }
-    await logGamePlay(gameId, ip);
+    // Leaderboard only counts signed-in users (per user request)
+    const cookie = req.headers.get("cookie") || "";
+    const token = cookie.split(";").find(s=> s.trim().startsWith("ggl_token="))?.split("=")[1]?.trim() || "";
+    const user = token ? await getUserFromToken(token).catch(()=> null) : null;
+    if (!user) {
+      // Guest play — still return ok but don't count for leaderboard
+      return NextResponse.json({ ok: true, guest: true });
+    }
+    await logGamePlay(gameId, ip, user.id);
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ ok: true });

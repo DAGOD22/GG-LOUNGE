@@ -52,6 +52,7 @@ export interface Visit {
   ua: string;
   path: string;
   createdAt: string;
+  userId?: string | null;
 }
 export interface GameRequest {
   id: string;
@@ -118,7 +119,8 @@ export function migrate(): Promise<void> {
           "ip" TEXT NOT NULL,
           "ua" TEXT NOT NULL DEFAULT '',
           "path" TEXT NOT NULL DEFAULT '/',
-          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "userId" TEXT REFERENCES "auth_user"("id") ON DELETE SET NULL
         );
         CREATE INDEX IF NOT EXISTS "visits_createdAt_idx" ON "visits" ("createdAt" DESC);
         CREATE TABLE IF NOT EXISTS "game_request" (
@@ -175,6 +177,8 @@ export function migrate(): Promise<void> {
       `);
       // Tolerate tables created by older schemas.
       await p.query(`ALTER TABLE "banned_user" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMPTZ`);
+      await p.query(`ALTER TABLE "visits" ADD COLUMN IF NOT EXISTS "userId" TEXT`);
+      await p.query(`CREATE INDEX IF NOT EXISTS "visits_userId_idx" ON "visits" ("userId")`);
       await p.query(`ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'pending'`);
       await p.query(`ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "votes" INTEGER NOT NULL DEFAULT 1`);
       await p.query(`ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "html" TEXT`);
@@ -361,14 +365,15 @@ export async function findActiveBan(identifier: string): Promise<Ban | null> {
 
 /* ---------------- Visits ---------------- */
 
-export async function logVisit(ip: string, ua: string, visitPath: string): Promise<void> {
+export async function logVisit(ip: string, ua: string, visitPath: string, userId?: string | null): Promise<void> {
   try {
     if (getMode() === "postgres") {
-      await pgQuery('INSERT INTO "visits" ("id","ip","ua","path") VALUES ($1,$2,$3,$4)', [
+      await pgQuery('INSERT INTO "visits" ("id","ip","ua","path","userId") VALUES ($1,$2,$3,$4,$5)', [
         randomUUID(),
         ip.slice(0, 80),
         ua.slice(0, 300),
         visitPath.slice(0, 200),
+        userId || null,
       ]);
       if (Math.random() < 0.02) {
         await pgQuery(
@@ -384,7 +389,8 @@ export async function logVisit(ip: string, ua: string, visitPath: string): Promi
         ua: ua.slice(0, 300),
         path: visitPath.slice(0, 200),
         createdAt: new Date().toISOString(),
-      });
+        userId: userId || null,
+      } as any);
       s.visits = s.visits.slice(-500);
     });
   } catch {
@@ -477,20 +483,22 @@ export async function listReports(): Promise<Report[]> {
   const s = await readLocal();
   return (s.reports||[]).slice().reverse().slice(0,100);
 }
-export async function logGamePlay(gameId: string, ip: string): Promise<void> {
-  // reuse visits for leaderboard; store path as /play/<id>
-  await logVisit(ip, "play", "/play/"+gameId);
+export async function logGamePlay(gameId: string, ip: string, userId?: string | null): Promise<void> {
+  // only signed-in users count for leaderboard — guests are ignored
+  if (!userId) return;
+  await logVisit(ip, "play", "/play/"+gameId, userId);
 }
 export async function leaderboard(limit=10): Promise<{gameId:string,count:number}[]>{
   if(getMode()==="postgres"){
     try{
-      const rows = await pgQuery<{gameId:string,count:string}>('SELECT substring("path" from 7) as "gameId", COUNT(*) as count FROM "visits" WHERE "path" LIKE \'/play/%\' GROUP BY "gameId" ORDER BY count DESC LIMIT $1', [limit]);
+      // Only signed-in users (userId IS NOT NULL) count — guests ignored
+      const rows = await pgQuery<{gameId:string,count:string}>('SELECT substring("path" from 7) as "gameId", COUNT(*) as count FROM "visits" WHERE "path" LIKE \'/play/%\' AND "userId" IS NOT NULL GROUP BY "gameId" ORDER BY count DESC LIMIT $1', [limit]);
       return rows.map(r=> ({gameId:r.gameId, count: Number(r.count)}));
     }catch{ return []}
   }
   const s = await readLocal();
   const map: Record<string,number>={}
-  for(const v of s.visits) if(v.path.startsWith('/play/')) map[v.path.slice(6)] = (map[v.path.slice(6)]||0)+1
+  for(const v of s.visits) if(v.path.startsWith('/play/') && (v as any).userId) map[v.path.slice(6)] = (map[v.path.slice(6)]||0)+1
   return Object.entries(map).sort((a,b)=> b[1]-a[1]).slice(0,limit).map(([gameId,count])=> ({gameId,count}))
 }
 // --- Moderation & user state ---

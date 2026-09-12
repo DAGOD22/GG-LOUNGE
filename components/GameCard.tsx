@@ -31,7 +31,7 @@ export function GameCard({
         <Heart size={17} fill={isFavorite ? 'currentColor' : 'none'} />
       </button>
       <div
-        className="game-art"
+        className="game-art game-art--full"
         onClick={() => onLaunch(game)}
         role="button"
         tabIndex={0}
@@ -41,20 +41,23 @@ export function GameCard({
       >
         {showIcon ? (
           <img
-            className="game-icon"
+            className="game-icon game-icon--cover"
             src={game.icon}
             alt={`${game.title} icon`}
             loading="lazy"
             decoding="async"
             onError={() => setImgError(true)}
-            style={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 12, background: 'rgba(255,255,255,.08)', padding: 6 }}
           />
         ) : (
-          <span className="game-mark" aria-hidden="true">
-            {game.mark}
-          </span>
+          <div className="game-cover-fallback" aria-hidden="true">
+            <span className="game-mark game-mark--huge">{game.mark}</span>
+            <span className="game-cover-title">{game.title}</span>
+          </div>
         )}
-        <small aria-hidden="true">{String(index + 1).padStart(2, '0')}</small>
+        <div className="game-art-overlay" aria-hidden="true">
+          <small>{String(index + 1).padStart(2, '0')}</small>
+          <span className="art-play"><Play size={14} fill="currentColor" /></span>
+        </div>
       </div>
       <div className="game-info">
         <div>
@@ -100,7 +103,7 @@ export function ShelfCard({
         <Heart size={15} fill={isFavorite ? 'currentColor' : 'none'} />
       </button>
       <div
-        className="shelf-art"
+        className="shelf-art shelf-art--full"
         onClick={() => onLaunch(game)}
         role="button"
         tabIndex={0}
@@ -109,19 +112,22 @@ export function ShelfCard({
       >
         {showIcon ? (
           <img
-            className="game-icon"
+            className="game-icon game-icon--cover"
             src={game.icon}
             alt={`${game.title} icon`}
             loading="lazy"
-            style={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 12, background: 'rgba(255,255,255,.08)', padding: 6 }}
             onError={() => setImgError(true)}
           />
         ) : (
-          <span className="game-mark" style={{ fontSize: 32 }} aria-hidden="true">
-            {game.mark}
-          </span>
+          <div className="game-cover-fallback" aria-hidden="true">
+            <span className="game-mark game-mark--huge" style={{ fontSize: 42 }}>{game.mark}</span>
+            <span className="game-cover-title" style={{fontSize:10}}>{game.title}</span>
+          </div>
         )}
-        <small aria-hidden="true">{String(index + 1).padStart(2, '0')}</small>
+        <div className="game-art-overlay" aria-hidden="true">
+          <small>{String(index + 1).padStart(2, '0')}</small>
+          <span className="art-play"><Play size={12} fill="currentColor" /></span>
+        </div>
       </div>
       <div className="shelf-info">
         <p className="card-kicker" style={{ fontSize: 9 }}>

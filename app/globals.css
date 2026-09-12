@@ -256,3 +256,21 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--lime)}
 .btn-load{padding:10px 18px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--foreground);font-weight:800;cursor:pointer}
 .btn-load:hover{border-color:var(--lime);background:rgba(215,243,74,.1)}
 
+
+
+/* --- Full-bleed game covers (fix tiny icons + world favicon fallback) --- */
+.game-art--full, .shelf-art--full{padding:0 !important; overflow:hidden; position:relative; background:#0b0d12;}
+.game-art--full{ min-height:220px; }
+.shelf-art--full{ height:170px; }
+.game-icon--cover{width:100% !important; height:100% !important; object-fit:cover !important; object-position:center !important; display:block !important; border-radius:0 !important; background:transparent !important; padding:0 !important; filter:none !important; transition:transform .45s cubic-bezier(.2,.8,.2,1);}
+.game-card:hover .game-icon--cover, .shelf-card-art:hover .game-icon--cover{transform:scale(1.07);}
+.game-cover-fallback{width:100%; height:100%; display:grid; place-items:center; align-content:center; gap:8px; padding:16px; text-align:center; background:linear-gradient(135deg, rgba(255,255,255,.08), rgba(0,0,0,.22)), var(--panel); position:relative; overflow:hidden;}
+.game-cover-fallback::before{content:''; position:absolute; inset:-20%; background:radial-gradient(circle at 30% 20%, rgba(215,243,74,.18), transparent 40%), radial-gradient(circle at 80% 90%, rgba(125,107,255,.16), transparent 40%); pointer-events:none;}
+.game-mark--huge{font-size:64px; line-height:1; font-weight:900; letter-spacing:-.1em; transform:rotate(-7deg); color:var(--foreground); text-shadow: 6px 6px 0 rgba(0,0,0,.22); position:relative; z-index:1;}
+.shelf-art--full .game-mark--huge{font-size:44px;}
+.game-cover-title{font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:rgba(255,255,255,.82); background:rgba(0,0,0,.28); padding:4px 8px; border-radius:999px; backdrop-filter:blur(6px); max-width:92%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position:relative; z-index:1; border:1px solid rgba(255,255,255,.12);}
+.game-art-overlay{position:absolute; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.62) 100%); color:#fff; font-size:10px; letter-spacing:.12em;}
+.game-art-overlay small{position:static !important; color:rgba(255,255,255,.9) !important; font-size:10px; font-weight:800; letter-spacing:.14em; background:rgba(0,0,0,.32); padding:3px 7px; border-radius:999px; border:1px solid rgba(255,255,255,.14); backdrop-filter:blur(4px);}
+.game-art-overlay .art-play{width:28px; height:28px; display:grid; place-items:center; border-radius:999px; background:var(--lime); color:#0b0d12; box-shadow:0 4px 14px rgba(0,0,0,.3); opacity:0; transform:translateY(4px) scale(.9); transition: all .25s;}
+.game-card:hover .art-play, .shelf-card-art:hover .art-play{opacity:1; transform:translateY(0) scale(1);}
+@media(max-width:760px){ .game-art--full{ min-height:190px;} .game-mark--huge{font-size:52px;}}

@@ -198,21 +198,29 @@ const LOCAL_ICON_MAP: Record<string,string> = {
   "a-dance-of-fire-and-ice": "/games/a-dance-of-fire-and-ice/splash.png",
   "achievementunlocked": "/games/achievementunlocked/achievementunlocked.png",
   "alienhominid": "/games/alienhominid/alienhominid.jpg",
+  "among-us": "/games/among-us/red.png",
   "awesometanks2": "/games/awesometanks2/awesometanks2.jpg",
-    "bad-ice-cream": "/games/bad-ice-cream/bad-ice-cream.png",
+  "backrooms": "/games/backrooms/img/icon.png",
+  "bad-ice-cream": "/games/bad-ice-cream/bad-ice-cream.png",
   "bad-ice-cream-2": "/games/bad-ice-cream-2/bad-ice-cream-2.png",
   "bad-ice-cream-3": "/games/bad-ice-cream-3/bad-ice-cream-3.png",
+  "baldis-basics": "/games/baldis-basics/splash.png",
+  "basket-random": "/games/basket-random/splash.jpeg",
+  "basketball-stars": "/games/basketball-stars/assets/images/basketball-stars.png",
   "bloxors": "/games/bloxors/favicon.ico",
   "bobtherobber2": "/games/bobtherobber2/favicon.ico",
   "boxing-random": "/games/boxing-random/512x512.jpg",
   "breakingthebank": "/games/breakingthebank/breakingthebank.png",
-    "chrome-dino": "/games/chrome-dino/favicon.ico",
+  "cell-machine": "/games/cell-machine/TemplateData/favicon.ico",
+  "chrome-dino": "/games/chrome-dino/favicon.ico",
   "cluster-rush": "/games/cluster-rush/icon.jpg",
   "cookie-clicker": "/games/cookie-clicker/img/favicon.ico",
   "core-ball": "/games/core-ball/pr_source.png",
   "crossyroad": "/games/crossyroad/crossyroad.png",
-    "doodle-jump": "/games/doodle-jump/doodle.png",
-  "drift-boss": "/games/drift-boss/drift-boss.png",
+  "cubefield": "/games/cubefield/assets/splash.png",
+  "death-run-3d": "/games/death-run-3d/TemplateData/favicon.ico",
+  "doodle-jump": "/games/doodle-jump/doodle.png",
+  "drift-boss": "/games/drift-boss/branding/logo.png",
   "drift-hunters": "/games/drift-hunters/drift-hunters.png",
   "drive-mad": "/games/drive-mad/drive-mad-logo-web.png",
   "ducklife1": "/games/ducklife1/ducklife.png",
@@ -223,10 +231,12 @@ const LOCAL_ICON_MAP: Record<string,string> = {
   "escapingtheprison": "/games/escapingtheprison/escapingtheprison.jpg",
   "fancypantsadventures": "/games/fancypantsadventures/fancypantsadventure.png",
   "fireboywatergirlforesttemple": "/games/fireboywatergirlforesttemple/icon-60x60.png",
+  "flappy-bird": "/games/flappy-bird/assets/splash.png",
+  "flashtetris": "/games/flashtetris/flashtetris.png",
   "fnaf": "/games/fnaf/favicon.ico",
   "fnaw": "/games/fnaw/favicon.ico",
   "fruitninja": "/games/fruitninja/FruitNinjaTeaser.jpg",
-    "google-feud": "/games/google-feud/splash.png",
+  "google-feud": "/games/google-feud/splash.png",
   "granny": "/games/granny/logo.png",
   "hackertype": "/games/hackertype/favicon.ico",
   "impossiblequiz": "/games/impossiblequiz/impossiblequiz.png",
@@ -235,15 +245,21 @@ const LOCAL_ICON_MAP: Record<string,string> = {
   "learntofly": "/games/learntofly/learntofly.png",
   "learntofly2": "/games/learntofly2/learn-to-fly-2.jpg",
   "level-devil": "/games/level-devil/favicon.png",
+  "minecraft-classic": "/games/minecraft-classic/pack.png",
+  "monkey-mart": "/games/monkey-mart/icons/icon-512.png",
   "moto-x3m": "/games/moto-x3m/favicon.ico",
   "n-gon": "/games/n-gon/favicon.ico",
+  "ovo": "/games/ovo/icon-114.png",
   "papasburgeria": "/games/papasburgeria/ico.png",
   "papaspizzaria": "/games/papaspizzaria/papaspizzaria.jpg",
   "plants-vs-zombies": "/games/plants-vs-zombies/PVZ.ico",
-    "riddleschool": "/games/riddleschool/riddleschool.png",
+  "poki": "/games/poki/images/icon512.png",
+  "retro-bowl": "/games/retro-bowl/img/icon.jpg",
+  "riddleschool": "/games/riddleschool/riddleschool.png",
   "riddleschool2": "/games/riddleschool2/riddleschool2.png",
   "riddleschool3": "/games/riddleschool3/riddleschool3.png",
-    "slope": "/games/slope/slope4.jpeg",
+  "rooftop-snipers": "/games/rooftop-snipers/img/thumb.png",
+  "slope": "/games/slope/slope4.jpeg",
   "slope-2": "/games/slope-2/slope-2-logo.png",
   "slope-ball": "/games/slope-ball/icon.jpg",
   "snow-rider-3d": "/games/snow-rider-3d/favicon.ico",
@@ -254,22 +270,60 @@ const LOCAL_ICON_MAP: Record<string,string> = {
   "temple-run-2": "/games/temple-run-2/ecb75761cc5768501b9345d4417c76f7.png",
   "thisistheonlylevel": "/games/thisistheonlylevel/thisistheonlylevel.png",
   "tiny-fishing": "/games/tiny-fishing/tiny-fishing.png",
-    "twitch-tetris": "/games/twitch-tetris/logo.png",
-      }
+  "tunnel-rush": "/games/tunnel-rush/style/webgl-logo.png",
+  "twitch-tetris": "/games/twitch-tetris/logo.png",
+  "wordle": "/games/wordle/img/logo_512x512.png",
+  "worlds-hardest-game": "/games/worlds-hardest-game/images/splash.jpg",
+  "youtube": "/games/youtube/icon.svg"
+}
+
+// Generic hosting domains that return host favicon, not game-specific — avoid showing wrong icon
+const GENERIC_HOSTS = new Set([
+  "github.io", "githubusercontent.com", "itch.io", "poki.com", "armorgames.com", "newgrounds.com",
+  "henrystickmin.com", "crazygames.com", "y8.com", "gamedistribution.com", "coolmathgames.com",
+  "google.com", "github.com"
+])
+const GENERIC_EXACT = new Set([
+  "itch.io", "poki.com", "github.io" // exact host
+])
+function isGenericDomain(domain: string): boolean {
+  if (!domain) return true
+  // Check suffix
+  for (const h of GENERIC_HOSTS) {
+    if (domain === h || domain.endsWith("."+h)) return true
+  }
+  // Check reused domains (same favicon for multiple games) — handled below via dedup
+  return false
+}
+// Build set of domains that appear multiple times (reused) — those are not unique game favicons
+const DOMAIN_COUNTS: Record<string, number> = (() => {
+  const c: Record<string, number> = {}
+  for (const d of Object.values(ICON_DOMAIN_MAP)) c[d] = (c[d]||0)+1
+  return c
+})()
 
 export function getGameIconUrl(id: string): string {
   // 1) local icon if we have a curated one
   if (LOCAL_ICON_MAP[id]) return LOCAL_ICON_MAP[id]
-  // 2) high-res external favicon via gstatic (128px, better than s2 16)
+  // 2) external favicon only if domain is unique and not generic
   const domain = ICON_DOMAIN_MAP[id]
-  if (domain) return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=128`
-  // 3) fallback: try DuckDuckGo 128 + Google s2 64
-  const fallback = id.replace(/-/g,'') + '.com'
-  return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${fallback}&size=128`
+  if (domain) {
+    const isGeneric = isGenericDomain(domain) || (DOMAIN_COUNTS[domain]||0) > 1
+    // For github.io and other generics, don't return favicon (would be wrong/world)
+    if (!isGeneric) {
+      return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=256`
+    }
+  }
+  // 3) No reliable external icon — return empty so UI shows premium full-bleed cover (not world globe)
+  // We intentionally return empty string for generic/reused/missing domains to avoid default globe icon
+  return ""
 }
+
 export function getFaviconFallback(id: string): string {
   const d = ICON_DOMAIN_MAP[id] || id
-  return `https://icons.duckduckgo.com/ip3/${d}.ico`
+  // Return t3 large, but caller should handle empty string fallback to cover instead of globe
+  if (!d || isGenericDomain(d) || (DOMAIN_COUNTS[d]||0) > 1) return ""
+  return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${d}&size=256`
 }
 export const games: Game[] = [
   { id: 'cookie-clicker', title: 'Cookie Clicker', subtitle: 'Bake a bigger future.', description: "Start with one tiny click and build an unstoppable cookie empire.", genre: 'Idle', tone: 'Cozy chaos', mark: 'CC', color: 'cookie', path: '/games/cookie-clicker/index.html', icon: getGameIconUrl('cookie-clicker'), featured: true },

@@ -198,11 +198,37 @@ export default function Page() {
     }
     return m
   }, [allGames, favorites, query, searchIndex])
+  // Leaderboard: server-side, only signed-in users count (per user request)
+  const [serverLeaderboard, setServerLeaderboard] = useState<{gameId:string,count:number}[]>([])
+  useEffect(()=>{
+    let alive=true
+    fetch('/api/leaderboard?limit=5').then(r=> r.ok? r.json(): null).then((d:any)=>{
+      if(!alive) return
+      if(d?.leaderboard && Array.isArray(d.leaderboard)) setServerLeaderboard(d.leaderboard)
+    }).catch(()=>{})
+    const id=setInterval(()=>{
+      fetch('/api/leaderboard?limit=5').then(r=> r.ok? r.json(): null).then((d:any)=>{
+        if(!alive) return
+        if(d?.leaderboard) setServerLeaderboard(d.leaderboard)
+      }).catch(()=>{})
+    }, 30000)
+    return ()=> { alive=false; clearInterval(id)}
+  }, [playCounts, authUser]) // refresh when you play or auth changes
   const leaderboard = useMemo(()=>{
+    if(serverLeaderboard.length>0){
+      const map = new Map(allGames.map(g=> [g.id, g] as const))
+      const rows = serverLeaderboard.map(r=> {
+        const g = map.get(r.gameId)
+        return g ? { game:g, count:r.count } : null
+      }).filter(Boolean) as {game:typeof allGames[number], count:number}[]
+      if(rows.length>0) return rows.slice(0,5)
+    }
+    // Fallback to local playCounts until server has data, but only show if you are signed in — guests see featured
+    if(!authUser) return featuredGames.slice(0,5).map((g,i)=> ({ game:g, count: 0}))
     const entries = allGames.map(g=> ({ game:g, count: playCounts[g.id]||0})).sort((a,b)=> b.count - a.count).slice(0,5)
-    if(entries.every(e=> e.count===0)) return featuredGames.slice(0,5).map((g,i)=> ({ game:g, count: 5-i}))
+    if(entries.every(e=> e.count===0)) return featuredGames.slice(0,5).map((g,i)=> ({ game:g, count: 0}))
     return entries
-  }, [allGames, playCounts])
+  }, [allGames, playCounts, serverLeaderboard, authUser, featuredGames])
   // JSON-LD for SEO - top games as ItemList
   const jsonLd = useMemo(()=> ({
     '@context':'https://schema.org',
@@ -343,7 +369,7 @@ export default function Page() {
         <span style={{display:'flex',alignItems:'center',gap:10,fontWeight:800,fontSize:13}}><span style={{width:32,height:32,borderRadius:999,background:'var(--lime)',display:'grid',placeItems:'center',color:'#0b0d12'}}><Download size={16}/></span> Install GG Lounge — play offline & launch like an app</span>
         <span style={{display:'flex',gap:8}}><button onClick={doInstall} style={{padding:'8px 14px',borderRadius:999,background:'#0b0d12',color:'#fff',border:'1px solid rgba(255,255,255,.15)',fontWeight:800,cursor:'pointer'}}>Install</button><button onClick={()=> setInstallable(false)} style={{padding:'8px 10px',borderRadius:999,background:'transparent',border:'1px solid var(--line)',color:'var(--foreground)',cursor:'pointer'}}>Dismiss</button></span>
       </div>}
-      <section className="hero" id="top">
+      <section className="hero" id="top" style={{position:"relative", overflow:"hidden", background:"radial-gradient(600px 400px at 15% 10%, rgba(125,107,255,.14), transparent 60%), radial-gradient(700px 500px at 85% 15%, rgba(215,243,74,.12), transparent 60%), radial-gradient(500px 400px at 50% 90%, rgba(255,108,131,.08), transparent 60%), var(--background)"}}>
         <div className="hero-copy">
           <p className="eyebrow">
             <Sparkles size={14} /> THE INDEPENDENT ARCADE
@@ -365,7 +391,7 @@ export default function Page() {
               <Gift size={14}/> Game of the Day: {gameOfDay.title}
             </button>
           </div>
-          <div className="hero-stats">
+          <div className="hero-stats" style={{gap:18, padding:'12px 16px', borderRadius:999, background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.06)', backdropFilter:'blur(8px)', display:'inline-flex', width:'fit-content', marginTop:22}}>
             <span>
               <strong>{allGames.length}</strong> games
             </span>
@@ -382,11 +408,15 @@ export default function Page() {
             <span>SPOTLIGHT / {(String(spotIdx+1).padStart(2,'0'))}</span>
             <span className="spotlight-tag">FEATURED</span>
           </div>
-          <div className="spotlight-art" onClick={()=> launch(spotlight)} role="button" tabIndex={0} onKeyDown={e=> e.key==='Enter'&&launch(spotlight)} style={{cursor:'pointer'}}>
-            <div className="orbit orbit-a" />
-            <div className="orbit orbit-b" />
-            <span className="spotlight-mark">{spotlight.mark}</span>
-            <span className="spotlight-caption">
+          <div className="spotlight-art" onClick={()=> launch(spotlight)} role="button" tabIndex={0} onKeyDown={e=> e.key==='Enter'&&launch(spotlight)} style={{cursor:'pointer', overflow:'hidden', borderRadius:16, position:'relative'}}>
+            {spotlight.icon ? (
+              <img src={spotlight.icon} alt={spotlight.title} style={{position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', opacity:.9}} onError={(e)=> (e.currentTarget.style.display='none')} />
+            ) : null}
+            <div style={{position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 30%, rgba(0,0,0,.55) 100%)'}}/>
+            <div className="orbit orbit-a" style={{opacity:.5}} />
+            <div className="orbit orbit-b" style={{opacity:.4}} />
+            <span className="spotlight-mark" style={{position:'relative', zIndex:1, textShadow:'0 4px 20px rgba(0,0,0,.45)'}}>{spotlight.mark}</span>
+            <span className="spotlight-caption" style={{zIndex:1, background:'rgba(0,0,0,.32)', padding:'6px 10px', borderRadius:999, border:'1px solid rgba(255,255,255,.14)', backdropFilter:'blur(6px)'}}>
               {spotlight.tone.toUpperCase()}<br/>{spotlight.genre.toUpperCase()}
             </span>
           </div>
@@ -439,17 +469,18 @@ export default function Page() {
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(320px, 1fr))',gap:14}}>
           <div style={{border:'1px solid var(--line)',borderRadius:16,background:'var(--panel)',padding:14}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-              <p className="eyebrow" style={{margin:0,display:'flex',alignItems:'center',gap:6}}><Flame size={12}/> LEADERBOARD — most played</p>
+              <p className="eyebrow" style={{margin:0,display:'flex',alignItems:'center',gap:6}}><Flame size={12}/> LEADERBOARD — most played <span style={{fontSize:9, padding:'3px 7px', borderRadius:999, background: authUser? 'rgba(34,197,94,.14)':'rgba(255,92,92,.12)', border: authUser? '1px solid rgba(34,197,94,.25)':'1px solid rgba(255,92,92,.22)', color: authUser? '#22c55e':'#ff8f8f', letterSpacing:'.06em'}}>{authUser? 'SIGNED-IN ONLY' : 'SIGN IN TO COUNT'}</span></p>
               <span style={{display:'flex',gap:6}}>
                 <button onClick={()=> setLeaderTab('today')} style={{padding:'5px 9px',borderRadius:999,border: leaderTab==='today'?'1px solid var(--lime)':'1px solid var(--line)',background: leaderTab==='today'?'var(--lime)':'transparent',color: leaderTab==='today'?'#0b0d12':'var(--foreground)',fontWeight:800,fontSize:11,cursor:'pointer'}}>Today</button>
                 <button onClick={()=> setLeaderTab('week')} style={{padding:'5px 9px',borderRadius:999,border: leaderTab==='week'?'1px solid var(--lime)':'1px solid var(--line)',background: leaderTab==='week'?'var(--lime)':'transparent',color: leaderTab==='week'?'#0b0d12':'var(--foreground)',fontWeight:800,fontSize:11,cursor:'pointer'}}>Week</button>
               </span>
             </div>
+            {!authUser && <div style={{padding:'8px 12px', borderRadius:10, background:'rgba(255,92,92,.08)', border:'1px solid rgba(255,92,92,.15)', fontSize:11, display:'flex',alignItems:'center',gap:6, marginBottom:8}}><ShieldCheck size={12} color="#ff8f8f"/> Sign in to have your plays count on the global leaderboard — guest plays are not ranked.</div>}
             <div style={{display:'grid',gap:8}}>
               {leaderboard.map((e,i)=> (
-                <button key={e.game.id} onClick={()=> launch(e.game)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 10px',borderRadius:12,border:'1px solid var(--line)',background:'rgba(255,255,255,.03)',cursor:'pointer',textAlign:'left'}}>
-                  <span style={{width:28,height:28,borderRadius:999,background: i===0?'var(--lime)': i===1?'#cbd5e1': i===2?'#fdba74':'rgba(255,255,255,.08)',color: i<3?'#0b0d12':'var(--foreground)',display:'grid',placeItems:'center',fontWeight:900,fontSize:12}}>{i+1}</span>
-                  <span style={{width:36,height:36,borderRadius:10,background:'var(--line)',display:'grid',placeItems:'center',fontWeight:900,fontSize:12,flexShrink:0}}>{e.game.mark}</span>
+                <button key={e.game.id} onClick={()=> launch(e.game)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 10px',borderRadius:12,border:'1px solid var(--line)',background:'rgba(255,255,255,.03)',cursor:'pointer',textAlign:'left', transition:'transform .2s, border-color .2s'}}>
+                  <span style={{width:28,height:28,borderRadius:999,background: i===0?'var(--lime)': i===1?'#cbd5e1': i===2?'#fdba74':'rgba(255,255,255,.08)',color: i<3?'#0b0d12':'var(--foreground)',display:'grid',placeItems:'center',fontWeight:900,fontSize:12, boxShadow: i===0? '0 4px 14px rgba(215,243,74,.35)':''}}>{i+1}</span>
+                  {e.game.icon ? <img src={e.game.icon} alt="" style={{width:36,height:36,borderRadius:10,objectFit:'cover', flexShrink:0, border:'1px solid rgba(255,255,255,.12)'}} onError={(ev)=> (ev.currentTarget.style.display='none')} /> : <span style={{width:36,height:36,borderRadius:10,background:'var(--line)',display:'grid',placeItems:'center',fontWeight:900,fontSize:12,flexShrink:0}}>{e.game.mark}</span>}
                   <span style={{flex:1,minWidth:0}}><strong style={{display:'block',fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{e.game.title}</strong><span style={{fontSize:11,color:'var(--muted)'}}>{e.game.genre} · {e.count} plays</span></span>
                   <Play size={14} fill="currentColor"/>
                 </button>
