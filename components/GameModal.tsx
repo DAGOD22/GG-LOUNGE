@@ -1,8 +1,10 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Heart, Maximize2, X, Copy, ExternalLink, Gamepad2, Keyboard, Monitor, Bug, Flag, AlertCircle, Loader2, Save } from 'lucide-react'
+import { Heart, Maximize2, X, Copy, ExternalLink, Gamepad2, Keyboard, Monitor, Bug, Flag, AlertCircle, Loader2, Save, Trophy, Star, Lock, Medal, Crown, Zap, Target } from 'lucide-react'
 import type { Game } from '@/lib/games'
 import { CONTROLS_LEGEND } from '@/lib/games'
+import { inferAchievementUpdates } from '@/lib/achievement-tracker'
+import { getAchievementsForGame, RARITY_COLOR } from '@/lib/achievements'
 
 export function GameModal({
   game,
@@ -29,6 +31,14 @@ export function GameModal({
   const saveAppliedRef = useRef(false)
   const lastSaveDataRef = useRef<string | null>(null)
   const saveAbortRef = useRef<AbortController | null>(null)
+  // achievements
+  const [achievements, setAchievements] = useState<any[]>([])
+  const [showAchievements, setShowAchievements] = useState(false)
+  const [achUnlockedToast, setAchUnlockedToast] = useState<any | null>(null)
+  const [achStats, setAchStats] = useState<{unlocked:number,total:number}>({unlocked:0,total:0})
+  const playsRef = useRef(1)
+  const timeRef = useRef(0)
+  const lastAchSentRef = useRef<string>('')
 
   // Fix 3: improved collect/save with diff and no reload loop
   const collectSaveFromFrame = useCallback((): string | null => {
@@ -181,6 +191,90 @@ export function GameModal({
       if (saveAbortRef.current) saveAbortRef.current.abort()
     }
   }, [authUser, game, pushSave, collectSaveFromFrame])
+
+  // --- Achievements: fetch + heartbeat + inference ---
+  useEffect(() => {
+    if (!game) return
+    let cancelled = false
+    // load achievements for this game (guest gets 0 progress, signed in gets DB)
+    fetch('/api/achievements?gameId=' + encodeURIComponent(game.id))
+      .then(r=> r.json()).then((d:any)=>{
+        if(cancelled) return
+        if(d?.achievements) setAchievements(d.achievements)
+        const unlocked = d?.achievements?.filter((a:any)=> a.unlocked)?.length || 0
+        setAchStats({ unlocked, total: d?.achievements?.length || getAchievementsForGame(game.id).length })
+      }).catch(()=>{})
+    // track play count for achievements inference — also notify server for per-user stats
+    if(authUser){
+      fetch('/api/game-stats', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ gameId: game.id, timeSeconds:0 }) }).catch(()=>{})
+      // fetch existing stats to seed plays/time
+      fetch('/api/game-stats?gameId='+encodeURIComponent(game.id)).then(r=>r.json()).then((d:any)=>{
+        if(d?.stats){ playsRef.current = Math.max(1, d.stats.plays||1); timeRef.current = d.stats.timeSeconds||0 }
+      }).catch(()=>{})
+    } else {
+      // guest fallback from localStorage
+      try{
+        const k='ggl_plays_'+game.id
+        const cur= parseInt(localStorage.getItem(k)||'0',10)||0
+        const next=cur+1
+        localStorage.setItem(k, String(next))
+        playsRef.current=next
+      }catch{ playsRef.current=1 }
+    }
+    return ()=>{ cancelled=true }
+  }, [game, authUser])
+
+  // timer + achievement inference loop (every 4s)
+  useEffect(()=>{
+    if(!game) return
+    const tick = window.setInterval(()=>{
+      if(document.visibilityState==='hidden') return
+      timeRef.current+=4
+      // heartbeat every 30s to server
+      if(authUser && timeRef.current % 30 === 0 && timeRef.current>0){
+        fetch('/api/game-stats', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ gameId: game.id, timeSeconds:30 }) }).catch(()=>{})
+      }
+      // try to infer progress from iframe
+      let win: any = null
+      try{ win = frameRef.current?.contentWindow as any }catch{}
+      const updates = inferAchievementUpdates(game.id, win, { plays: playsRef.current, timeSeconds: timeRef.current })
+      if(updates.length===0) return
+      // diff against current achievements to avoid spamming same progress
+      const key = JSON.stringify(updates.map(u=> u.achievementId+':'+u.progress+':'+(u.unlocked?1:0)).sort())
+      if(key===lastAchSentRef.current) return
+      // optimistic local update
+      setAchievements((prev)=>{
+        if(!prev.length) return prev
+        const m = new Map(prev.map(p=> [p.id, p]))
+        let changed=false
+        let unlockedNew:any=null
+        for(const u of updates){
+          const cur = m.get(u.achievementId) as any
+          if(!cur) continue
+          if(u.progress > (cur.progress||0) || (!cur.unlocked && u.unlocked)){
+            if(!cur.unlocked && u.unlocked) unlockedNew = cur
+            m.set(u.achievementId, { ...cur, progress: u.progress, unlocked: cur.unlocked || u.unlocked })
+            changed=true
+          }
+        }
+        if(!changed) return prev
+        if(unlockedNew) { setAchUnlockedToast(unlockedNew); setTimeout(()=> setAchUnlockedToast(null), 3800) }
+        const arr = Array.from(m.values())
+        const unlocked = arr.filter((a:any)=> a.unlocked).length
+        setAchStats({ unlocked, total: arr.length })
+        return arr
+      })
+      // only send to server if signed in
+      if(!authUser) {
+        lastAchSentRef.current = key
+        return
+      }
+      // throttle server posts to only when progress grew
+      lastAchSentRef.current = key
+      fetch('/api/achievements', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ updates }) }).catch(()=>{})
+    }, 4000)
+    return ()=> clearInterval(tick)
+  }, [game, authUser])
 
   const handleFrameLoad = useCallback(() => {
     setFrameLoading(false)
@@ -335,6 +429,27 @@ export function GameModal({
           </div>
         </div>
         <div className="modal-actions">
+          <button
+            onClick={()=> setShowAchievements(v=> !v)}
+            title="Achievements"
+            aria-label="Achievements"
+            style={{
+              width: 'auto',
+              padding: '0 10px',
+              fontSize: 11,
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              border: showAchievements ? '1px solid var(--lime)' : '1px solid var(--line)',
+              background: showAchievements ? 'var(--lime)' : 'rgba(215,243,74,.16)',
+              color: showAchievements ? '#0b0d12' : 'var(--foreground)',
+              borderRadius: 999,
+              cursor: 'pointer',
+            }}
+          >
+            <Trophy size={14} /> {achStats.unlocked}/{achStats.total || getAchievementsForGame(game.id).length}
+          </button>
           {authUser && (
             <button
               onClick={pushSave}
@@ -565,6 +680,82 @@ export function GameModal({
             </button>
           </div>
         </div>
+
+        {/* Achievements drawer */}
+        {showAchievements && (
+          <div style={{ position:'absolute', inset:0, zIndex:9, display:'flex', justifyContent:'flex-end', pointerEvents:'auto' }}>
+            <div onClick={()=> setShowAchievements(false)} style={{ flex:1, background:'rgba(0,0,0,.42)', backdropFilter:'blur(2px)' }} />
+            <div style={{ width:'min(420px, 92vw)', background:'#0f121b', borderLeft:'1px solid var(--line)', display:'flex', flexDirection:'column', boxShadow:'-18px 0 40px rgba(0,0,0,.45)', overflow:'hidden' }}>
+              {/* header */}
+              <div style={{ padding:'16px 16px 14px', borderBottom:'1px solid var(--line)', background:'linear-gradient(180deg, rgba(125,107,255,.14), transparent)' }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <span style={{ width:34, height:34, borderRadius:10, display:'grid', placeItems:'center', background:'var(--lime)', color:'#0b0d12' }}><Trophy size={16} /></span>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:900, letterSpacing:'.02em' }}>{game.title} Achievements</div>
+                      <div style={{ fontSize:11, color:'var(--muted)', fontWeight:700 }}>{achStats.unlocked} of {achievements.length || getAchievementsForGame(game.id).length} unlocked • {achievements.filter((a:any)=> a.unlocked).reduce((acc:number,a:any)=> acc+(a.points||0),0)} pts</div>
+                    </div>
+                  </div>
+                  <button onClick={()=> setShowAchievements(false)} style={{ width:32, height:32, borderRadius:999, border:'1px solid var(--line)', background:'rgba(255,255,255,.06)', color:'var(--foreground)', display:'grid', placeItems:'center', cursor:'pointer' }}><X size={16} /></button>
+                </div>
+                {!authUser && (
+                  <div style={{ marginTop:10, padding:'8px 10px', borderRadius:10, background:'rgba(255,92,92,.10)', border:'1px solid rgba(255,92,92,.18)', fontSize:11, fontWeight:800, color:'var(--muted)', display:'flex', alignItems:'center', gap:8 }}>
+                    <Lock size={12} /> Sign in to save progress across devices. Guest progress is preview only.
+                  </div>
+                )}
+                {authUser && (
+                  <div style={{ marginTop:10, height:6, borderRadius:999, background:'rgba(255,255,255,.08)', overflow:'hidden' }}>
+                    <div style={{ width: `${Math.round((achStats.unlocked/(achievements.length||1))*100)}%`, height:'100%', background:'linear-gradient(90deg, var(--lime), #7dd3ff)', borderRadius:999, transition:'width 400ms ease' }} />
+                  </div>
+                )}
+              </div>
+              {/* list */}
+              <div style={{ flex:1, overflowY:'auto', padding:12, display:'flex', flexDirection:'column', gap:10 }}>
+                {(achievements.length ? achievements : getAchievementsForGame(game.id).map(d=> ({...d, progress:0, unlocked:false})) ).map((a:any)=>{
+                  const pct = Math.min(100, Math.round(( (a.progress||0) / (a.target||1) )*100))
+                  const tierColor = RARITY_COLOR[a.rarity] || '#888'
+                  const unlocked = !!a.unlocked
+                  return (
+                    <div key={a.id} style={{ display:'flex', gap:12, padding:'11px 12px', borderRadius:14, border: unlocked ? '1px solid rgba(215,243,74,.35)' : '1px solid var(--line)', background: unlocked ? 'linear-gradient(135deg, rgba(215,243,74,.14), rgba(125,107,255,.08))' : 'rgba(255,255,255,.04)', opacity: unlocked ? 1 : .96 }}>
+                      <div style={{ width:44, height:44, borderRadius:12, background: unlocked ? 'rgba(215,243,74,.18)' : 'rgba(255,255,255,.06)', border:'1px solid var(--line)', display:'grid', placeItems:'center', fontSize:18, flexShrink:0 }}>{a.icon}</div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                          <span style={{ fontSize:12, fontWeight:900 }}>{a.title}</span>
+                          <span style={{ fontSize:9, fontWeight:900, letterSpacing:'.06em', padding:'2px 6px', borderRadius:999, background: tierColor, color: a.rarity==='legendary' ? '#fff' : '#0b0d12' }}>{a.rarity.toUpperCase()}</span>
+                          <span style={{ fontSize:10, fontWeight:800, color: unlocked ? '#22c55e' : 'var(--muted)', display:'flex', alignItems:'center', gap:4 }}>{unlocked ? <><Star size={11} fill="#22c55e" color="#22c55e" /> Unlocked</> : <><Lock size={11}/> Locked</>}</span>
+                        </div>
+                        <div style={{ fontSize:11, color:'var(--muted)', lineHeight:1.35, marginTop:2 }}>{a.description}</div>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:8 }}>
+                          <div style={{ flex:1, height:6, borderRadius:999, background:'rgba(255,255,255,.09)', overflow:'hidden' }}>
+                            <div style={{ width: `${pct}%`, height:'100%', background: unlocked ? 'linear-gradient(90deg, var(--lime), #7dd3ff)' : 'linear-gradient(90deg, #7d6bff, #d7f34a)', transition:'width 400ms ease' }} />
+                          </div>
+                          <span style={{ fontSize:11, fontWeight:900, color: unlocked ? '#22c55e' : 'var(--foreground)', whiteSpace:'nowrap' }}>{(a.progress||0)}/{a.target} {a.unit||''}</span>
+                          <span style={{ fontSize:10, fontWeight:900, padding:'2px 6px', borderRadius:999, background: unlocked ? 'var(--lime)' : 'rgba(255,255,255,.08)', color: unlocked? '#0b0d12':'var(--muted)' }}>{a.points} pts</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div style={{ padding:'10px 12px', borderTop:'1px solid var(--line)', background:'rgba(255,255,255,.03)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10 }}>
+                <span style={{ fontSize:11, fontWeight:800, color:'var(--muted)', display:'flex', alignItems:'center', gap:6 }}><Medal size={12}/> Total {getAchievementsForGame(game.id).length} to collect</span>
+                <button onClick={()=> setShowAchievements(false)} style={{ padding:'8px 12px', borderRadius:999, border:'1px solid var(--line)', background:'#fff', color:'#0b0d12', fontWeight:900, fontSize:11, cursor:'pointer' }}>Keep playing</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* unlock toast */}
+        {achUnlockedToast && (
+          <div style={{ position:'absolute', left:'50%', bottom: showControls ? 96 : 18, transform:'translateX(-50%)', zIndex:10, pointerEvents:'none', display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:16, background:'linear-gradient(135deg, #0b0d12, #151a28)', border:'1px solid rgba(215,243,74,.55)', boxShadow:'0 12px 36px rgba(0,0,0,.45)', minWidth:280, maxWidth:'92%' }}>
+            <span style={{ width:36, height:36, borderRadius:999, display:'grid', placeItems:'center', background:'var(--lime)', color:'#0b0d12', fontSize:18 }}>🏆</span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:10, fontWeight:900, letterSpacing:'.08em', color:'var(--lime)' }}>ACHIEVEMENT UNLOCKED</div>
+              <div style={{ fontSize:12, fontWeight:900, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{achUnlockedToast.icon} {achUnlockedToast.title} — {achUnlockedToast.points} pts</div>
+            </div>
+            <Crown size={16} color="var(--lime)" />
+          </div>
+        )}
       </div>
     </div>
   )

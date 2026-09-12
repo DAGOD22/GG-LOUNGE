@@ -7,6 +7,7 @@ import type { Game } from '@/lib/games'
 import { GameCard, ShelfCard } from '@/components/GameCard'
 import { GameModal } from '@/components/GameModal'
 import { AuthDialog } from '@/components/AuthDialog'
+import { AchievementsHub } from '@/components/AchievementsHub'
 
 type PublishedListing = { id: string; title: string; icon: string | null }
 type RequestItem = { id: string; title: string; votes: number; status: string }
@@ -39,6 +40,8 @@ export default function Page() {
   const [visibleCount, setVisibleCount] = useState(36)
   const [hideLow, setHideLow] = useState(false)
   const [showStaffOnly, setShowStaffOnly] = useState(false)
+  const [showAchievementsHub, setShowAchievementsHub] = useState(false)
+  const [achSummary, setAchSummary] = useState<{total:number, unlocked:number, points:number} | null>(null)
 
   const featuredGames = useMemo(()=> games.filter(g=> FEATURED_IDS.includes(g.id)), [])
 
@@ -106,6 +109,18 @@ export default function Page() {
   useEffect(()=>{
     fetch('/api/auth/me').then(r=> r.ok? r.json():null).then((d:any)=> { if(d?.user) setAuthUser(d.user) }).catch(()=>{})
   },[])
+  // achievements summary (CrazyGames-style)
+  useEffect(()=>{
+    if(!authUser){ setAchSummary(null); return }
+    fetch('/api/achievements/stats').then(r=> r.ok? r.json():null).then((d:any)=>{
+      if(d?.signedIn) setAchSummary({ total: d.total||0, unlocked: d.totalUnlocked||0, points: d.totalPoints||0 })
+    }).catch(()=>{})
+  }, [authUser])
+  useEffect(()=>{
+    const h=()=> setShowAuth('login')
+    window.addEventListener('ggl:open-auth' as any, h as any)
+    return ()=> window.removeEventListener('ggl:open-auth' as any, h as any)
+  }, [])
   // anonymous id for cloud sync
   const anonIdRef = useRef<string>('')
   useEffect(()=>{
@@ -328,11 +343,13 @@ export default function Page() {
           <a href="#games">Library</a>
           <a href="/apps">Apps</a>
           <a href="/proxy">Proxy</a>
+          <button onClick={()=> setShowAchievementsHub(true)} style={{background:'none',border:0,cursor:'pointer',font: 'inherit',color:'inherit',display:'flex',alignItems:'center',gap:6,fontWeight:800}}><Trophy size={12}/> Achievements</button>
           <a href="#about">Studio</a>
           <a href="/request-game">Request a game</a>
           <a href="/admin">Admin</a>
         </nav>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <button onClick={()=> setShowAchievementsHub(true)} aria-label="Achievements" title={authUser ? `${achSummary?.unlocked||0}/${achSummary?.total||"--"} unlocked` : "View achievements — sign in to save"} style={{width:36,height:36,borderRadius:999,border:"1px solid var(--line)",background: authUser?"var(--lime)":"rgba(255,255,255,.06)",color: authUser?"#0b0d12":"var(--foreground)",display:"grid",placeItems:"center",cursor:"pointer",position:"relative"}}><Trophy size={16}/>{authUser && achSummary && achSummary.unlocked>0 ? <span style={{position:"absolute",top:-6,right:-6,background:"#0b0d12",color:"var(--lime)",border:"1px solid var(--lime)",fontSize:9,fontWeight:900,padding:"2px 5px",borderRadius:999,lineHeight:1}}>{achSummary.unlocked}</span> : null}</button>
           <div className="header-status" style={{display:'flex',alignItems:'center',gap:6}}>
             {online ? <Wifi size={12}/> : <WifiOff size={12} color="var(--coral)"/>}
             <span className="live-dot" style={{background: online?'var(--lime)':'var(--coral)'}} /> {allGames.length} titles
@@ -519,6 +536,43 @@ export default function Page() {
         </div>
       </section>
 
+
+      {/* Achievements Teaser — insane UI */}
+      <section className="catalog" style={{paddingTop:8,paddingBottom:10}}>
+        <div style={{border:'1px solid var(--line)', borderRadius:18, overflow:'hidden', background:'linear-gradient(135deg, rgba(125,107,255,.12), rgba(215,243,74,.10), rgba(255,108,131,.06)), var(--panel)', padding:0}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'14px 16px',flexWrap:'wrap',borderBottom:'1px solid var(--line)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:12}}>
+              <span style={{width:40,height:40,borderRadius:12,display:'grid',placeItems:'center',background:'linear-gradient(135deg, var(--lime), #7dd3ff)',color:'#0b0d12'}}><Trophy size={18}/></span>
+              <div>
+                <div style={{fontSize:14,fontWeight:950,letterSpacing:'-.01em',display:'flex',alignItems:'center',gap:8}}>Achievements <span style={{fontSize:10,padding:'3px 7px',borderRadius:999,background:'var(--lime)',color:'#0b0d12',fontWeight:900}}>{authUser ? `${achSummary?.unlocked||0} UNLOCKED` : '30 GAMES • 180+ TROPHIES'}</span></div>
+                <div style={{fontSize:11,color:'var(--muted)',fontWeight:700}}>{authUser ? `${achSummary?.points||0} points • synced to your username across devices` : 'Sign in to save progress like CrazyGames — guest can still see & earn preview.'}</div>
+              </div>
+            </div>
+            <button onClick={()=> setShowAchievementsHub(true)} style={{padding:'9px 14px',borderRadius:999,background:'#0b0d12',color:'#fff',border:'1px solid rgba(255,255,255,.12)',fontWeight:900,fontSize:12,display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}><Sparkles size={14}/> View all achievements <ArrowUpRight size={14}/></button>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))',gap:10,padding:14}}>
+            {[
+              { id:'cookie-clicker', title:'Cookie Clicker', desc:'Bake 100k cookies, buy upgrades, hit 10 cookies/sec', icon:'🍪', color:'linear-gradient(135deg, #ffb86a, #ff6c83)' },
+              { id:'ragdoll-archers', title:'Ragdoll Archers', desc:'Arrows fired, kills & 25 headshots — bow mastery', icon:'🏹', color:'linear-gradient(135deg, #7dd3ff, #7d6bff)' },
+              { id:'solar-smash', title:'Solar Smash', desc:'Destroy 50 planets with lasers & black holes', icon:'🪐', color:'linear-gradient(135deg, #1a1a2e, #7d6bff)' },
+              { id:'survival-race', title:'Survival Race', desc:'Survive 1000m, 5 races & 30s without crash', icon:'🏁', color:'linear-gradient(135deg, #ff6b6b, #ffd93d)' },
+            ].map(card=> (
+              <button key={card.id} onClick={()=> { const g=allGames.find(x=> x.id===card.id); if(g) launch(g); }} style={{textAlign:'left',padding:14,borderRadius:14,border:'1px solid var(--line)',background:'rgba(255,255,255,.03)',cursor:'pointer',display:'flex',gap:12,alignItems:'center'}}>
+                <span style={{width:44,height:44,borderRadius:12,background:card.color,display:'grid',placeItems:'center',fontSize:18,flexShrink:0}}>{card.icon}</span>
+                <span style={{flex:1,minWidth:0}}><strong style={{display:'block',fontSize:12}}>{card.title}</strong><span style={{fontSize:11,color:'var(--muted)',lineHeight:1.35}}>{card.desc}</span></span>
+                <Play size={14} fill="currentColor" />
+              </button>
+            ))}
+          </div>
+          <div style={{padding:'0 14px 14px',display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+            {['Drive Mad','Slope','Retro Bowl','Stack','Moto X3M'].map(t=> (
+              <span key={t} style={{fontSize:11,fontWeight:800,padding:'6px 10px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.04)'}}>{t} → trophies</span>
+            ))}
+            <span style={{fontSize:11,color:'var(--muted)',fontWeight:700}}>+ 22 more titles with epic & legendary racks</span>
+          </div>
+        </div>
+      </section>
+
       {/* Recently played */}
       {recentlyPlayed.length>0 && (
         <section className="catalog" style={{paddingTop:8,paddingBottom:10}}>
@@ -680,12 +734,13 @@ export default function Page() {
         <ShieldCheck size={19} />
         <span>Admin</span>
       </a>
+      {showAchievementsHub && <AchievementsHub open={showAchievementsHub} onClose={()=> setShowAchievementsHub(false)} authUser={authUser} onPlayGame={(id)=> { const g=allGames.find(x=> x.id===id); if(g){ setShowAchievementsHub(false); launch(g) } }} />}
       {activeGame && (
         <GameModal
           game={activeGame}
           isFavorite={favorites.includes(activeGame.id)}
           onToggleFavorite={toggleFavorite}
-          onClose={() => setActiveGame(null)}
+          onClose={() => { setActiveGame(null); if(authUser) fetch('/api/achievements/stats').then(r=> r.ok? r.json():null).then((d:any)=>{ if(d?.signedIn) setAchSummary({ total:d.total||0, unlocked:d.totalUnlocked||0, points:d.totalPoints||0 }) }).catch(()=>{}) }}
           authUser={authUser}
         />
       )}
