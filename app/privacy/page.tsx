@@ -23,16 +23,14 @@ export default function PrivacyPage() {
         <div style={{ display: 'grid', gap: 16, marginTop: 28 }}>
           <Card icon={<Eye size={16} />} title="What we collect (and why)">
             <ul>
-              <li><strong>Gate cookie `gg_gate`</strong> — HttpOnly HMAC that proves you entered the lounge password. 3 hours, then you re-enter. No personal data inside.</li>
               <li><strong>Anonymous ID `ggl_anon_id`</strong> — random string like `anon_abc123...` in localStorage so guest favorites/recently-played sync if you open another tab before login. Not linked to you.</li>
               <li><strong>Account (optional)</strong> — `username`, `favoriteFood` (used only for password reset), bcrypt password hash. No email. If you never register, we never ask.</li>
               <li><strong>Game activity</strong> — `favorites`, `recentlyPlayed`, `playCounts`, `requestVotes` — stored in localStorage + `/api/user-state` (if logged in) or `localStorage` only (guest). Used for Your Lounge, leaderboard, and requests.</li>
-              <li><strong>IP + User-Agent for gate bans</strong> — only when you fail the gate 3× in a row we store `ip`/`user-agent` hash with an escalating ban (1m → perm). Never sold.</li>
+              <li><strong>No gate</strong> — lounge is now public, no password or gate bans. We don't store gate IPs.</li>
             </ul>
           </Card>
           <Card icon={<Cookie size={16} />} title="Cookies & storage">
             <ul>
-              <li>`gg_gate` — unlock, 10800s, HttpOnly, SameSite=Lax.</li>
               <li>`gg_bare` — which Bare server worked fastest, 86400s, so proxy is fast next time.</li>
               <li>`localStorage: ggl_fav, ggl_recent, ggl_playcounts, ggl_anon_id, ggl_yt_history` — all on your device, clearable in browser settings.</li>
             </ul>
@@ -50,13 +48,12 @@ export default function PrivacyPage() {
             <ol>
               <li><strong>Guest:</strong> Clear site data in browser (Chrome: ⋮ → Settings → Privacy → Clear browsing data → Cached images + Cookies → gg-lounge) — or open DevTools → Application → Local Storage → delete `ggl_*` and cookies.</li>
               <li><strong>Logged in:</strong> Go to <a href="/admin" style={{ textDecoration: 'underline', color: 'var(--lime)' }}>/admin</a> → Request deletion, we delete `/api/user-state?id=YOUR_USERNAME` and auth row. Under Postgres it is hard-deleted.</li>
-              <li><strong>Gate ban:</strong> bans auto-expire; perm bans can be appealed by contacting admin.</li>
             </ol>
             <p style={{ marginTop: 10, padding: 12, borderRadius: 12, background: 'rgba(215,243,74,.08)', border: '1px solid rgba(215,243,74,.2)', fontSize: 13 }}><strong>Under 13?</strong> Don't register. Play as guest — no personal info needed.</p>
           </Card>
           <Card icon={<Mail size={16} />} title="Contact & age">
             <p>This is a hobby project by <strong>Kai Chauhan — GG-Lounge Studios™</strong>. For privacy requests: open <a href="/request-game" style={{ textDecoration: 'underline' }}>Request page</a> and type "privacy". We respond within 7 days.</p>
-            <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 12 }}>If we change this policy, we bump the date above and post a banner on the lounge for 7 days. Material changes need you to re-enter the gate.</p>
+            <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 12 }}>If we change this policy, we bump the date above and post a banner on the lounge for 7 days.</p>
           </Card>
         </div>
 

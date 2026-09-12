@@ -18,16 +18,15 @@ export default function TermsPage() {
       <section className="catalog" style={{ maxWidth: 860 }}>
         <p className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Scale size={14} /> TERMS • 12 SEP 2026 • AUSTRALIA</p>
         <h1 style={{ fontSize: 'clamp(32px,5vw,52px)', letterSpacing: '-0.05em', marginTop: 8 }}>Terms of Service</h1>
-        <p style={{ color: 'var(--muted)', lineHeight: 1.6, marginTop: 8 }}>By entering the lounge (gate password) or using proxy/apps/games, you agree to these. Plain English, no lawyer fog. If you are under 13, play as guest only and get a teacher/parent ok.</p>
+        <p style={{ color: 'var(--muted)', lineHeight: 1.6, marginTop: 8 }}>By using proxy/apps/games, you agree to these. Plain English, no lawyer fog. If you are under 13, play as guest only and get a teacher/parent ok.</p>
 
         <div style={{ display: 'grid', gap: 16, marginTop: 28 }}>
           <Card icon={<FileText size={16} />} title="1. What GG-Lounge is">
             <p>GG-Lounge is a hand-picked browser arcade + unblocked proxy (Ultraviolet/Bare) + Piped-powered YouTube client. We host open-source game builds in <code>/public/games/*</code> and proxy third-party sites so school filters see only <code>gg-lounge.*</code>. We are <strong>not</strong> affiliated with Slope, Retro Bowl, 1v1.LOL, YouTube, TikTok, Discord, etc. Those marks belong to their owners.</p>
           </Card>
-          <Card icon={<Shield size={16} />} title="2. Gate & acceptable use">
+          <Card icon={<Shield size={16} />} title="2. Acceptable use">
             <ul>
-              <li>Gate password is `kai is the best at coding` — device unlocked 3h via `gg_gate` HttpOnly cookie. Don't share it outside your school.</li>
-              <li>Don't brute-force the gate. 3 fails → escalating IP ban (1m→perm). Ban evasion via VPN to abuse is a bannable offence.</li>
+              <li>Public lounge — no password required. Just open and play.</li>
               <li>Proxy is for unblocking educational Brescia + your own accounts. Don't use it to harass, spam, phish, scrape at scale, or break your school's AUP. We log `x-forwarded-for` + path for abuse only and will block abusers.</li>
               <li>You are responsible for your school's rules. If your school forbids proxies, don't use this there.</li>
             </ul>
@@ -54,13 +53,13 @@ export default function TermsPage() {
             <p>Operator: <strong>Kai Chauhan — GG-Lounge Studios™</strong>, Adelaide SA, AU. We post material term changes as a banner for 7 days + bump this date. Continued use = acceptance.</p>
           </Card>
           <Card icon={<FileText size={16} />} title="7. Privacy">
-            <p>See <a href="/privacy" style={{ color: 'var(--lime)', textDecoration: 'underline' }}>Privacy Policy</a> for what we store (gate cookie, anon ID, optional account, playCounts) and how to delete. By using the lounge you agree to that too.</p>
+            <p>See <a href="/privacy" style={{ color: 'var(--lime)', textDecoration: 'underline' }}>Privacy Policy</a> for what we store (anon ID, optional account, playCounts) and how to delete. By using the lounge you agree to that too.</p>
           </Card>
         </div>
 
         <div style={{ marginTop: 28, padding: 16, borderRadius: 16, border: '1px solid var(--line)', background: 'var(--panel)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <Scale size={18} color="var(--lime)" />
-          <span style={{ fontWeight: 800 }}>TL;DR: Don't abuse proxy/gate, don't be a jerk, no warranty, AU law.</span>
+          <span style={{ fontWeight: 800 }}>TL;DR: Don't abuse proxy, don't be a jerk, no warranty, AU law.</span>
           <a href="/privacy" style={{ marginLeft: 'auto', padding: '8px 14px', borderRadius: 999, background: 'var(--panel)', border: '1px solid var(--line)', fontWeight: 800, textDecoration: 'none' }}>Privacy →</a>
         </div>
       </section>
