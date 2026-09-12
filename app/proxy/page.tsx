@@ -147,28 +147,53 @@ export default function ProxyPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // Boot proxy with concurrent health checks
+  // Boot proxy — Fix 4: cached, fast parallel, user-friendly status
   useEffect(() => {
     let cancelled = false;
     async function boot() {
       try {
         setStatus('Starting browser…');
-        // Check local aliases first (evade keyword block)
-        const localChecks = await Promise.all(LOCAL_BARES.map(u => probeBare(u)));
+        // Fix 4: try cached bare first (5min TTL) to avoid probing on every visit
+        try {
+          const cached = JSON.parse(localStorage.getItem('gg_bare_cache') || 'null')
+          if (cached && cached.url && cached.exp > Date.now()) {
+            const r = await probeBare(cached.url, 2500)
+            if (r.ok) {
+              if (cancelled) return
+              setBare(cached.url); setBareMs(r.ms); setBareHealth(h=> ({...h, [cached.url]:{ok:true,ms:r.ms}}))
+              localStorage.setItem('gg_bare', cached.url)
+              document.cookie = `gg_bare=${encodeURIComponent(cached.url)}; path=/; max-age=86400; samesite=lax`
+              // still continue to load UV, but cache hit saves 3-4s
+              // we'll skip full probe and go to UV load
+              const chosen = cached.url
+              let ms = r.ms
+              // Load UV stack
+              await loadScript('/uv/uv.bundle.js');
+              await loadScript('/uv/uv.config.js');
+              try { const w = window as unknown as { __uv$config?: { bare?: string } }; if (w.__uv$config && chosen) { const nb = chosen.endsWith('/') ? chosen : chosen + '/'; w.__uv$config.bare = nb; } } catch {}
+              // Service worker (same as below, but we can reuse logic by falling through)
+              // Instead of duplicating, just set ready if SW already registered, else continue to full boot
+              try { if (navigator.serviceWorker.controller) { if (!cancelled){ setReady(true); setStatus('Ready — private browsing active'); } return } } catch {}
+              // if not ready, fall through to full probe to ensure SW
+            }
+          }
+        } catch {}
+        // Fix 4: probe only 2 fastest locals + 2 publics in parallel (was 4+4 serial, slow)
+        const localChecks = await Promise.all(LOCAL_BARES.slice(0,2).map(u => probeBare(u, 3000)));
         localChecks.forEach(r => setBareHealth(h => ({ ...h, [r.url]: { ok: r.ok, ms: r.ms } })));
         let chosen = localChecks.filter(r => r.ok).sort((a, b) => a.ms - b.ms)[0]?.url;
         let ms = localChecks.find(r => r.url === chosen)?.ms ?? null;
 
         if (!chosen) {
           setStatus('Connecting…');
-          const publicChecks = await Promise.all(PUBLIC_BARES.slice(0, 4).map(u => probeBare(u)));
+          const publicChecks = await Promise.all(PUBLIC_BARES.slice(0, 2).map(u => probeBare(u, 3000)));
           publicChecks.forEach(r => setBareHealth(h => ({ ...h, [r.url]: { ok: r.ok, ms: r.ms } })));
           chosen = publicChecks.filter(r => r.ok).sort((a, b) => a.ms - b.ms)[0]?.url;
           ms = publicChecks.find(r => r.url === chosen)?.ms ?? null;
           if (!chosen) {
-            // Last resort: try remaining publics one by one
-            for (const u of PUBLIC_BARES.slice(4)) {
-              const r = await probeBare(u, 4500);
+            // Last resort: try remaining one by one
+            for (const u of [...LOCAL_BARES.slice(2), ...PUBLIC_BARES.slice(2)]) {
+              const r = await probeBare(u, 3000);
               setBareHealth(h => ({ ...h, [r.url]: { ok: r.ok, ms: r.ms } }));
               if (r.ok) { chosen = r.url; ms = r.ms; break; }
             }
@@ -185,6 +210,7 @@ export default function ProxyPage() {
         setBare(chosen);
         setBareMs(ms);
         localStorage.setItem('gg_bare', chosen);
+        try { localStorage.setItem('gg_bare_cache', JSON.stringify({ url: chosen, exp: Date.now()+5*60*1000 })) } catch {}
         document.cookie = `gg_bare=${encodeURIComponent(chosen)}; path=/; max-age=86400; samesite=lax`;
 
         // Load UV stack
@@ -229,12 +255,11 @@ export default function ProxyPage() {
 
         if (!cancelled) {
           setReady(true);
-          const isLocal = (LOCAL_BARES as readonly string[]).includes(chosen);
-          setStatus(`${isLocal ? '✓ Lounge' : '✓ Mirror'} tunnel — ${ms != null ? ms + 'ms' : 'ready'} • YouTube & Google ready`);
+          setStatus('Ready — private browsing active');
         }
       } catch (err) {
-        if (!cancelled) setStatus('Connection hiccup: ' + (err instanceof Error ? err.message : 'failed') + ' — retrying');
-        setTimeout(() => { if (!cancelled) boot(); }, 2200);
+        if (!cancelled) setStatus('Starting…');
+        setTimeout(() => { if (!cancelled) boot(); }, 1200);
       }
     }
     void boot();

@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
-import { verifyAuthUser, createSession } from "@/lib/db";
+import { verifyAuthUser, createSession, checkRateLimit } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function cookieForToken(token:string){
-  return `ggl_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30*24*3600};`
+  return `ggl_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30*24*3600}; Secure;`
 }
-
+function getIp(req:Request){
+  try{ const h=req.headers.get('x-forwarded-for'); if(h) return h.split(',')[0].trim(); return req.headers.get('x-real-ip')||'unknown' }catch{ return 'unknown'}
+}
 export async function POST(req: Request){
   try{
+    const ip=getIp(req)
+    if(!checkRateLimit('login:'+ip, 8, 10*60*1000)) return NextResponse.json({ error: "Too many attempts — wait 10 minutes." }, { status: 429 })
     const { username, password } = await req.json() as any
     if(!username || !password) return NextResponse.json({ error: "Username and password required." }, { status: 400 })
     const user = await verifyAuthUser(String(username), String(password))

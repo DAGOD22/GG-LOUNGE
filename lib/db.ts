@@ -10,6 +10,33 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { Pool } from "pg";
 
+// ---- Fix 1: queued writes to avoid local JSON races ----
+let writeQueue: Promise<void> = Promise.resolve();
+
+// ---- Fix 2: auth hardening helpers ----
+const COMMON_PASSWORDS = new Set(['password','123456','qwerty','letmein','admin','aaaa','abcd','1234','password1','qwerty123'])
+function isStrongPassword(pw: string): string | null {
+  if (pw.length < 6 || pw.length > 64) return 'Password must be 6-64 characters'
+  if (COMMON_PASSWORDS.has(pw.toLowerCase())) return 'Password too common — choose another'
+  if (/^([a-zA-Z0-9])\1{3,}$/.test(pw)) return 'Password too simple'
+  return null
+}
+const rateMap = new Map<string, { count:number, reset:number }>()
+export function checkRateLimit(key:string, max=5, windowMs=15*60*1000): boolean {
+  const now = Date.now()
+  const e = rateMap.get(key)
+  if (!e || now > e.reset) { rateMap.set(key, { count: 1, reset: now + windowMs }); return true }
+  if (e.count >= max) return false
+  e.count++
+  return true
+}
+export function getRateLimitRemaining(key:string, max=5): number {
+  const e = rateMap.get(key)
+  if (!e) return max
+  if (Date.now() > e.reset) return max
+  return Math.max(0, max - e.count)
+}
+
 export type DbMode = "postgres" | "local";
 
 export interface Ban {
@@ -224,9 +251,18 @@ async function readLocal(): Promise<LocalStore> {
   }
 }
 
-async function writeLocal(store: LocalStore): Promise<void> {
+async function writeLocalRaw(store: LocalStore): Promise<void> {
   const dir = await getLocalDir();
-  await fs.writeFile(path.join(dir, "lounge.json"), JSON.stringify(store));
+  // atomic: write tmp then rename
+  const tmp = path.join(dir, "lounge.json.tmp");
+  await fs.writeFile(tmp, JSON.stringify(store));
+  await fs.rename(tmp, path.join(dir, "lounge.json"));
+}
+async function writeLocal(store: LocalStore): Promise<void> {
+  const task = writeQueue.then(() => writeLocalRaw(store));
+  // keep queue alive even if one fails
+  writeQueue = task.catch(() => {});
+  return task;
 }
 
 /* ---------------- Bans & kicks ---------------- */
@@ -512,7 +548,8 @@ export async function createAuthUser(username:string, password:string, favoriteF
   const usernameTrim = username.trim()
   const usernameLower = usernameTrim.toLowerCase()
   if(!/^[a-z0-9_]{3,20}$/.test(usernameLower)) throw new Error('Username must be 3-20 letters, numbers or _')
-  if(password.length<4 || password.length>64) throw new Error('Password must be 4-64 characters')
+  const pwErr = isStrongPassword(password)
+  if (pwErr) throw new Error(pwErr)
   if(!favoriteFood.trim()) throw new Error('Favorite food is required')
   if(getMode()==="postgres"){
     await migrate()
@@ -569,7 +606,8 @@ export async function verifyFavoriteFood(username:string, food:string): Promise<
   return verifyFood(food, u.favoriteFoodHash, u.favoriteFoodNorm)
 }
 export async function resetAuthPassword(username:string, newPassword:string): Promise<void>{
-  if(newPassword.length<4 || newPassword.length>64) throw new Error('Password must be 4-64 characters')
+  const pwErr = isStrongPassword(newPassword)
+  if (pwErr) throw new Error(pwErr)
   const hash=hashPassword(newPassword)
   if(getMode()==="postgres"){
     await migrate()
