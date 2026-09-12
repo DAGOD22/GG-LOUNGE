@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap, LayoutGrid, Rows3, Shuffle, ExternalLink, Copy, AlertCircle, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap, LayoutGrid, Rows3, Shuffle, ExternalLink, Copy, AlertCircle, Loader2, ChevronLeft, ChevronRight, Sun, Moon, Download, Flag, Flame, Crown, Gift, Monitor, Keyboard, Bug, ThumbsUp, Globe, MessageSquare, Star, Timer, WifiOff, Wifi } from 'lucide-react'
 
 type Game = { id: string; title: string; subtitle: string; description: string; genre: string; tone: string; mark: string; color: string; path: string; icon?: string; featured?: boolean }
 
@@ -216,6 +216,30 @@ type PublishedListing = { id: string; title: string; icon: string | null }
 
 const FEATURED_IDS = ['cookie-clicker','stack','drive-mad','moto-x3m','among-us','retro-bowl','hole-io']
 
+// --- 10 Feature Helpers ---
+const CONTROLS_LEGEND: Record<string,string> = {
+  Arcade: 'Arrows / WASD to move • Space to jump/action • R to restart',
+  Platformer: 'Arrows / WASD • Space to jump • Shift to run • R to restart',
+  Racing: 'Arrows / WASD to steer • Space to brake • R to reset',
+  Puzzle: 'Mouse + keyboard • Arrows to move • R/Enter to restart',
+  Idle: 'Mouse clicks • Space to speed',
+  Simulation: 'Mouse + WASD • Scroll to zoom',
+  Sandbox: 'WASD to move • Space to jump • E to interact',
+  Battle: 'WASD to move • Mouse to aim • Space/Click to shoot',
+  Community: 'WASD / Arrows • Space • Enter',
+  default: 'Arrows / WASD • Space • Enter • R to restart'
+}
+function hashDay(str:string){ let h=0; for(let i=0;i<str.length;i++) h=(h*31+str.charCodeAt(i))>>>0; return h }
+function gameOfDayIndex(len:number, dateStr?:string){ const d=dateStr|| new Date().toISOString().slice(0,10); return hashDay(d)%len }
+const PROXY_TILES = [
+  { id:'yt', label:'YouTube', sub:'Watch unblocked', href:'/proxy', icon:'▶', color:'#ff2e63', url:'https://www.youtube.com' },
+  { id:'gg', label:'Google', sub:'Search anything', href:'/proxy', icon:'G', color:'#4285f4', url:'https://www.google.com' },
+  { id:'dc', label:'Discord', sub:'Chat & calls', href:'/proxy', icon:'◈', color:'#5865f2', url:'https://discord.com/app' },
+  { id:'tk', label:'TikTok', sub:'Shorts feed', href:'/proxy', icon:'♪', color:'#00f2ea', url:'https://www.tiktok.com' },
+]
+type RequestItem = { id:string; title:string; votes:number; status:string }
+
+
 export default function Page() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('All games')
@@ -227,9 +251,21 @@ export default function Page() {
   const [frameLoading, setFrameLoading] = useState(true)
   const [frameError, setFrameError] = useState<string | null>(null)
   const [showControls, setShowControls] = useState(false)
+  const [showLegend, setShowLegend] = useState(false)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [recentlyPlayed, setRecentlyPlayed] = useState<string[]>([])
+  // 10 features state
+  const [theme, setTheme] = useState<'dark'|'light'>('dark')
+  const [online, setOnline] = useState(true)
+  const [installPrompt, setInstallPrompt] = useState<any>(null)
+  const [installable, setInstallable] = useState(false)
+  const [playCounts, setPlayCounts] = useState<Record<string,number>>({})
+  const [requests, setRequests] = useState<RequestItem[]>([])
+  const [requestVotes, setRequestVotes] = useState<string[]>([])
+  const [newReqTitle, setNewReqTitle] = useState('')
+  const [reportSent, setReportSent] = useState(false)
+  const [leaderTab, setLeaderTab] = useState<'today'|'week'>('today')
 
   const featuredGames = useMemo(()=> games.filter(g=> FEATURED_IDS.includes(g.id)), [])
 
@@ -261,17 +297,44 @@ export default function Page() {
       .catch(() => {})
   }, [])
 
-  // Load favorites from localStorage
+  // Load favorites from localStorage + theme + playCounts + requests votes
   useEffect(()=>{
     try{
       const f = JSON.parse(localStorage.getItem('ggl_fav')||'[]')
       if(Array.isArray(f)) setFavorites(f)
       const r = JSON.parse(localStorage.getItem('ggl_recent')||'[]')
       if(Array.isArray(r)) setRecentlyPlayed(r)
+      const th = localStorage.getItem('ggl_theme') as 'dark'|'light'|null
+      if(th) setTheme(th)
+      const pc = JSON.parse(localStorage.getItem('ggl_playcounts')||'{}')
+      if(pc && typeof pc==='object') setPlayCounts(pc)
+      const rv = JSON.parse(localStorage.getItem('ggl_req_votes')||'[]')
+      if(Array.isArray(rv)) setRequestVotes(rv)
     }catch{}
+    setOnline(typeof navigator!=='undefined' ? navigator.onLine : true)
+    const onOnline=()=> setOnline(true)
+    const onOffline=()=> setOnline(false)
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    const onInstallable = ()=> setInstallable(true)
+    window.addEventListener('ggl:installable', onInstallable as any)
+    const dp = (window as any).__gglDeferredPrompt
+    if(dp) { setInstallPrompt(dp); setInstallable(true) }
+    const handler = (e:any)=>{ e.preventDefault(); setInstallPrompt(e); setInstallable(true) }
+    window.addEventListener('beforeinstallprompt', handler as any)
+    return ()=> { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); window.removeEventListener('ggl:installable', onInstallable as any); window.removeEventListener('beforeinstallprompt', handler as any) }
   },[])
   useEffect(()=>{ try{localStorage.setItem('ggl_fav', JSON.stringify(favorites))}catch{} },[favorites])
   useEffect(()=>{ try{localStorage.setItem('ggl_recent', JSON.stringify(recentlyPlayed.slice(0,12)))}catch{} },[recentlyPlayed])
+  useEffect(()=>{ try{ localStorage.setItem('ggl_playcounts', JSON.stringify(playCounts))}catch{}},[playCounts])
+  useEffect(()=>{ try{ localStorage.setItem('ggl_req_votes', JSON.stringify(requestVotes))}catch{}},[requestVotes])
+  useEffect(()=>{ try{ localStorage.setItem('ggl_theme', theme); document.documentElement.setAttribute('data-theme', theme); }catch{}},[theme])
+  // fetch requests for upvote list
+  useEffect(()=>{
+    fetch('/api/game-requests').then(r=> r.ok? r.json(): null).then((d:any)=>{
+      if(d?.requests) setRequests(d.requests.map((x:any)=> ({ id:String(x.id), title:x.title||x.game||x.name||'Unknown', votes: Number(x.votes||x.upvotes||0), status: x.status||'pending'})))
+    }).catch(()=>{})
+  },[])
 
   const allGames = useMemo(() => [...games, ...published], [published])
   const visibleGames = useMemo(
@@ -296,13 +359,37 @@ export default function Page() {
   }, [visibleGames])
 
   const spotlight = featuredGames[spotIdx] || games[0]
+  const gameOfDay = useMemo(()=> {
+    const idx = gameOfDayIndex(allGames.length)
+    return allGames[idx] || games[0]
+  }, [allGames])
+  const filterCounts = useMemo(()=>{
+    const m: Record<string,number>={}
+    for(const f of filters){
+      if(f==='All games') m[f]= allGames.filter(g=> `${g.title} ${g.genre} ${g.tone} ${g.description}`.toLowerCase().includes(query.toLowerCase())).length
+      else if(f==='Favorites') m[f]= allGames.filter(g=> favorites.includes(g.id) && `${g.title} ${g.genre} ${g.tone} ${g.description}`.toLowerCase().includes(query.toLowerCase())).length
+      else m[f]= allGames.filter(g=> g.genre===f && `${g.title} ${g.genre} ${g.tone} ${g.description}`.toLowerCase().includes(query.toLowerCase())).length
+    }
+    return m
+  }, [allGames, favorites, query])
+  const leaderboard = useMemo(()=>{
+    const entries = allGames.map(g=> ({ game:g, count: playCounts[g.id]||0})).sort((a,b)=> b.count - a.count).slice(0,5)
+    // if no plays, fall back to featured order
+    if(entries.every(e=> e.count===0)) return featuredGames.slice(0,5).map((g,i)=> ({ game:g, count: 5-i}))
+    return entries
+  }, [allGames, playCounts])
 
   function launch(game: Game) {
     setActiveGame(game)
     setFrameLoading(true)
     setFrameError(null)
     setShowControls(false)
+    setShowLegend(false)
+    setReportSent(false)
     setRecentlyPlayed(prev=> [game.id, ...prev.filter(x=> x!==game.id)].slice(0,12))
+    setPlayCounts(prev=> ({ ...prev, [game.id]: (prev[game.id]||0)+1 }))
+    // also fire visit beacon best-effort
+    try{ fetch('/api/visit', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ gameId: game.id }) }).catch(()=>{}) }catch{}
   }
   function toggleFavorite(id: string) {
     setFavorites((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
@@ -312,6 +399,47 @@ export default function Page() {
     const pick = pool[Math.floor(Math.random()*pool.length)]
     if(pick) launch(pick)
   }
+  function toggleTheme(){ setTheme(t=> t==='dark'?'light':'dark') }
+  async function doInstall(){
+    const dp:any = installPrompt || (window as any).__gglDeferredPrompt
+    if(dp && dp.prompt){ try{ dp.prompt(); const r= await dp.userChoice; if(r) { setInstallable(false); setInstallPrompt(null); (window as any).__gglDeferredPrompt=null } }catch{} return }
+    // fallback: hint
+    alert('To install: open browser menu → Install app / Add to Home Screen')
+  }
+  function reportBroken(){
+    if(!activeGame) return
+    const key='ggl_reported_'+activeGame.id
+    try{ localStorage.setItem(key,'1') }catch{}
+    setReportSent(true)
+    fetch('/api/report', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ gameId: activeGame.id, title: activeGame.title })}).catch(()=>{})
+    // also store locally for admin view
+    try{
+      const arr = JSON.parse(localStorage.getItem('ggl_reports')||'[]')
+      arr.push({ id: activeGame.id, title: activeGame.title, at: Date.now() })
+      localStorage.setItem('ggl_reports', JSON.stringify(arr.slice(-50)))
+    }catch{}
+  }
+  async function submitRequest(){
+    const title = newReqTitle.trim()
+    if(!title) return
+    const optimistic = { id: 'local-'+Date.now(), title, votes:1, status:'pending'}
+    setRequests(r=> [optimistic, ...r].slice(0,20))
+    setRequestVotes(v=> [...v, optimistic.id])
+    setNewReqTitle('')
+    try{
+      const res = await fetch('/api/game-requests', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ title })})
+      if(res.ok){ const d= await res.json(); if(d?.request) setRequests(r=> r.map(x=> x.id===optimistic.id ? { id:String(d.request.id), title:d.request.title, votes: Number(d.request.votes||1), status:d.request.status||'pending'}: x)) }
+    }catch{}
+  }
+  async function upvoteRequest(id:string){
+    if(requestVotes.includes(id)) return
+    setRequestVotes(v=> [...v, id])
+    setRequests(rs=> rs.map(r=> r.id===id? {...r, votes:r.votes+1}: r))
+    try{ await fetch('/api/game-requests/'+id+'/upvote', { method:'POST' }).catch(()=> fetch('/api/game-requests', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ upvoteId:id })})) }catch{}
+    // fallback local
+    try{ await fetch('/api/report', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ upvoteRequestId:id })}) }catch{}
+  }
+  function openProxyTile(url:string){ window.location.href = '/proxy?url='+encodeURIComponent(url) }
 
   function handleFrameLoad(){
     setFrameLoading(false)
@@ -433,10 +561,22 @@ export default function Page() {
           <a href="/request-game">Request a game</a>
           <a href="/admin">Admin</a>
         </nav>
-        <div className="header-status">
-          <span className="live-dot" /> {allGames.length} titles / open all night
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div className="header-status" style={{display:'flex',alignItems:'center',gap:6}}>
+            {online ? <Wifi size={12}/> : <WifiOff size={12} color="var(--coral)"/>}
+            <span className="live-dot" style={{background: online?'var(--lime)':'var(--coral)'}} /> {allGames.length} titles
+          </div>
+          <button onClick={toggleTheme} aria-label="Toggle theme" title={theme==='dark'?'Switch to light mode':'Switch to dark mode'} style={{width:36,height:36,borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',display:'grid',placeItems:'center',cursor:'pointer'}}>
+            {theme==='dark' ? <Sun size={16}/> : <Moon size={16}/>}
+          </button>
+          {installable && <button onClick={doInstall} style={{padding:'7px 10px',borderRadius:999,border:'1px solid var(--lime)',background:'var(--lime)',color:'#0b0d12',fontWeight:900,fontSize:12,display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}><Download size={14}/> Install</button>}
         </div>
       </header>
+      {!online && <div style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(255,92,92,.12)',border:'1px solid rgba(255,92,92,.3)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:13}}><WifiOff size={16}/> You’re offline — installed games and cached pages still work.</div>}
+      {installable && <div style={{margin:'12px 18px 0',padding:'12px 14px',borderRadius:14,background:'linear-gradient(135deg, rgba(204,255,0,.18), rgba(0,242,234,.14))',border:'1px solid rgba(204,255,0,.35)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+        <span style={{display:'flex',alignItems:'center',gap:10,fontWeight:800,fontSize:13}}><span style={{width:32,height:32,borderRadius:999,background:'var(--lime)',display:'grid',placeItems:'center',color:'#0b0d12'}}><Download size={16}/></span> Install GG Lounge — play offline & launch like an app</span>
+        <span style={{display:'flex',gap:8}}><button onClick={doInstall} style={{padding:'8px 14px',borderRadius:999,background:'#0b0d12',color:'#fff',border:'1px solid rgba(255,255,255,.15)',fontWeight:800,cursor:'pointer'}}>Install</button><button onClick={()=> setInstallable(false)} style={{padding:'8px 10px',borderRadius:999,background:'transparent',border:'1px solid var(--line)',color:'var(--foreground)',cursor:'pointer'}}>Dismiss</button></span>
+      </div>}
       <section className="hero" id="top">
         <div className="hero-copy">
           <p className="eyebrow">
@@ -454,6 +594,9 @@ export default function Page() {
             </a>
             <button onClick={shufflePick} className="btn-ghost" style={{padding:'8px 14px',fontSize:13}}>
               <Shuffle size={14}/> Surprise me
+            </button>
+            <button onClick={()=> launch(gameOfDay)} style={{padding:'8px 12px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',fontWeight:800,fontSize:12,display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}>
+              <Gift size={14}/> Game of the Day: {gameOfDay.title}
             </button>
           </div>
           <div className="hero-stats">
@@ -493,6 +636,88 @@ export default function Page() {
           </div>
           <div style={{display:'flex',gap:6,justifyContent:'center',marginTop:10}}>
             {featuredGames.map((_,i)=> <span key={i} style={{width: i===spotIdx?22:8,height:6,borderRadius:99,background: i===spotIdx?'var(--lime)':'rgba(255,255,255,.22)',transition:'all .3s',display:'block'}}/>)}
+          </div>
+        </div>
+      </section>
+
+      {/* Game of the Day + Proxy Quick Bar */}
+      <section className="catalog" style={{paddingTop:14,paddingBottom:6}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))',gap:14}}>
+          <div style={{border:'1px solid var(--line)',borderRadius:16,overflow:'hidden',background:'linear-gradient(135deg, rgba(204,255,0,.14), rgba(126,91,255,.14))',padding:14,display:'flex',gap:14,alignItems:'center'}}>
+            <div style={{width:64,height:64,borderRadius:14,background:'var(--panel)',border:'1px solid var(--line)',display:'grid',placeItems:'center',fontWeight:900,fontSize:22,flexShrink:0}}>{gameOfDay.mark}</div>
+            <div style={{minWidth:0,flex:1}}>
+              <p className="eyebrow" style={{margin:0,fontSize:10,letterSpacing:'.14em',display:'flex',alignItems:'center',gap:6}}><Crown size={12}/> GAME OF THE DAY — {new Date().toLocaleDateString('en-AU',{month:'short',day:'numeric'})}</p>
+              <h3 style={{margin:'4px 0 2px',fontSize:18,letterSpacing:'-0.03em'}}>{gameOfDay.title}</h3>
+              <p style={{margin:0,color:'var(--muted)',fontSize:13,lineHeight:1.4}}>{gameOfDay.subtitle} · {gameOfDay.genre} · {gameOfDay.tone}</p>
+            </div>
+            <button onClick={()=> launch(gameOfDay)} style={{padding:'10px 16px',borderRadius:999,background:'var(--lime)',color:'#0b0d12',border:'1px solid var(--lime)',fontWeight:900,cursor:'pointer',display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap'}}><Play size={14} fill="currentColor"/> Play now</button>
+          </div>
+          <div style={{border:'1px solid var(--line)',borderRadius:16,overflow:'hidden',background:'var(--panel)',padding:12}}>
+            <p className="eyebrow" style={{margin:'0 0 10px',fontSize:10,display:'flex',alignItems:'center',gap:6}}><Globe size={12}/> PROXY QUICK-BAR — open anywhere</p>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
+              {PROXY_TILES.map(tile=> (
+                <button key={tile.id} onClick={()=> openProxyTile(tile.url)} style={{border:'1px solid var(--line)',borderRadius:12,padding:'12px 8px',background:'rgba(255,255,255,.04)',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:6, textAlign:'center'}}>
+                  <span style={{width:36,height:36,borderRadius:999,background: tile.color, color:'#fff', display:'grid',placeItems:'center',fontWeight:900,fontSize:16}}>{tile.icon}</span>
+                  <strong style={{fontSize:12,lineHeight:1}}>{tile.label}</strong>
+                  <span style={{fontSize:10,color:'var(--muted)'}}>{tile.sub}</span>
+                </button>
+              ))}
+            </div>
+            <a href="/proxy" style={{display:'inline-flex',alignItems:'center',gap:6,marginTop:10,fontSize:12,fontWeight:700,color:'var(--foreground)',textDecoration:'none'}}>Open Proxy <ArrowUpRight size={12}/></a>
+          </div>
+        </div>
+      </section>
+
+      {/* Leaderboard + Your Lounge */}
+      <section className="catalog" style={{paddingTop:8,paddingBottom:6}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(320px, 1fr))',gap:14}}>
+          <div style={{border:'1px solid var(--line)',borderRadius:16,background:'var(--panel)',padding:14}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+              <p className="eyebrow" style={{margin:0,display:'flex',alignItems:'center',gap:6}}><Flame size={12}/> LEADERBOARD — most played</p>
+              <span style={{display:'flex',gap:6}}>
+                <button onClick={()=> setLeaderTab('today')} style={{padding:'5px 9px',borderRadius:999,border: leaderTab==='today'?'1px solid var(--lime)':'1px solid var(--line)',background: leaderTab==='today'?'var(--lime)':'transparent',color: leaderTab==='today'?'#0b0d12':'var(--foreground)',fontWeight:800,fontSize:11,cursor:'pointer'}}>Today</button>
+                <button onClick={()=> setLeaderTab('week')} style={{padding:'5px 9px',borderRadius:999,border: leaderTab==='week'?'1px solid var(--lime)':'1px solid var(--line)',background: leaderTab==='week'?'var(--lime)':'transparent',color: leaderTab==='week'?'#0b0d12':'var(--foreground)',fontWeight:800,fontSize:11,cursor:'pointer'}}>Week</button>
+              </span>
+            </div>
+            <div style={{display:'grid',gap:8}}>
+              {leaderboard.map((e,i)=> (
+                <button key={e.game.id} onClick={()=> launch(e.game)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 10px',borderRadius:12,border:'1px solid var(--line)',background:'rgba(255,255,255,.03)',cursor:'pointer',textAlign:'left'}}>
+                  <span style={{width:28,height:28,borderRadius:999,background: i===0?'var(--lime)': i===1?'#cbd5e1': i===2?'#fdba74':'rgba(255,255,255,.08)',color: i<3?'#0b0d12':'var(--foreground)',display:'grid',placeItems:'center',fontWeight:900,fontSize:12}}>{i+1}</span>
+                  <span style={{width:36,height:36,borderRadius:10,background:'var(--line)',display:'grid',placeItems:'center',fontWeight:900,fontSize:12,flexShrink:0}}>{e.game.mark}</span>
+                  <span style={{flex:1,minWidth:0}}><strong style={{display:'block',fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{e.game.title}</strong><span style={{fontSize:11,color:'var(--muted)'}}>{e.game.genre} · {e.count} plays</span></span>
+                  <Play size={14} fill="currentColor"/>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{border:'1px solid var(--line)',borderRadius:16,background:'var(--panel)',padding:14}}>
+            <p className="eyebrow" style={{margin:'0 0 10px',display:'flex',alignItems:'center',gap:6}}><Star size={12}/> YOUR LOUNGE — favorites & history</p>
+            {favorites.length===0 && recentlyPlayed.length===0 && <p style={{color:'var(--muted)',fontSize:13}}>Favorite games with ♥ and they’ll live here. Played games appear in history automatically.</p>}
+            {favorites.length>0 && <>
+              <p style={{fontSize:12,fontWeight:800,margin:'0 0 8px',display:'flex',alignItems:'center',gap:6}}><Heart size={12} fill="var(--coral)" color="var(--coral)"/> Favorites ({favorites.length})</p>
+              <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:8,scrollbarWidth:'none'}}>
+                {allGames.filter(g=> favorites.includes(g.id)).map(g=> (
+                  <button key={g.id} onClick={()=> launch(g)} style={{minWidth:120,border:'1px solid var(--line)',borderRadius:12,padding:10,background:'rgba(255,255,255,.04)',cursor:'pointer',textAlign:'left',flexShrink:0}}>
+                    <span style={{width:28,height:28,borderRadius:8,background:'var(--lime)',color:'#0b0d12',display:'grid',placeItems:'center',fontWeight:900,fontSize:12}}>{g.mark}</span>
+                    <strong style={{display:'block',marginTop:6,fontSize:12,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.title}</strong>
+                    <span style={{fontSize:10,color:'var(--muted)'}}>{g.genre}</span>
+                  </button>
+                ))}
+              </div>
+            </>}
+            {recentlyPlayed.length>0 && <>
+              <p style={{fontSize:12,fontWeight:800,margin:'10px 0 8px',display:'flex',alignItems:'center',gap:6}}><Timer size={12}/> Recent ({recentlyPlayed.length})</p>
+              <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:4,scrollbarWidth:'none'}}>
+                {allGames.filter(g=> recentlyPlayed.includes(g.id)).slice(0,8).map(g=> (
+                  <button key={g.id} onClick={()=> launch(g)} style={{minWidth:120,border:'1px solid var(--line)',borderRadius:12,padding:10,background:'rgba(255,255,255,.04)',cursor:'pointer',textAlign:'left',flexShrink:0}}>
+                    <span style={{width:28,height:28,borderRadius:8,background:'var(--line)',display:'grid',placeItems:'center',fontWeight:900,fontSize:12}}>{g.mark}</span>
+                    <strong style={{display:'block',marginTop:6,fontSize:12,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.title}</strong>
+                    <span style={{fontSize:10,color:'var(--muted)'}}>{g.genre}</span>
+                  </button>
+                ))}
+              </div>
+              <button onClick={()=> setRecentlyPlayed([])} style={{marginTop:8,fontSize:11,background:'none',border:0,color:'var(--muted)',textDecoration:'underline',cursor:'pointer'}}>Clear history</button>
+            </>}
           </div>
         </div>
       </section>
@@ -542,7 +767,7 @@ export default function Page() {
         <div className="filter-tabs" role="tablist" aria-label="Filter games">
           {filters.map((item) => (
             <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)} role="tab" aria-selected={filter === item}>
-              {item}
+              {item} <span style={{opacity:.7,fontWeight:700,marginLeft:4,fontSize:11}}>({filterCounts[item]??0})</span>
             </button>
           ))}
         </div>
@@ -624,6 +849,28 @@ export default function Page() {
             )}
           </>
         )}
+      {/* Requests + Upvotes */}
+        <div style={{marginTop:18,border:'1px solid var(--line)',borderRadius:16,background:'var(--panel)',padding:14}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+            <p className="eyebrow" style={{margin:0,display:'flex',alignItems:'center',gap:6}}><MessageSquare size={12}/> REQUEST A GAME — upvote what you want</p>
+            <a href="/request-game" style={{fontSize:12,fontWeight:800,display:'inline-flex',alignItems:'center',gap:6,color:'var(--foreground)',textDecoration:'none'}}>Full request page <ArrowUpRight size={12}/></a>
+          </div>
+          <div style={{display:'flex',gap:8,marginTop:12,flexWrap:'wrap'}}>
+            <input value={newReqTitle} onChange={e=> setNewReqTitle(e.target.value)} placeholder="Type a game you want…" style={{flex:1,minWidth:220,padding:'10px 12px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',outline:'none'}} onKeyDown={e=> e.key==='Enter'&&submitRequest()} />
+            <button onClick={submitRequest} style={{padding:'10px 16px',borderRadius:999,background:'var(--lime)',color:'#0b0d12',border:'1px solid var(--lime)',fontWeight:900,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><Sparkles size={14}/> Request</button>
+          </div>
+          {requests.length>0 ? (
+            <div style={{display:'grid',gap:8,marginTop:14,maxHeight:260,overflowY:'auto',paddingRight:4}}>
+              {requests.slice(0,8).map(r=> (
+                <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:12,border:'1px solid var(--line)',background:'rgba(255,255,255,.03)'}}>
+                  <span style={{flex:1,minWidth:0}}><strong style={{fontSize:13}}>{r.title}</strong> <span style={{fontSize:11,color:'var(--muted)',marginLeft:6}}>{r.status}</span></span>
+                  <span style={{fontSize:12,fontWeight:800,display:'flex',alignItems:'center',gap:4}}><ThumbsUp size={12}/> {r.votes}</span>
+                  <button disabled={requestVotes.includes(r.id)} onClick={()=> upvoteRequest(r.id)} style={{padding:'6px 10px',borderRadius:999,border: requestVotes.includes(r.id)?'1px solid var(--line)':'1px solid var(--lime)',background: requestVotes.includes(r.id)?'transparent':'var(--lime)',color: requestVotes.includes(r.id)?'var(--muted)':'#0b0d12',fontWeight:900,fontSize:11,cursor: requestVotes.includes(r.id)?'default':'pointer'}}>{requestVotes.includes(r.id)?'Voted':'Upvote'}</button>
+                </div>
+              ))}
+            </div>
+          ) : <p style={{marginTop:12,color:'var(--muted)',fontSize:13}}>No requests yet — be the first to ask for a game.</p>}
+        </div>
       </section>
       <footer id="about">
         <div className="footer-top">
@@ -658,14 +905,27 @@ export default function Page() {
             </div>
             <div className="modal-actions">
               <button className={`controls-toggle ${showControls?'active':''}`} onClick={()=> setShowControls(v=>!v)} title="Toggle touch controls" aria-label="Toggle touch controls" style={{width:'auto',padding:'0 12px',fontSize:11,fontWeight:900,letterSpacing:'.06em'}}><Gamepad2 size={14}/> {showControls?'Hide':'Controls'}</button>
+              <button onClick={()=> setShowLegend(v=>!v)} title="Controls legend" aria-label="Controls legend" style={{width:'auto',padding:'0 10px',fontSize:11,fontWeight:800,display:'flex',alignItems:'center',gap:6,border: showLegend?'1px solid var(--lime)':'1px solid var(--line)',background: showLegend?'var(--lime)':'rgba(255,255,255,.06)',color: showLegend?'#0b0d12':'var(--foreground)',borderRadius:999,cursor:'pointer'}}><Keyboard size={14}/> {showLegend?'Hide':'How to play'}</button>
+              <button onClick={reportBroken} disabled={reportSent} title={reportSent?'Reported':'Report broken'} aria-label="Report broken" style={{width:'auto',padding:'0 10px',fontSize:11,fontWeight:800,display:'flex',alignItems:'center',gap:6,border:'1px solid var(--line)',background: reportSent?'rgba(255,92,92,.18)':'rgba(255,255,255,.06)',color: reportSent?'var(--coral)':'var(--foreground)',borderRadius:999,cursor: reportSent?'default':'pointer',opacity: reportSent?.6:1}}><Bug size={14}/> {reportSent?'Reported':'Report'}</button>
               <button onClick={()=> { if(navigator.clipboard) navigator.clipboard.writeText(location.origin + activeGame.path); }} title="Copy link" aria-label="Copy link"><Copy size={16}/></button>
               <button onClick={()=> window.open(activeGame.path, '_blank')} title="Open in new tab" aria-label="Open in new tab"><ExternalLink size={16}/></button>
               <button onClick={()=> toggleFavorite(activeGame.id)} title={favorites.includes(activeGame.id)?'Remove favorite':'Add favorite'} aria-label="Favorite"><Heart size={16} fill={favorites.includes(activeGame.id)?'currentColor':'none'}/></button>
-              <button onClick={() => { const el = wrapRef.current || frameRef.current; if(el) (el as HTMLElement).requestFullscreen?.().catch(()=> frameRef.current?.requestFullscreen()); }} aria-label="Fullscreen"><Maximize2 size={18} /></button>
+              <button onClick={() => { const el = wrapRef.current || frameRef.current; if(el) (el as HTMLElement).requestFullscreen?.()?.catch(()=> frameRef.current?.requestFullscreen?.()); else frameRef.current?.requestFullscreen?.(); }} aria-label="Fullscreen"><Maximize2 size={18} /></button>
               <button onClick={() => setActiveGame(null)} aria-label="Close game"><X size={20} /></button>
             </div>
           </div>
           <div className="frame-wrap" ref={wrapRef} onClick={()=> { try{ frameRef.current?.focus(); const c=(frameRef.current?.contentDocument?.querySelector('canvas') as HTMLElement); c?.focus(); }catch{} }}>
+            {showLegend && (
+              <div style={{position:'absolute',top:10,left:10,right:10,zIndex:6,padding:'12px 14px',borderRadius:12,background:'rgba(11,13,18,.92)',border:'1px solid var(--line)',backdropFilter:'blur(8px)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+                <span style={{display:'flex',alignItems:'center',gap:8,fontSize:12,fontWeight:800}}><Keyboard size={14}/> {CONTROLS_LEGEND[activeGame?.genre||'default'] || CONTROLS_LEGEND.default}</span>
+                <span style={{display:'flex',alignItems:'center',gap:8,fontSize:11,color:'var(--muted)'}}><Monitor size={12}/> Tap Fullscreen for best view • <button onClick={()=> setShowLegend(false)} style={{background:'none',border:0,color:'var(--foreground)',textDecoration:'underline',cursor:'pointer',fontSize:11}}>Close</button></span>
+              </div>
+            )}
+            {reportSent && (
+              <div style={{position:'absolute',top: showLegend? 66:10, left:'50%', transform:'translateX(-50%)', zIndex:6, padding:'8px 12px', borderRadius:999, background:'rgba(255,92,92,.16)', border:'1px solid rgba(255,92,92,.35)', fontSize:12, fontWeight:800, display:'flex',alignItems:'center',gap:6}}>
+                <Flag size={12}/> Thanks — reported as broken. We’ll check the mirror.
+              </div>
+            )}
             {frameLoading && (
               <div className="frame-loader">
                 <Loader2 size={28} className="spin"/>

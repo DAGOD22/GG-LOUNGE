@@ -33,6 +33,13 @@ export interface GameRequest {
   html?: string;
   status: string;
   createdAt: string;
+  votes?: number;
+}
+export interface Report {
+  id: string;
+  gameId: string;
+  title: string;
+  createdAt: string;
 }
 export interface PublishedGame {
   id: string;
@@ -109,10 +116,18 @@ export function migrate(): Promise<void> {
           "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           PRIMARY KEY ("upload_id", "idx")
         );
+        CREATE TABLE IF NOT EXISTS "reports" (
+          "id" TEXT PRIMARY KEY,
+          "gameId" TEXT NOT NULL,
+          "title" TEXT NOT NULL,
+          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
       `);
       // Tolerate tables created by older schemas.
       await p.query(`ALTER TABLE "banned_user" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMPTZ`);
       await p.query(`ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'pending'`);
+      await p.query(`ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "votes" INTEGER NOT NULL DEFAULT 1`);
+      await p.query(`ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "html" TEXT`);
     })().catch((err) => {
       migratePromise = null;
       throw err;
@@ -137,6 +152,7 @@ interface LocalStore {
   visits: Visit[];
   requests: GameRequest[];
   games: PublishedGame[];
+  reports: Report[];
 }
 
 let localDir: string | null = null;
@@ -170,9 +186,10 @@ async function readLocal(): Promise<LocalStore> {
       visits: parsed.visits ?? [],
       requests: parsed.requests ?? [],
       games: parsed.games ?? [],
+      reports: (parsed as any).reports ?? [],
     };
   } catch {
-    return { bans: [], visits: [], requests: [], games: [] };
+    return { bans: [], visits: [], requests: [], games: [], reports: [] };
   }
 }
 
@@ -308,36 +325,95 @@ export function validateGameHtml(html: string): string | null {
 export async function createRequest(
   title: string,
   icon: string | null,
-  html: string,
+  html: string = "",
 ): Promise<GameRequest> {
   const id = randomUUID();
   const createdAt = new Date().toISOString();
   if (getMode() === "postgres") {
-    await pgQuery('INSERT INTO "game_request" ("id","title","icon","html","status") VALUES ($1,$2,$3,$4,$5)', [
+    await pgQuery('INSERT INTO "game_request" ("id","title","icon","html","status","votes") VALUES ($1,$2,$3,$4,$5,$6)', [
       id,
       title,
       icon,
-      html,
+      html || "",
       "pending",
+      1,
     ]);
   } else {
     const s = await readLocal();
-    s.requests.push({ id, title, icon, html, status: "pending", createdAt });
+    s.requests.push({ id, title, icon, html: html||"", status: "pending", createdAt, votes: 1 });
     await writeLocal(s);
   }
-  return { id, title, icon, status: "pending", createdAt };
+  return { id, title, icon, status: "pending", createdAt, votes: 1 };
+}
+export async function createSimpleRequest(title: string): Promise<GameRequest> {
+  return createRequest(title, null, "");
+}
+export async function upvoteRequest(id: string): Promise<GameRequest | null> {
+  if (getMode() === "postgres") {
+    await pgQuery('UPDATE "game_request" SET "votes" = COALESCE("votes",0)+1 WHERE "id"=$1', [id]);
+    const rows = await pgQuery<GameRequest>('SELECT "id","title","icon","status","createdAt","votes" FROM "game_request" WHERE "id"=$1', [id]);
+    return rows[0] ?? null;
+  }
+  const s = await readLocal();
+  const r = s.requests.find(x=> x.id===id);
+  if(!r) return null;
+  r.votes = (r.votes||0)+1;
+  await writeLocal(s);
+  return r;
+}
+export async function addReport(gameId: string, title: string): Promise<Report> {
+  const id = randomUUID();
+  const createdAt = new Date().toISOString();
+  const rep: Report = { id, gameId, title, createdAt };
+  if (getMode() === "postgres") {
+    try{ await pgQuery('INSERT INTO "reports" ("id","gameId","title") VALUES ($1,$2,$3)', [id, gameId, title]); }catch{}
+  } else {
+    const s = await readLocal();
+    s.reports = s.reports || [];
+    s.reports.push(rep);
+    s.reports = s.reports.slice(-200);
+    await writeLocal(s);
+  }
+  return rep;
+}
+export async function listReports(): Promise<Report[]> {
+  if (getMode() === "postgres") {
+    try{ return await pgQuery<Report>('SELECT "id","gameId","title","createdAt" FROM "reports" ORDER BY "createdAt" DESC LIMIT 100'); }catch{ return []}
+  }
+  const s = await readLocal();
+  return (s.reports||[]).slice().reverse().slice(0,100);
+}
+export async function logGamePlay(gameId: string, ip: string): Promise<void> {
+  // reuse visits for leaderboard; store path as /play/<id>
+  await logVisit(ip, "play", "/play/"+gameId);
+}
+export async function leaderboard(limit=10): Promise<{gameId:string,count:number}[]>{
+  if(getMode()==="postgres"){
+    try{
+      const rows = await pgQuery<{gameId:string,count:string}>('SELECT substring("path" from 7) as "gameId", COUNT(*) as count FROM "visits" WHERE "path" LIKE \'/play/%\' GROUP BY "gameId" ORDER BY count DESC LIMIT $1', [limit]);
+      return rows.map(r=> ({gameId:r.gameId, count: Number(r.count)}));
+    }catch{ return []}
+  }
+  const s = await readLocal();
+  const map: Record<string,number>={}
+  for(const v of s.visits) if(v.path.startsWith('/play/')) map[v.path.slice(6)] = (map[v.path.slice(6)]||0)+1
+  return Object.entries(map).sort((a,b)=> b[1]-a[1]).slice(0,limit).map(([gameId,count])=> ({gameId,count}))
 }
 
 export async function listRequests(): Promise<GameRequest[]> {
   if (getMode() === "postgres") {
-    return pgQuery<GameRequest>(
-      'SELECT "id","title","icon","status","createdAt" FROM "game_request" ORDER BY "createdAt" DESC',
-    );
+    try{
+      return await pgQuery<GameRequest>(
+        'SELECT "id","title","icon","status","createdAt",COALESCE("votes",1) as "votes" FROM "game_request" ORDER BY COALESCE("votes",0) DESC, "createdAt" DESC',
+      );
+    }catch{
+      return pgQuery<GameRequest>('SELECT "id","title","icon","status","createdAt" FROM "game_request" ORDER BY "createdAt" DESC').then(rs=> rs.map(r=> ({...r, votes:1})));
+    }
   }
   const s = await readLocal();
   return s.requests
-    .map(({ html: _h, ...rest }) => rest)
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    .map(({ html: _h, ...rest }) => ({...rest, votes: (rest as any).votes||1}))
+    .sort((a, b) => ((b as any).votes||0) - ((a as any).votes||0) || (a.createdAt < b.createdAt ? 1 : -1));
 }
 
 export async function getRequest(id: string): Promise<GameRequest | null> {

@@ -1,0 +1,46 @@
+{
+  "name": "GG-Lounge — Small games. Big energy.",
+  "short_name": "GG Lounge",
+  "description": "A handpicked, no-filler collection of browser games for the minutes between everything. Unblocked.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0d12",
+  "theme_color": "#d7f34a",
+  "orientation": "any",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/placeholder-logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Library",
+      "url": "/#games",
+      "description": "Open game library"
+    },
+    {
+      "name": "Proxy",
+      "url": "/proxy",
+      "description": "Unblocked browser"
+    },
+    {
+      "name": "Apps",
+      "url": "/apps",
+      "description": "Unblocked apps"
+    }
+  ]
+}
