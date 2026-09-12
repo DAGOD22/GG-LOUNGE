@@ -303,27 +303,13 @@ const DOMAIN_COUNTS: Record<string, number> = (() => {
 })()
 
 export function getGameIconUrl(id: string): string {
-  // 1) local icon if we have a curated one
-  if (LOCAL_ICON_MAP[id]) return LOCAL_ICON_MAP[id]
-  // 2) external favicon only if domain is unique and not generic
-  const domain = ICON_DOMAIN_MAP[id]
-  if (domain) {
-    const isGeneric = isGenericDomain(domain) || (DOMAIN_COUNTS[domain]||0) > 1
-    // For github.io and other generics, don't return favicon (would be wrong/world)
-    if (!isGeneric) {
-      return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=256`
-    }
-  }
-  // 3) No reliable external icon — return empty so UI shows premium full-bleed cover (not world globe)
-  // We intentionally return empty string for generic/reused/missing domains to avoid default globe icon
-  return ""
+  // High-res generated covers in /game-icons/ — crisp, correct, not blurry favicons
+  // All 192 games have a bespoke 512px cover; missing files fall back to premium typography cover via onError
+  return `/game-icons/${id}.png`
 }
 
 export function getFaviconFallback(id: string): string {
-  const d = ICON_DOMAIN_MAP[id] || id
-  // Return t3 large, but caller should handle empty string fallback to cover instead of globe
-  if (!d || isGenericDomain(d) || (DOMAIN_COUNTS[d]||0) > 1) return ""
-  return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${d}&size=256`
+  return `/game-icons/${id}.png`
 }
 export const games: Game[] = [
   { id: 'cookie-clicker', title: 'Cookie Clicker', subtitle: 'Bake a bigger future.', description: "Start with one tiny click and build an unstoppable cookie empire.", genre: 'Idle', tone: 'Cozy chaos', mark: 'CC', color: 'cookie', path: '/games/cookie-clicker/index.html', icon: getGameIconUrl('cookie-clicker'), featured: true },
