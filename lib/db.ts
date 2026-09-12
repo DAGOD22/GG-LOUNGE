@@ -383,7 +383,7 @@ export async function publishDirect(
   title: string,
   icon: string | null,
   html: string,
-  id = randomUUID(),
+  id: string = randomUUID(),
 ): Promise<PublishedGame> {
   const createdAt = new Date().toISOString();
   if (getMode() === "postgres") {

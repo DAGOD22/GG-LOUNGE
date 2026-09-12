@@ -1,6 +1,7 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import GlobalSW from './global-sw'
 
 export const metadata: Metadata = {
   title: 'GG-Lounge — Small games. Big energy.',
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className="bg-background">
       <body className="antialiased">
+        <GlobalSW />
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

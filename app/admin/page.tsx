@@ -60,6 +60,7 @@ export default function AdminPage() {
   const [data, setData] = useState<Data>(empty);
   const [identifier, setIdentifier] = useState('');
   const [reason, setReason] = useState('');
+  const [activeTab, setActiveTab] = useState<'overview'|'users'|'bans'|'publish'|'requests'|'games'>('overview');
 
   // publish form
   const [pubTitle, setPubTitle] = useState('');
@@ -208,52 +209,64 @@ export default function AdminPage() {
 
   const pending = data.requests.filter((r) => r.status === 'pending');
   const stats = [
-    { icon: <Users size={18} />, label: 'Visitors logged', value: data.visits.length, href: '#users' },
-    { icon: <Inbox size={18} />, label: 'Pending requests', value: pending.length, href: '#requests', alert: pending.length > 0 },
-    { icon: <Gamepad2 size={18} />, label: 'Published games', value: data.games.length, href: '#games' },
-    { icon: <ShieldAlert size={18} />, label: 'Active bans', value: data.bans.length, href: '#bans' },
+    { icon: <Users size={18} />, label: 'Visitors', value: data.visits.length, sub: 'last 50 unique', color: 'lime' },
+    { icon: <Inbox size={18} />, label: 'Requests', value: pending.length, sub: `${pending.length} pending`, color: 'violet', alert: pending.length > 0 },
+    { icon: <Gamepad2 size={18} />, label: 'Published', value: data.games.length, sub: 'community live', color: 'coral' },
+    { icon: <ShieldAlert size={18} />, label: 'Bans', value: data.bans.length, sub: data.bans.length? 'active': 'peace', color: 'muted' },
   ];
 
   return (
     <main className="admin-shell">
-      <header className="console-header">
+      <header className="console-header" style={{background:'linear-gradient(135deg,rgba(215,243,74,.12),rgba(125,107,255,.10) 45%, rgba(0,0,0,.2))', border:'1px solid rgba(255,255,255,.08)'}}>
         <div className="console-brand">
-          <span className="console-shield">
+          <span className="console-shield" style={{background:'var(--lime)', boxShadow:'0 8px 30px rgba(215,243,74,.35)'}}>
             <ShieldCheck size={20} />
           </span>
           <div>
-            <p className="eyebrow">GG-LOUNGE™ / CONTROL ROOM</p>
-            <h1>Moderation console</h1>
+            <p className="eyebrow" style={{color:'var(--lime)', opacity:.9}}>GG-LOUNGE™ / CONTROL ROOM — v2</p>
+            <h1 style={{display:'flex',alignItems:'center',gap:10}}>Moderation console <span style={{fontSize:10,padding:'4px 8px',borderRadius:99,background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.12)',letterSpacing:'.08em'}}>LIVE</span></h1>
+            <p style={{margin:'6px 0 0',color:'rgba(255,255,255,.55)',fontSize:12}}>Manage visitors, bans, game submissions and live publishing. Everything here is real-time.</p>
           </div>
-          <span className={`mode-badge ${data.mode === 'postgres' ? 'pg' : 'local'}`}>
-            <Server size={12} /> {data.mode === 'postgres' ? 'Postgres • permanent' : 'Local mode • connect Postgres for permanence'}
+          <span className={`mode-badge ${data.mode === 'postgres' ? 'pg' : 'local'}`} style={{alignSelf:'flex-start'}}>
+            <Server size={12} /> {data.mode === 'postgres' ? 'Postgres • permanent' : 'Local • add DATABASE_URL for permanence'}
           </span>
         </div>
-        <div className="console-actions">
-          <nav className="console-nav">
-            <a href="#users">Users</a>
-            <a href="#publish">Publish</a>
-            <a href="#requests">Requests{pending.length > 0 && <em>{pending.length}</em>}</a>
-            <a href="#games">Games</a>
+        <div className="console-actions" style={{flexDirection:'column',alignItems:'stretch',gap:10}}>
+          <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+            <a className="btn-ghost" href="/" style={{padding:'8px 14px'}}><Gamepad2 size={14}/> Lounge</a>
+            <button className="btn-ghost" onClick={() => void logout()} style={{padding:'8px 14px'}}>
+              <LogOut size={15} /> Log out
+            </button>
+          </div>
+          <nav className="console-nav" style={{justifyContent:'flex-end', background:'rgba(0,0,0,.35)'}}>
+            {[
+              ['overview','Overview'],
+              ['users','Users'],
+              ['publish','Publish'],
+              ['requests',`Requests${pending.length?` • ${pending.length}`:''}`],
+              ['games',`Games • ${data.games.length}`],
+              ['bans',`Bans • ${data.bans.length}`],
+            ].map(([id,label])=> (
+              <a key={id} href={`#${id}`} onClick={(e)=>{e.preventDefault(); setActiveTab(id as never)}} style={{background: activeTab===id?'var(--lime)':'transparent', color: activeTab===id?'#111':'rgba(255,255,255,.75)', fontWeight:800, cursor:'pointer'}}>
+                {label as string}
+                {id==='requests' && pending.length>0 && <em style={{background:'#e23b3b'}}>{pending.length}</em>}
+              </a>
+            ))}
           </nav>
-          <a className="btn-ghost" href="/">Lounge</a>
-          <button className="btn-ghost" onClick={() => void logout()}>
-            <LogOut size={15} /> Log out
-          </button>
         </div>
       </header>
 
       <section className="stat-row">
         {stats.map((s) => (
-          <a key={s.label} className={`stat-card${s.alert ? ' alert' : ''}`} href={s.href}>
+          <div key={s.label} className={`stat-card${s.alert ? ' alert' : ''}`} onClick={()=> setActiveTab(s.label==='Visitors'? 'users' : s.label==='Requests'? 'requests' : s.label==='Published'? 'games' : s.label==='Bans'? 'bans' : 'overview')} style={{cursor:'pointer', background: s.color==='lime'? 'linear-gradient(135deg,rgba(215,243,74,.14),rgba(255,255,255,.02))' : s.color==='violet'? 'linear-gradient(135deg,rgba(125,107,255,.14),rgba(255,255,255,.02))' : s.color==='coral'? 'linear-gradient(135deg,rgba(255,108,131,.14),rgba(255,255,255,.02))' : 'rgba(255,255,255,.04)'}}>
             <span className="stat-icon">{s.icon}</span>
             <span className="stat-value">{s.value}</span>
-            <span className="stat-label">{s.label}</span>
-          </a>
+            <span className="stat-label">{s.label} <span style={{opacity:.5, fontWeight:400}}>— {s.sub}</span></span>
+          </div>
         ))}
       </section>
 
-      <section className="admin-grid" id="users">
+      {(activeTab==="overview" || activeTab==="users" || activeTab==="bans") && (<section className="admin-grid" id="users">
         <section className="admin-panel">
           <div className="panel-heading">
             <span className="panel-icon"><Users size={18} /></span>
@@ -338,7 +351,8 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section className="admin-panel admin-wide" id="publish">
+      )}
+      {(activeTab==="overview" || activeTab==="publish") && (<section className="admin-panel admin-wide" id="publish">
         <div className="panel-heading">
           <span className="panel-icon"><Upload size={18} /></span>
           <div>
@@ -373,7 +387,8 @@ export default function AdminPage() {
         {pubMessage && <p className={`pub-message${pubMessage.startsWith('Published') ? ' ok' : ''}`}>{pubMessage}</p>}
       </section>
 
-      <section className="admin-panel admin-wide" id="requests">
+      )}
+      {(activeTab==="overview" || activeTab==="requests") && (<section className="admin-panel admin-wide" id="requests">
         <div className="panel-heading">
           <span className="panel-icon"><Inbox size={18} /></span>
           <div>
@@ -415,7 +430,8 @@ export default function AdminPage() {
         ))}
       </section>
 
-      <section className="admin-panel admin-wide" id="games">
+      )}
+      {(activeTab==="overview" || activeTab==="games") && (<section className="admin-panel admin-wide" id="games">
         <div className="panel-heading">
           <span className="panel-icon"><Play size={18} /></span>
           <div>
@@ -443,7 +459,7 @@ export default function AdminPage() {
             </div>
           </div>
         ))}
-      </section>
+      </section>)}
     </main>
   );
 }

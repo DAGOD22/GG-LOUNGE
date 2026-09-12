@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Hole.io</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0b0d12;color:#f4f2ec;font-family:system-ui,Arial}
+  #c{width:100%;height:100%;display:block;background:radial-gradient(ellipse at 30% 20%,#1a2332,#0b0d12 60%)}
+  #hud{position:absolute;left:12px;top:12px;right:12px;display:flex;justify-content:space-between;align-items:center;pointer-events:none}
+  #score{font-weight:900;font-size:18px;letter-spacing:.04em}
+  #score small{font-weight:700;opacity:.6;font-size:11px;letter-spacing:.08em;display:block}
+  #time{font-weight:900;font-size:16px}
+  #bar{position:absolute;left:12px;right:12px;bottom:12px;height:8px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden}
+  #fill{height:100%;width:0%;background:linear-gradient(90deg,#d7f34a,#7d6bff);transition:width .2s}
+  #center{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+  #msg{padding:18px 22px;border-radius:16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);text-align:center;backdrop-filter:blur(8px)}
+  #msg h1{margin:0;font-size:22px;letter-spacing:-.02em}
+  #msg p{margin:6px 0 0;opacity:.7;font-size:13px}
+  #msg button{pointer-events:auto;margin-top:12px;padding:10px 18px;border-radius:99px;border:0;background:#d7f34a;color:#111;font-weight:900;cursor:pointer}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="score">0<small>Score • Eat to grow</small></div><div id="time">02:00</div></div>
+<div id="bar"><div id="fill"></div></div>
+<div id="center"><div id="msg"><h1>Hole.io — Lounge Edition</h1><p>Move mouse / WASD / touch to eat. Bigger hole eats bigger buildings!</p><button id="play">Play</button></div></div>
+<script>
+(function(){
+  const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+  const scoreEl=document.getElementById('score'), timeEl=document.getElementById('time'), fill=document.getElementById('fill');
+  const msg=document.getElementById('msg'), center=document.getElementById('center');
+  let W,H, dpr;
+  function resize(){ dpr=Math.min(2,window.devicePixelRatio||1); W=canvas.width=innerWidth*dpr; H=canvas.height=innerHeight*dpr; canvas.style.width=innerWidth+'px'; canvas.style.height=innerHeight+'px'; ctx.setTransform(dpr,0,0,dpr,0,0); }
+  window.addEventListener('resize',resize); resize();
+  let hole={x: innerWidth/2, y: innerHeight/2, r: 22, score:0, tx: innerWidth/2, ty: innerHeight/2};
+  let objs=[], t=120, playing=false, last=0, raf;
+  const colors=['#d7f34a','#ff6c83','#7d6bff','#35a6a3','#ffbe46'];
+  function spawn(){
+    objs=[];
+    for(let i=0;i<70;i++){
+      const isBig=Math.random()<0.18;
+      const r=isBig? 18+Math.random()*16 : 6+Math.random()*10;
+      objs.push({x:Math.random()*innerWidth, y:Math.random()*innerHeight, r: r, eaten:false, col: colors[i%colors.length], h: 6+Math.random()*12});
+    }
+  }
+  function dist(a,b){ return Math.hypot(a.x-b.x,a.y-b.y); }
+  let keys={};
+  window.addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);
+  window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+  canvas.addEventListener('pointermove',e=>{ if(!playing) return; hole.tx=e.clientX; hole.ty=e.clientY; });
+  canvas.addEventListener('touchmove',e=>{ if(!playing) return; const tt=e.touches[0]; if(tt){ hole.tx=tt.clientX; hole.ty=tt.clientY; } },{passive:true});
+  // keyboard movement
+  function update(dt){
+    let sx=0, sy=0;
+    if(keys['w']||keys['arrowup']) sy-=1;
+    if(keys['s']||keys['arrowdown']) sy+=1;
+    if(keys['a']||keys['arrowleft']) sx-=1;
+    if(keys['d']||keys['arrowright']) sx+=1;
+    if(sx||sy){ const m=Math.hypot(sx,sy); sx/=m; sy/=m; hole.tx+=sx*260*dt; hole.ty+=sy*260*dt; hole.tx=Math.max(hole.r,Math.min(innerWidth-hole.r,hole.tx)); hole.ty=Math.max(hole.r,Math.min(innerHeight-hole.r,hole.ty)); }
+    hole.x += (hole.tx - hole.x)*Math.min(1, dt*9);
+    hole.y += (hole.ty - hole.y)*Math.min(1, dt*9);
+    // eat check: hole can eat objects smaller than 0.85*r
+    for(const o of objs){ if(o.eaten) continue; if(dist(hole,o) < hole.r*0.55 && o.r < hole.r*0.88){ o.eaten=true; hole.score+=Math.round(o.r*2); hole.r+= o.r*0.07; if(hole.r>90) hole.r=90; } }
+    // win progress
+    const eaten=objs.filter(o=>o.eaten).length;
+    fill.style.width=(eaten/objs.length*100)+'%';
+    scoreEl.firstChild.textContent=hole.score;
+    t-=dt;
+    if(t<=0){ t=0; endGame(true); }
+    timeEl.textContent=String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0');
+    if(objs.every(o=>o.eaten)){ // respawn
+      spawn();
+    }
+  }
+  function draw(){
+    ctx.clearRect(0,0,innerWidth,innerHeight);
+    // grid
+    ctx.strokeStyle='rgba(255,255,255,.04)'; ctx.lineWidth=1;
+    for(let x=0;x<innerWidth;x+=48){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,innerHeight); ctx.stroke(); }
+    for(let y=0;y<innerHeight;y+=48){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(innerWidth,y); ctx.stroke(); }
+    // objects
+    for(const o of objs){ if(o.eaten) continue; ctx.save(); ctx.translate(o.x,o.y);
+      // shadow
+      ctx.fillStyle='rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(2,4,o.r*0.9, o.r*0.5,0,0,Math.PI*2); ctx.fill();
+      // building
+      ctx.fillStyle=o.col; ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=1;
+      const w=o.r*1.8, h=o.h*2.2;
+      ctx.beginPath(); ctx.roundRect(-w/2, -h, w, h, 3); ctx.fill(); ctx.stroke();
+      // roof
+      ctx.fillStyle='rgba(0,0,0,.18)'; ctx.beginPath(); ctx.moveTo(-w/2,-h); ctx.lineTo(0,-h-8); ctx.lineTo(w/2,-h); ctx.fill();
+      ctx.restore();
+    }
+    // hole
+    ctx.save(); ctx.translate(hole.x,hole.y);
+    // outer glow
+    const g=ctx.createRadialGradient(0,0,hole.r*0.2,0,0,hole.r*1.6); g.addColorStop(0,'rgba(0,0,0,1)'); g.addColorStop(0.55,'rgba(10,12,18,1)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,hole.r*1.55,0,Math.PI*2); ctx.fill();
+    // hole interior
+    ctx.fillStyle='#020308'; ctx.beginPath(); ctx.arc(0,0,hole.r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(215,243,74,.9)'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(0,0,hole.r,0,Math.PI*2); ctx.stroke();
+    // inner rim
+    ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(0,0,hole.r*0.72,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+  function loop(ts){
+    if(!last) last=ts;
+    const dt=Math.min(0.033,(ts-last)/1000); last=ts;
+    if(playing){ update(dt); draw(); raf=requestAnimationFrame(loop); }
+  }
+  function start(){
+    hole.r=22; hole.score=0; hole.x=innerWidth/2; hole.y=innerHeight/2; hole.tx=hole.x; hole.ty=hole.y;
+    t=120; spawn(); playing=true; center.style.display='none'; last=0; cancelAnimationFrame(raf); raf=requestAnimationFrame(loop);
+  }
+  function endGame(win){
+    playing=false;
+    msg.innerHTML='<h1>'+(win?'Time up!':'')+' Score '+hole.score+'</h1><p>'+ (hole.score>400?'Insane run!':'Keep eating to grow bigger.') +'</p><button id="again">Play again</button>';
+    center.style.display='grid';
+    document.getElementById('again').onclick=start;
+  }
+  document.getElementById('play').onclick=start;
+  draw();
+  // polyfill roundRect
+  if(!CanvasRenderingContext2D.prototype.roundRect){
+    CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){ this.moveTo(x+r,y); this.arcTo(x+w,y,x+w,y+h,r); this.arcTo(x+w,y+h,x,y+h,r); this.arcTo(x,y+h,x,y,r); this.arcTo(x,y,x+w,y,r); this.closePath(); };
+  }
+})();
+</script>
+</body>
+</html>

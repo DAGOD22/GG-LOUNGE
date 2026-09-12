@@ -1,0 +1,106 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>CAR SIMULATOR — GG-Lounge</title><style>
+html,body{margin:0;height:100%;overflow:hidden;background:#0b0d12;color:#f4f2ec;font-family:system-ui,Segoe UI,Arial}
+#c{width:100%;height:100%;display:block;background:radial-gradient(ellipse at 50% 0%, 0a121e 0%, #0b0d12 68%)}
+#hud{position:absolute;inset:12px 12px auto 12px;display:flex;justify-content:space-between;align-items:center;pointer-events:none;gap:10px}
+.pill{font-weight:900;font-size:13px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);padding:7px 12px;border-radius:99px;backdrop-filter:blur(6px)}
+#score{font-size:18px;background:none;border:0;padding:0}
+#score small{display:block;font-size:10px;opacity:.6;letter-spacing:.08em}
+#center{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;padding:18px}
+#card{pointer-events:auto;width:min(420px,94vw);padding:20px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(10px);text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.45)}
+#card h1{margin:0;font-size:24px;letter-spacing:-.02em}
+#card p{margin:8px 0 0;opacity:.75;font-size:13px;line-height:1.55}
+#card button{margin-top:14px;padding:11px 22px;border-radius:99px;border:0;background:#d7f34a;color:#0b0d12;font-weight:900;cursor:pointer;font-size:14px;box-shadow:0 6px 18px rgba(215,243,74,.35)}
+#bar{position:absolute;left:14px;right:14px;bottom:14px;height:8px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden}
+#fill{height:100%;width:0%;background:linear-gradient(90deg,#d7f34a,#7d6bff);transition:width .25s}
+#controls{position:absolute;left:12px;right:12px;bottom:28px;display:flex;justify-content:space-between;gap:12px;pointer-events:none}
+.pad{display:grid;grid-template-columns:56px 56px 56px;grid-template-rows:56px 56px;gap:7px;pointer-events:auto}
+.pad button{width:56px;height:56px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.09);color:#fff;font-size:18px;display:grid;place-items:center;backdrop-filter:blur(8px);touch-action:manipulation}
+.pad button:active{background:rgba(215,243,74,.28)}
+.act{display:flex;gap:10px;align-items:flex-end;pointer-events:auto}
+.act button{width:72px;height:72px;border-radius:16px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.09);color:#fff;font-weight:900;backdrop-filter:blur(8px)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:99px;background:rgba(215,243,74,.12);border:1px solid rgba(215,243,74,.28);color:#d7f34a;font-size:11px;font-weight:900;letter-spacing:.06em;margin-bottom:10px}
+@media(pointer:fine){#controls{display:none}}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="score" class="pill" style="background:none;border:0;padding:0;line-height:1">0<small>Drive free.</small></div><div class="pill" id="timer">02:00</div><div class="pill" id="lvl">LVL 1</div></div>
+<div id="bar"><div id="fill"></div></div>
+<div id="center"><div id="card"><div class="badge">CLASSROOM CENTER • HTML ONLY • NO EMBED</div><h1>CAR SIMULATOR</h1><p>Car Simulator — open world drive.<br><strong>Drive — collect coins</strong></p><button id="play">Play Now</button><p style="font-size:11px;opacity:.55;margin-top:10px">Local file • Works offline • No proxy needed • GG-Lounge™</p></div></div>
+<div id="controls"><div class="pad"><span></span><button data-k="w">▲</button><span></span><button data-k="a">◀</button><button data-k="s">▼</button><button data-k="d">▶</button></div><div class="act"><button data-k=" ">JUMP</button><button data-k="shift">DASH</button></div></div>
+<script>
+(function(){
+  const c=document.getElementById('c'),ctx=c.getContext('2d'),fill=document.getElementById('fill'),scoreEl=document.getElementById('score').firstChild,timerEl=document.getElementById('timer'),lvlEl=document.getElementById('lvl'),card=document.getElementById('card'),center=document.getElementById('center');
+  let W,H,playing=false,score=0,time=120,level=1,last=0,raf;
+  const player={x:0,y:0,r:17,vx:0,vy:0};
+  let tx=0,ty=0,stars=[],enemies=[],particles=[],keys={};
+  const THEME={bg1:"0a121e",player:"#60a5fa",accent:"#93c5fd"};
+  function resize(){ const dpr=Math.min(2,devicePixelRatio||1); W=c.width=innerWidth*dpr; H=c.height=innerHeight*dpr; c.style.width=innerWidth+'px'; c.style.height=innerHeight+'px'; ctx.setTransform(dpr,0,0,dpr,0,0); player.x=innerWidth/2; player.y=innerHeight/2; tx=player.x; ty=player.y; }
+  addEventListener('resize',resize); resize();
+  function spawn(){ stars=[]; enemies=[]; const sc=5+level*2; const ec=4+Math.floor(level*1.2); for(let i=0;i<sc;i++) stars.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:9+Math.random()*5,rot:Math.random()*Math.PI}); for(let i=0;i<ec;i++) enemies.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:15+Math.random()*4,vx:(Math.random()-.5)* (1.6+level*0.12),vy:(Math.random()-.5)*(1.6+level*0.12)}); }
+  function dist(a,b){ return Math.hypot(a.x-b.x,a.y-b.y); }
+  addEventListener('keydown',e=>{ keys[e.key.toLowerCase()]=true; if(e.key===' ') e.preventDefault();}); addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+  document.querySelectorAll('#controls button').forEach(b=>{ const k=b.getAttribute('data-k')||''; const kk=k.toLowerCase(); b.addEventListener('touchstart',e=>{e.preventDefault(); keys[kk]=true;}); b.addEventListener('touchend',e=>{e.preventDefault(); keys[kk]=false;}); b.addEventListener('mousedown',()=>keys[kk]=true); b.addEventListener('mouseup',()=>keys[kk]=false); });
+  c.addEventListener('pointermove',e=>{ if(playing){ tx=e.clientX; ty=e.clientY; }});
+  let mouseDown=false; c.addEventListener('pointerdown',()=>mouseDown=true); c.addEventListener('pointerup',()=>mouseDown=false);
+  function spawnParticles(x,y,col){ for(let i=0;i<10;i++) particles.push({x,y,vx:(Math.random()-.5)*6,vy:(Math.random()-.5)*6,life:1,dec:0.06+Math.random()*0.05,col});}
+  function update(dt){
+    // input
+    let ax=0,ay=0;
+    if(keys['w']||keys['arrowup']) ay-=1;
+    if(keys['s']||keys['arrowdown']) ay+=1;
+    if(keys['a']||keys['arrowleft']) ax-=1;
+    if(keys['d']||keys['arrowright']) ax+=1;
+    if(ax||ay){ let m=Math.hypot(ax,ay)||1; ax/=m; ay/=m; tx+=ax*280*dt; ty+=ay*280*dt; }
+    if(keys['shift']){ let dx=tx-player.x, dy=ty-player.y, m=Math.hypot(dx,dy)||1; player.x+=dx/m*5; player.y+=dy/m*5; }
+    // mouse follow with smoothing
+    tx=Math.max(player.r,Math.min(innerWidth-player.r,tx));
+    ty=Math.max(player.r,Math.min(innerHeight-player.r,ty));
+    player.x+=(tx-player.x)*Math.min(1,dt*7.2);
+    player.y+=(ty-player.y)*Math.min(1,dt*7.2);
+    // enemies
+    for(const e of enemies){ e.x+=e.vx; e.y+=e.vy; if(e.x<e.r||e.x>innerWidth-e.r) e.vx*=-1; if(e.y<e.r||e.y>innerHeight-e.r) e.vy*=-1; e.x=Math.max(e.r,Math.min(innerWidth-e.r,e.x)); e.y=Math.max(e.r,Math.min(innerHeight-e.r,e.y)); }
+    // stars collect
+    for(let i=stars.length-1;i>=0;i--){ const s=stars[i]; if(dist(player,s) < player.r+s.r){ stars.splice(i,1); score+=10; player.r+=0.09; spawnParticles(s.x,s.y,'#ffd54a'); if(score%70===0) level++; } }
+    // collisions
+    for(const e of enemies){ if(dist(player,e) < player.r+e.r*0.72){ playing=false; spawnParticles(player.x,player.y,THEME.player); endGame(false); return; } }
+    if(stars.length===0){ level++; lvlEl.textContent='LVL '+level; spawn(); }
+    // particles
+    for(let i=particles.length-1;i>=0;i--){ const p=particles[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.18; p.life-=p.dec; if(p.life<=0) particles.splice(i,1); }
+    fill.style.width=((score%100))+'%';
+    scoreEl.textContent=score;
+    lvlEl.textContent='LVL '+level;
+    time-=dt; if(time<=0){ time=0; playing=false; endGame(true); return; }
+    timerEl.textContent=String(Math.floor(time/60)).padStart(2,'0')+':'+String(Math.floor(time%60)).padStart(2,'0');
+  }
+  function draw(){
+    ctx.clearRect(0,0,innerWidth,innerHeight);
+    // subtle grid + vignette
+    ctx.strokeStyle='rgba(255,255,255,.035)'; ctx.lineWidth=1;
+    for(let x=0;x<innerWidth;x+=42){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,innerHeight); ctx.stroke();}
+    for(let y=0;y<innerHeight;y+=42){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(innerWidth,y); ctx.stroke();}
+    // stars (collectibles) with sparkle
+    for(const s of stars){ ctx.save(); ctx.translate(s.x,s.y); s.rot+=0.04; ctx.rotate(s.rot); ctx.fillStyle='#ffd54a'; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=1; // star shape
+      ctx.beginPath(); for(let i=0;i<5;i++){ const ang=i*Math.PI*2/5 - Math.PI/2; const x=Math.cos(ang)*s.r, y=Math.sin(ang)*s.r; const ix=Math.cos(ang+Math.PI/5)*s.r*0.5, iy=Math.sin(ang+Math.PI/5)*s.r*0.5; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); ctx.lineTo(ix,iy);} ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();}
+    // enemies
+    for(const e of enemies){ ctx.save(); ctx.translate(e.x,e.y); ctx.fillStyle='#ff3b6b'; ctx.beginPath(); ctx.arc(0,0,e.r,0,Math.PI*2); ctx.fill(); ctx.fillStyle='rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(2,3,e.r*0.55,e.r*0.32,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-5,-4,3.2,0,Math.PI*2); ctx.arc(5,-4,3.2,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#0b0d12'; ctx.beginPath(); ctx.arc(-5,-4,1.5,0,Math.PI*2); ctx.arc(5,-4,1.5,0,Math.PI*2); ctx.fill(); ctx.restore();}
+    // particles
+    for(const p of particles){ ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=p.col; ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill();} ctx.globalAlpha=1;
+    // player with theme color
+    ctx.save(); ctx.translate(player.x,player.y);
+    const g=ctx.createRadialGradient(0,0,player.r*0.2,0,0,player.r*1.45); g.addColorStop(0,'rgba(0,0,0,0.9)'); g.addColorStop(0.5, THEME.player); g.addColorStop(1,'rgba(0,0,0,0)');
+    // glow
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,player.r*1.6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=THEME.player; ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=2.2; ctx.beginPath(); ctx.arc(0,0,player.r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    // eyes
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-player.r*0.28,-player.r*0.16,player.r*0.22,0,Math.PI*2); ctx.arc(player.r*0.28,-player.r*0.16,player.r*0.22,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#0b0d12'; ctx.beginPath(); ctx.arc(-player.r*0.28+1,-player.r*0.16,player.r*0.1,0,Math.PI*2); ctx.arc(player.r*0.28+1,-player.r*0.16,player.r*0.1,0,Math.PI*2); ctx.fill();
+    // accent
+    ctx.strokeStyle=THEME.accent; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(0,0,player.r*0.62,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+  function loop(ts){ if(!last) last=ts; const dt=Math.min(0.033,(ts-last)/1000); last=ts; if(playing){ update(dt); draw(); raf=requestAnimationFrame(loop);} }
+  function start(){ score=0; time=120; level=1; player.r=17; player.x=innerWidth/2; player.y=innerHeight/2; tx=player.x; ty=player.y; particles=[]; spawn(); playing=true; center.style.display='none'; last=0; cancelAnimationFrame(raf); raf=requestAnimationFrame(loop); draw(); lvlEl.textContent='LVL 1';}
+  function endGame(win){ center.style.display='grid'; const title=win?'Time up!':'Caught!'; card.querySelector('h1').textContent=title+' — Score '+score; card.querySelector('p').innerHTML=(score>160?'Insane run! 🔥':'Keep going — collect to level up!')+'<br><strong>Mouse / WASD / Touch to move • Shift Dash</strong>'; let btn=card.querySelector('button'); if(!btn){ btn=document.createElement('button'); card.appendChild(btn);} btn.textContent='Play Again'; btn.onclick=start; }
+  document.getElementById('play').onclick=start;
+  draw();
+})();
+</script></body></html>

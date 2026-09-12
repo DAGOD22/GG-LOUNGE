@@ -1,18 +1,82 @@
+<!DOCTYPE html>
 <html>
   <head>
     <title>Drift Hunters</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="title" content="Drift Hunters" />
     <link rel="stylesheet" href="style.css" />
+    <style>
+      html,body{margin:0;padding:0;background:#111;color:#eee;font-family:Arial,sans-serif;overflow:hidden}
+      .webgl-content{position:relative;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;background:#0f1115}
+      #gameContainer{width:100%;height:100%;min-height:100vh}
+      #dh-overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;background:radial-gradient(ellipse at 50% 30%,#1a1f2e,#0b0d12);z-index:9;text-align:center;padding:28px}
+      #dh-overlay.show{display:flex}
+      #dh-overlay h2{margin:0;font-size:22px;letter-spacing:-.02em}
+      #dh-overlay p{margin:0;opacity:.7;font-size:14px;max-width:520px;line-height:1.5}
+      #dh-overlay button{padding:10px 18px;border-radius:99px;border:1px solid rgba(215,243,74,.5);background:rgba(215,243,74,.12);color:#d7f34a;font-weight:800;cursor:pointer}
+      #dh-overlay button:hover{background:#d7f34a;color:#111}
+      .dh-loader{position:absolute;inset:auto;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:2}
+      .dh-loader .spinner{width:36px;height:36px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:#d7f34a;animation:spin .9s linear infinite;margin:0 auto 12px}
+      @keyframes spin{to{transform:rotate(360deg)}}
+    </style>
     <script src="./UnityLoader.js"></script>
     <script>
-      var gameInstance = UnityLoader.instantiate("gameContainer", "./dh.json");
+      // Patch json dataUrl that points off-site (bitbucket, blocked). Rewrite to local if file missing will fallback to overlay.
+      (function(){
+        var origOpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(m,u){
+          // rewrite remote bitbucket data url to local attempt (will 404 -> show overlay)
+          if (typeof u === 'string' && u.indexOf('ubg100.bitbucket.io') !== -1) {
+            arguments[1] = './dh.data.unityweb';
+          }
+          return origOpen.apply(this, arguments);
+        };
+      })();
     </script>
   </head>
-  <body style="margin: 0; overflow: hidden;">
+  <body>
     <div class="webgl-content">
-      <div id="gameContainer" style="width: 100vw; height: 100vh; margin: 0;"></div>
+      <div id="gameContainer"></div>
+      <div class="dh-loader" id="loader"><div class="spinner"></div><div style="font-weight:700;letter-spacing:.08em;font-size:12px;opacity:.7">DRIFT HUNTERS</div><div style="font-size:13px;opacity:.55;margin-top:4px">Loading…</div></div>
+      <div id="dh-overlay">
+        <h2>🏁 Drift Hunters is updating</h2>
+        <p>This build is missing its track data on this mirror. The lounge is pulling a fresh copy — try again, or hop to the proxy to play it on a mirror that has the files.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+          <button onclick="location.reload()">Retry</button>
+          <a href="/proxy" style="padding:10px 18px;border-radius:99px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#fff;text-decoration:none;font-weight:800;font-size:14px">Open in Proxy</a>
+          <a href="/games/drift-boss/index.html" style="padding:10px 18px;border-radius:99px;border:1px solid rgba(215,243,74,.35);background:rgba(215,243,74,.14);color:#d7f34a;text-decoration:none;font-weight:800;font-size:14px">Play Drift Boss instead</a>
+        </div>
+      </div>
     </div>
-    <!---->
+    <script>
+      // show overlay if Unity fails to start within 12s
+      var start = Date.now();
+      var showed = false;
+      function showFail(msg){
+        if (showed) return; showed=true;
+        document.getElementById('loader').style.display='none';
+        var o=document.getElementById('dh-overlay'); o.classList.add('show');
+        if(msg) o.querySelector('p').textContent = msg;
+      }
+      // patch error prints
+      var _err = console.error;
+      console.error = function(){ var s=[].slice.call(arguments).join(' ');
+        if (/dh\.data|404|Failed to download|Unable to parse/i.test(s)) showFail('Game files not found on this server. Try the proxy or another network.');
+        return _err.apply(this, arguments);
+      };
+      window.addEventListener('error', function(e){ if(/UnityLoader|dh\.data/i.test(e.message||'')) showFail(); });
+      // Try to instantiate; if dh.data missing, UnityLoader will log error -> overlay
+      try {
+        var gameInstance = UnityLoader.instantiate("gameContainer", "./dh.json", {
+          onProgress: function(inst, p){
+            if(p===1) setTimeout(function(){ document.getElementById('loader').style.display='none'; }, 1200);
+          }
+        });
+      } catch(e){ showFail(e.message); }
+      setTimeout(function(){
+        var c=document.getElementById('gameContainer');
+        // if container still empty (no canvas) after 12s, show overlay
+        if(!c.querySelector('canvas') && !showed) showFail();
+      }, 5000);
+    </script>
   </body>
 </html>

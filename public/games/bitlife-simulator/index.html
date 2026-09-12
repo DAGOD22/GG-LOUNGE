@@ -1,0 +1,47 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BitLife Simulator — GG-Lounge Tunnel</title><style>html,body{margin:0;height:100%;background:#0b0d12;color:#f4f2ec;display:grid;place-items:center;font-family:system-ui,Segoe UI,Arial;overflow:hidden}*{box-sizing:border-box}.card{text-align:center;padding:22px;max-width:520px}.spin{width:36px;height:36px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:#d7f34a;animation:spin .8s linear infinite;margin:0 auto 14px}h1{margin:0;font-size:15px;letter-spacing:.08em;font-weight:900}p{margin:6px 0 0;opacity:.65;font-size:13px;line-height:1.5}#err{display:none;margin-top:14px;padding:10px 14px;border-radius:10px;background:rgba(255,190,70,.12);border:1px solid rgba(255,190,70,.25);font-size:12px;line-height:1.5;text-align:left;max-width:520px}#err b{color:#ffbe46}a.btn{display:inline-block;margin-top:10px;padding:9px 14px;border-radius:99px;background:#d7f34a;color:#111;font-weight:900;text-decoration:none;font-size:13px}@keyframes spin{to{transform:rotate(360deg)}}</style><script src="/uv/uv.bundle.js"></script><script src="/uv/uv.config.js"></script></head><body><div class="card"><div class="spin"></div><h1>CONNECTING — BITLIFE SIMULATOR — LOUNGE TUNNEL</h1><p>Encrypted • Unblocked • Same-origin /service/ tunnel</p><p style="opacity:.45;font-size:11px;margin-top:4px">Target: https://bitlifeonline.github.io/play.html</p><div id="err"></div><div id="actions" style="display:none;margin-top:12px;display:flex;gap:8;justify-content:center;flex-wrap:wrap"><a class="btn" href="/proxy">Open in Proxy</a><a class="btn" id="retry" href="javascript:void(0)">Retry</a></div></div><script>
+(function(){
+  var target="https://bitlifeonline.github.io/play.html";
+  var tries=0;
+  function getBare(){
+    try{var v=localStorage.getItem('gg_bare');if(v) return v;}catch(e){}
+    try{var m=document.cookie.match(/(?:^|; )gg_bare=([^;]*)/);if(m) return decodeURIComponent(m[1]);}catch(e){}
+    return '/api/bare/';
+  }
+  function setBare(b){
+    try{localStorage.setItem('gg_bare',b);}catch(e){}
+    try{document.cookie='gg_bare='+encodeURIComponent(b)+'; path=/; max-age=86400; samesite=lax';}catch(e){}
+    try{if(self.__uv$config) self.__uv$config.bare=b.endsWith('/')?b:b+'/';}catch(e){}
+  }
+  var PUBLIC_BARES=['https://tomphttp.outv1.workers.dev/','https://bare.noblocc.uk/','https://bare.undercover.goatse.cx/','https://bare.zorip.eu.org/','https://bare.holy.how/'];
+  async function probeBare(u){try{var r=await fetch(u,{cache:'no-store',signal:AbortSignal.timeout(3500)});return r.ok;}catch(e){return false;}}
+  async function chooseBare(){var cur=getBare();try{if(await probeBare(cur)) return cur;}catch(e){} for(var i=0;i<PUBLIC_BARES.length;i++){var cand=PUBLIC_BARES[i];try{if(await probeBare(cand)){setBare(cand);return cand;}}catch(e){}} return cur;}
+  function showErr(msg,bare){
+    var el=document.getElementById('err');var acts=document.getElementById('actions');
+    if(el){el.style.display='block';el.innerHTML='<b>Tunnel warm-up:</b> '+(msg||'waiting')+(bare?'<br><span style="opacity:.7">bare: '+bare+'</span>':'')+'<br><span style="opacity:.6">If this sticks, open in Proxy — Proxy probes all mirrors automatically.</span>';}
+    if(acts) acts.style.display='flex';
+  }
+  async function ensureSW(){
+    if(!('serviceWorker' in navigator)) return false;
+    if(navigator.serviceWorker.controller) return true;
+    var cands=[{script:'/uv/uv.sw.js',scope:'/service/'},{script:'/uv/uv.sw.js',scope:'/' },{script:'/service/uv.sw.js',scope:'/service/'},{script:'/uv.sw.js',scope:'/'}];
+    for(var i=0;i<cands.length;i++){var c=cands[i];try{var reg=await navigator.serviceWorker.register(c.script,{scope:c.scope,updateViaCache:'none'});try{await reg.update();}catch(e){} await Promise.race([navigator.serviceWorker.ready,new Promise(function(_,rej){setTimeout(function(){rej(new Error('ready timeout'))},2200)})]); if(navigator.serviceWorker.controller||(reg&&reg.active)) return true; await new Promise(function(r){setTimeout(r,300)}); if(navigator.serviceWorker.controller) return true;}catch(e){continue;}}
+    return !!navigator.serviceWorker.controller;
+  }
+  async function go(){
+    tries++;
+    try{
+      if(!self.Ultraviolet||!self.__uv$config||!self.__uv$config.encodeUrl) throw new Error('uv not ready — loading /uv/uv.bundle.js…');
+      var bare=await chooseBare(); setBare(bare);
+      var hasSW=false; try{hasSW=await ensureSW();}catch(e){}
+      if(!hasSW && tries<4){showErr('ServiceWorker warming… (attempt '+tries+')',bare); setTimeout(go,700+tries*300); return;}
+      var cfg=self.__uv$config; if(!cfg||!cfg.encodeUrl) throw new Error('encodeUrl missing');
+      try{var fresh=await chooseBare(); if(fresh) cfg.bare=fresh.endsWith('/')?fresh:fresh+'/';}catch(e){}
+      var url=cfg.prefix+cfg.encodeUrl(target);
+      setTimeout(function(){location.href=url;},hasSW?120:180);
+    }catch(e){showErr((e&&e.message)||String(e),getBare()); setTimeout(go,900+tries*250);}
+  }
+  document.getElementById('retry').onclick=function(){tries=0;go();};
+  if(document.readyState==='complete') setTimeout(go,80); else window.addEventListener('load',go);
+  setTimeout(go,1400);
+})();
+</script></body></html>

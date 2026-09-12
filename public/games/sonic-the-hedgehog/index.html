@@ -1,0 +1,78 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>Sonic The Hedgehog — GG Lounge</title><style>html,body{margin:0;height:100%;overflow:hidden;background:#0b0d12;color:#f4f2ec;font-family:system-ui,Segoe UI,Arial}*{box-sizing:border-box}#bar{position:absolute;top:0;left:0;right:0;height:34px;display:flex;align-items:center;gap:8;padding:0 10px;background:rgba(11,13,18,.88);border-bottom:1px solid rgba(255,255,255,.08);z-index:20;font-size:11px;font-weight:800;letter-spacing:.04em}#bar span{opacity:.8}#bar button{margin-left:auto;padding:5px 10px;border-radius:99px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.08);color:#fff;font-size:11px;font-weight:800;cursor:pointer}#frame{position:absolute;inset:34px 0 0 0;border:0;width:100%;height:calc(100% - 34px);background:#000}#loader{position:absolute;inset:34px 0 0 0;display:grid;place-items:center;background:#0b0d12;z-index:10;text-align:center;padding:20px}#loader.hidden{display:none}.spin{width:36px;height:36px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:#d7f34a;animation:spin .8s linear infinite;margin:0 auto 12px}@keyframes spin{to{transform:rotate(360deg)}}#err{display:none;margin-top:12px;padding:10px 14px;border-radius:10px;background:rgba(255,190,70,.12);border:1px solid rgba(255,190,70,.25);font-size:12px;max-width:520px;text-align:left}#err b{color:#ffbe46}</style><script src="/uv/uv.bundle.js"></script><script src="/uv/uv.config.js"></script></head><body>
+<div id="bar"><span>SONIC THE HEDGEHOG • Unblocked • Game-only</span><button id="fs">Fullscreen</button><button id="openProxy">Proxy</button></div>
+<div id="loader"><div><div class="spin"></div><div style="font-weight:900;letter-spacing:.04em">LOADING — SONIC THE HEDGEHOG</div><div style="opacity:.6;font-size:12px;margin-top:4px">Game-only view • via ubg76 / Google Sites • same-origin /service/</div><div id="err"></div></div></div>
+<iframe id="frame" allow="fullscreen; autoplay; clipboard-read; clipboard-write; encrypted-media; picture-in-picture; gamepad; keyboard-map" allowfullscreen></iframe>
+<script>
+(function(){
+  var id="sonic-the-hedgehog";
+  var title="Sonic The Hedgehog";
+  var targets=[
+    "https://ubg76.gitlab.io/game/"+id+".html",
+    "https://unblockedgames76.gitlab.io/game/"+id+".html",
+    "https://sites.google.com/site/unblockedgames6x/"+id.replace(/-/g,"-"),
+    "https://sites.google.com/view/unblockedgames66/"+id,
+    "https://sites.google.com/site/classroom6x/"+id
+  ];
+  var frame=document.getElementById('frame');
+  var loader=document.getElementById('loader');
+  var errEl=document.getElementById('err');
+  var PUBLIC_BARES=['https://tomphttp.outv1.workers.dev/','https://bare.noblocc.uk/','https://bare.undercover.goatse.cx/','https://bare.zorip.eu.org/','https://bare.holy.how/','https://tomphttp-2x.ayayay.workers.dev/'];
+  function getBare(){try{var v=localStorage.getItem('gg_bare');if(v) return v;}catch(e){} try{var m=document.cookie.match(/(?:^|; )gg_bare=([^;]*)/);if(m) return decodeURIComponent(m[1]);}catch(e){} return '/api/bare/';}
+  function setBare(b){try{localStorage.setItem('gg_bare',b);}catch(e){} try{document.cookie='gg_bare='+encodeURIComponent(b)+'; path=/; max-age=86400; samesite=lax';}catch(e){} try{if(self.__uv$config) self.__uv$config.bare=b.endsWith('/')?b:b+'/';}catch(e){}}
+  async function probeBare(u){try{var r=await fetch(u,{cache:'no-store',signal:AbortSignal.timeout(3500)});return r.ok;}catch(e){return false;}}
+  async function chooseBare(target){var cur=getBare(); try{if(await probeBare(cur)) return cur;}catch(e){} for(var i=0;i<PUBLIC_BARES.length;i++){var cand=PUBLIC_BARES[i];try{if(await probeBare(cand)){setBare(cand);return cand;}}catch(e){}} return cur;}
+  function showErr(msg,bare){if(errEl){errEl.style.display='block';errEl.innerHTML='<b>'+(msg||'waiting')+'</b>'+(bare?'<br><span style="opacity:.7">bare: '+bare+'</span>':'')+'<br><span style="opacity:.6">Trying next mirror — only the game will be shown fullscreen.</span>';}}
+  async function ensureSW(){
+    if(!('serviceWorker' in navigator)) return false;
+    if(navigator.serviceWorker.controller) return true;
+    var cands=[{script:'/uv/uv.sw.js',scope:'/service/'},{script:'/uv/uv.sw.js',scope:'/' },{script:'/service/uv.sw.js',scope:'/service/'},{script:'/uv.sw.js',scope:'/'}];
+    for(var i=0;i<cands.length;i++){var c=cands[i];try{var reg=await navigator.serviceWorker.register(c.script,{scope:c.scope,updateViaCache:'none'});try{await reg.update();}catch(e){} await Promise.race([navigator.serviceWorker.ready,new Promise(function(_,rej){setTimeout(function(){rej(new Error('ready timeout'))},2200)})]); if(navigator.serviceWorker.controller||(reg&&reg.active)) return true; await new Promise(function(r){setTimeout(r,300)}); if(navigator.serviceWorker.controller) return true;}catch(e){continue;}}
+    return !!navigator.serviceWorker.controller;
+  }
+  var curIdx=0; var tries=0; var booted=false; var bootTimer=null;
+  async function boot(force){
+    if(bootTimer) clearTimeout(bootTimer);
+    var target=targets[curIdx];
+    errEl.style.display='none'; loader.classList.remove('hidden');
+    tries++;
+    try{
+      if(!self.Ultraviolet||!self.__uv$config||!self.__uv$config.encodeUrl) throw new Error('uv not ready');
+      var bare=await chooseBare(target); setBare(bare);
+      var hasSW=false; try{hasSW=await ensureSW();}catch(e){}
+      if(!hasSW && tries<4){showErr('ServiceWorker warming… (attempt '+tries+')',bare); bootTimer=setTimeout(function(){boot();},700+tries*300); return;}
+      var cfg=self.__uv$config; try{var fresh=await chooseBare(target); if(fresh) cfg.bare=fresh.endsWith('/')?fresh:fresh+'/';}catch(e){}
+      var url=cfg.prefix+cfg.encodeUrl(target);
+      frame.src=url;
+      frame.onload=function(){
+        loader.classList.add('hidden');
+        try{
+          var doc=frame.contentDocument;
+          if(doc){
+            var st=doc.createElement('style');
+            st.textContent='html,body{margin:0!important;padding:0!important;background:#0b0d12!important;overflow:hidden!important} header,nav,footer,.header,.footer,.navbar,.ad,.ads,[class*="ad-"],[id*="ad-"],.similar,.related,.category,.logo,aside{display:none!important} #gameContainer,#game-container,#game,.game-container,iframe,canvas,embed,object{position:fixed!important;inset:34px 0 0 0!important;width:100%!important;height:calc(100% - 34px)!important;border:0!important;max-width:none!important;max-height:none!important} body > div:not(#gameContainer):not(iframe){display:none!important}';
+            doc.head&&doc.head.appendChild(st);
+            var g=doc.querySelector('iframe[src*="gamedistribution"],iframe[src*="ubg"],iframe[src*="html5"],iframe[src*="google"],canvas');
+            if(g){ g.style.cssText='position:fixed!important;inset:0!important;width:100%!important;height:100%!important;border:0!important;'; }
+          }
+        }catch(e){}
+        clearTimeout(bootTimer);
+        bootTimer=setTimeout(function(){
+          try{
+            var d=frame.contentDocument;
+            if(d && (!d.body || d.body.innerHTML.length<800 || /404|not found|sign in/i.test(d.body.innerText.slice(0,500)))){
+              if(curIdx+1 < targets.length){ curIdx++; boot(true); } else { showErr('All mirrors blocked — try Proxy', bare); }
+            }
+          }catch(e){}
+        }, 3800);
+      };
+      frame.onerror=function(){ if(curIdx+1 < targets.length){curIdx++; boot(true);} else {showErr('Frame error — trying next', bare);} };
+      booted=true;
+    }catch(e){ showErr((e&&e.message)||String(e), getBare()); bootTimer=setTimeout(boot,900+tries*250); }
+  }
+  document.getElementById('fs').onclick=function(){try{if(frame.requestFullscreen) frame.requestFullscreen();}catch(e){}};
+  document.getElementById('openProxy').onclick=function(){ window.top.location.href='/proxy'; };
+  if(document.readyState==='complete') setTimeout(function(){boot();},80); else window.addEventListener('load', boot);
+  setTimeout(boot,1400);
+  setTimeout(function(){ if(!booted) boot(); },4200);
+})();
+</script></body></html>
