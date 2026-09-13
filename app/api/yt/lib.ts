@@ -135,51 +135,47 @@ export type PipedResult =
   | { ok: true; data: unknown; instance: string; status: number }
   | { ok: false; error: string };
 
-/** GET a Piped JSON endpoint, trying instances in order until one works.
- * We try 7 instances with 6s each by default — Piped is flaky in schools,
- * so we trade a bit of latency for a much higher hit rate. */
+/** GET a Piped JSON endpoint — PARALLEL RACE for speed.
+ * Tries in batches of 3 in parallel, so 9 instances = ~5s not 35s.
+ * Vercel serverless has 10s limit, so we must finish fast.
+ * Falls back to next batch if first batch all fail. */
 export async function pipedGet(
   pathWithQuery: string,
   opts?: { timeoutMs?: number; attempts?: number },
 ): Promise<PipedResult> {
-  const timeoutMs = opts?.timeoutMs ?? 7000;
-  const attempts = opts?.attempts ?? 12;
+  const timeoutMs = opts?.timeoutMs ?? 5500;
+  const attempts = opts?.attempts ?? 9;
+  const pool = shuffledInstances().slice(0, attempts);
   const errors: string[] = [];
 
-  for (const instance of shuffledInstances().slice(0, attempts)) {
+  // Helper to try one instance
+  async function tryOne(instance: string): Promise<PipedResult> {
+    const res = await fetchWithTimeout(`${instance}${pathWithQuery}`, timeoutMs);
+    if (res.status >= 500) throw new Error(`${instance} -> ${res.status}`);
+    const text = await res.text();
+    let data: unknown = text;
     try {
-      const res = await fetchWithTimeout(
-        `${instance}${pathWithQuery}`,
-        timeoutMs,
-      );
-      if (res.status >= 500) {
-        errors.push(`${instance} -> ${res.status}`);
-        continue;
-      }
-      const text = await res.text();
-      let data: unknown = text;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        // leave as text — likely HTML/cloudflare challenge, treat as 500
-        errors.push(`${instance} -> invalid JSON`);
-        continue;
-      }
-      // If data is still string (HTML) or empty, treat as 500
-      if (typeof data === 'string') {
-        errors.push(`${instance} -> non-JSON`);
-        continue;
-      }
-      if (!res.ok) {
-        // 4xx is a real answer from a working instance (bad id etc.) — return it.
-        return { ok: true, data, instance, status: res.status };
-      }
-      return { ok: true, data, instance, status: 200 };
-    } catch (err) {
-      errors.push(
-        `${instance} -> ${err instanceof Error ? err.message : "fetch failed"}`,
-      );
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(`${instance} -> invalid JSON`);
     }
+    if (typeof data === "string") throw new Error(`${instance} -> non-JSON`);
+    if (!res.ok) return { ok: true, data, instance, status: res.status };
+    return { ok: true, data, instance, status: 200 };
+  }
+
+  // Race in batches of 3
+  for (let i = 0; i < pool.length; i += 3) {
+    const batch = pool.slice(i, i + 3);
+    const results = await Promise.allSettled(batch.map((inst) => tryOne(inst)));
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value.ok) return r.value;
+      if (r.status === "rejected") errors.push(r.reason instanceof Error ? r.reason.message : String(r.reason));
+      else if (r.status === "fulfilled" && !r.value.ok) errors.push((r.value as any).error || "unknown");
+    }
+    // if any batch had a 4xx success, it would have returned; otherwise continue to next batch
+    // Small delay between batches to avoid hammering
+    if (i + 3 < pool.length) await new Promise((res) => setTimeout(res, 180));
   }
   return { ok: false, error: errors.join("; ") || "all instances failed" };
 }

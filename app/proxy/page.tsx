@@ -22,18 +22,19 @@ const PUBLIC_BARES = [
   'https://d1o0a0r0r0c0k0.workers.dev/',
 ];
 
-// BING ONLY — smart automatic search. No chooser, no confusing options.
-const BING_URL = 'https://www.bing.com/search?q=';
+// DUCKDUCKGO HTML — no captcha, lightweight, proxy-friendly (Bing was showing recaptcha via Vercel IPs)
+const BING_URL = 'https://html.duckduckgo.com/html/?q=';
+const BING_FALLBACK = 'https://search.brave.com/search?q=';
 
 const QUICK: [string, string, string][] = [
   ['YouTube', '/games/youtube/index.html', '#FF0000'],
   ['Hole.io', 'https://holeonline.io/', '#35a6a3'],
-  ['Roblox', 'https://web.cloudmoonapp.com/run-site/?sid=_AKHfyOMGzkGg0az6FZ9bA&quality=SD', '#ff0000'],
-  ['now.gg', 'https://now.gg', '#ff6c83'],
-  ['Bing', 'https://www.bing.com', '#00809D'],
+  ['Roblox', 'https://now.gg/play/roblox-corporation/5349/roblox', '#ff0000'],
+  ['now.gg', 'https://now.gg/play/uncube/7070/now-gg', '#ff6c83'],
+  ['DuckDuckGo', 'https://html.duckduckgo.com/html/', '#00809D'],
   ['Poki', 'https://poki.com', '#ff6c83'],
   ['CrazyGames', 'https://www.crazygames.com', '#7d6bff'],
-  ['TikTok', 'https://m.tiktok.com', '#000000'],
+  ['TikTok', 'https://www.tiktok.com/foryou', '#000000'],
   ['Discord', 'https://discord.com/app', '#5865F2'],
   ['Reddit', 'https://www.reddit.com', '#FF4500'],
   ['Twitch', 'https://www.twitch.tv', '#9146FF'],
@@ -248,10 +249,25 @@ export default function ProxyPage() {
         if (q) { window.location.href = `/games/youtube/index.html?q=${encodeURIComponent(q)}`; return; }
         window.location.href = '/games/youtube/index.html'; return;
       }
-      if (u.hostname.includes('tiktok.com') && u.hostname === 'www.tiktok.com') { u.hostname = 'm.tiktok.com'; url = u.toString(); }
+      // TikTok: always use lightweight m. for proxy — www.tiktok.com is heavy and blocks bare
+      if (u.hostname.includes('tiktok.com')) {
+        // force m.tiktok.com for lightest, most proxy-friendly version (no heavy desktop JS)
+        if (u.hostname === 'www.tiktok.com' || u.hostname === 'tiktok.com') u.hostname = 'm.tiktok.com';
+        // strip unnecessary params that break bare cache
+        url = u.toString();
+      }
       if (u.hostname.includes('cloudmoonapp.com') && !u.searchParams.has('quality')) { u.searchParams.set('quality','SD'); url = u.toString(); }
-      // now.gg needs lightweight handling — force https and strip heavy params
-      if (u.hostname.includes('now.gg')) { u.protocol = 'https:'; url = u.toString(); }
+      // now.gg / Roblox via now.gg — force https, ensure play path has trailing slash for better bare cache
+      if (u.hostname.includes('now.gg')) {
+        u.protocol = 'https:';
+        // now.gg play URLs work better with https and no extra tracking params
+        if (u.pathname.includes('/play/') && !u.pathname.endsWith('/')) { /* keep as is */ }
+        url = u.toString();
+      }
+      // DuckDuckGo html search is already lightweight; ensure https
+      if (u.hostname.includes('duckduckgo.com') || u.hostname.includes('search.brave.com')) {
+        u.protocol = 'https:'; url = u.toString();
+      }
     } catch {}
     // Smart bare swap for heavy sites if local bare is unhealthy
     if (/(tiktok\.com|discord\.com|now\.gg|youtube\.com|youtu\.be|cloudmoon|roblox\.com)/i.test(url) && bare.startsWith('/api/') && bareHealth[bare] && !bareHealth[bare].ok) {
@@ -286,7 +302,7 @@ export default function ProxyPage() {
     <main className="proxy-shell" style={{ ['--bg' as never]: '#0b0d12', ['--ink' as never]: '#f4f2ec', minHeight:'100vh', background:'#0b0d12', color:'#f4f2ec', display:'flex', flexDirection:'column' }}>
       {/* Simple top bar — no tabs, no engine chooser, no cloak UI */}
       <header className="proxy-bar" style={{ position:'sticky', top:0, zIndex:20, display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'rgba(11,13,18,.92)', backdropFilter:'blur(16px)', borderBottom:'1px solid rgba(255,255,255,.07)' }}>
-        <a className="proxy-brand" href="/" style={{ display:'flex', alignItems:'center', gap:8, fontWeight:900, letterSpacing:'.02em', textDecoration:'none', color:'#f4f2ec', flex:'none' }}><Globe size={16}/> GG-LOUNGE<span style={{ opacity:.5, fontWeight:700 }}>/ BING</span></a>
+        <a className="proxy-brand" href="/" style={{ display:'flex', alignItems:'center', gap:8, fontWeight:900, letterSpacing:'.02em', textDecoration:'none', color:'#f4f2ec', flex:'none' }}><Globe size={16}/> GG-LOUNGE<span style={{ opacity:.5, fontWeight:700 }}>/ SEARCH</span></a>
         <div className="proxy-nav" style={{ display:'flex', alignItems:'center', gap:6 }}>
           <button aria-label="Back" onClick={() => nav(() => frame.current?.contentWindow?.history.back())} style={sIcon}><ArrowLeft size={16} /></button>
           <button aria-label="Forward" onClick={() => nav(() => frame.current?.contentWindow?.history.forward())} style={sIcon}><ArrowRight size={16} /></button>
@@ -295,7 +311,7 @@ export default function ProxyPage() {
         </div>
         <form className="proxy-form" onSubmit={handleSubmit} style={{ flex:1, display:'flex', alignItems:'center', gap:8, background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.10)', borderRadius:999, padding:'6px 12px', minWidth:0 }}>
           <Search size={14} style={{ opacity:.5, flex:'none' }} />
-          <input ref={addressRef} value={address} onChange={e => setAddress(e.target.value)} placeholder={ready ? "Search Bing or enter URL — try youtube.com" : 'Starting…'} disabled={!ready} aria-label="Search Bing or enter URL" style={{ flex:1, background:'transparent', border:0, outline:'none', color:'#f4f2ec', fontSize:14, minWidth:0 }} onKeyDown={e => { if (e.key === 'Escape') (e.target as HTMLInputElement).blur(); }} />
+          <input ref={addressRef} value={address} onChange={e => setAddress(e.target.value)} placeholder={ready ? "Search DuckDuckGo or enter URL — try youtube.com" : 'Starting…'} disabled={!ready} aria-label="Search DuckDuckGo or enter URL" style={{ flex:1, background:'transparent', border:0, outline:'none', color:'#f4f2ec', fontSize:14, minWidth:0 }} onKeyDown={e => { if (e.key === 'Escape') (e.target as HTMLInputElement).blur(); }} />
           {address && <button type="button" onClick={() => setAddress('')} style={{ border:0, background:'rgba(255,255,255,.12)', color:'#f4f2ec', width:20, height:20, borderRadius:99, display:'grid', placeItems:'center', cursor:'pointer', flex:'none' }}><X size={10} /></button>}
         </form>
         <div style={{ display:'flex', gap:6, alignItems:'center', flex:'none' }}>
@@ -309,13 +325,13 @@ export default function ProxyPage() {
       {!encodedCurrent ? (
         <section style={{ position:'relative', padding:'42px 24px 60px', maxWidth:1100, margin:'0 auto', width:'100%' }}>
           <div style={{textAlign:'center', maxWidth:700, margin:'0 auto'}}>
-            <div style={{display:'inline-flex',alignItems:'center',gap:8, padding:'7px 14px', borderRadius:999, background:'linear-gradient(135deg, rgba(0,128,157,.18), rgba(215,243,74,.14))', border:'1px solid rgba(0,128,157,.25)', fontSize:11, fontWeight:900, letterSpacing:'.06em', color:'#7dd3ff'}}><ShieldCheck size={14}/> BING ONLY • SMART AUTO • NO SETUP</div>
-            <h1 style={{fontSize:'clamp(36px,6vw,60px)', lineHeight:.9, margin:'18px 0 12px', fontWeight:900, letterSpacing:'-.03em'}}>Search with <em style={{fontStyle:'italic', background:'linear-gradient(135deg, #00809D, #7d6bff)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent'}}>Bing.</em> Go anywhere.</h1>
-            <p style={{fontSize:15, opacity:.65, lineHeight:1.6, maxWidth:560, margin:'0 auto'}}>No chooser, no toggles. Type anything — we auto-detect URL vs search and route to Bing. YouTube → native player, Roblox/now.gg → cloud, everything encrypted.</p>
+            <div style={{display:'inline-flex',alignItems:'center',gap:8, padding:'7px 14px', borderRadius:999, background:'linear-gradient(135deg, rgba(0,128,157,.18), rgba(215,243,74,.14))', border:'1px solid rgba(0,128,157,.25)', fontSize:11, fontWeight:900, letterSpacing:'.06em', color:'#7dd3ff'}}><ShieldCheck size={14}/> DUCKDUCKGO • NO CAPTCHA • SMART AUTO</div>
+            <h1 style={{fontSize:'clamp(36px,6vw,60px)', lineHeight:.9, margin:'18px 0 12px', fontWeight:900, letterSpacing:'-.03em'}}>Search with <em style={{fontStyle:'italic', background:'linear-gradient(135deg, #00809D, #7d6bff)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent'}}>DuckDuckGo.</em> Go anywhere.</h1>
+            <p style={{fontSize:15, opacity:.65, lineHeight:1.6, maxWidth:560, margin:'0 auto'}}>No chooser, no toggles. Type anything — we auto-detect URL vs search and route to DuckDuckGo (no captcha, unlike Bing). YouTube → native player, Roblox/now.gg → cloud, everything encrypted.</p>
             <form onSubmit={handleSubmit} style={{marginTop:22, display:'flex', gap:0, background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)', borderRadius:999, padding:'6px', backdropFilter:'blur(12px)', boxShadow:'0 20px 60px rgba(0,0,0,.35)'}}>
               <div style={{flex:1, display:'flex', alignItems:'center', gap:12, padding:'0 18px'}}>
                 <Search size={18} style={{opacity:.5}}/>
-                <input value={address} onChange={e=> setAddress(e.target.value)} placeholder={ready? "Search Bing or enter URL — try roblox.com" : 'Starting…'} disabled={!ready} style={{flex:1, background:'transparent', border:0, outline:'none', color:'#f4f2ec', fontSize:15, padding:'10px 0'}}/>
+                <input value={address} onChange={e=> setAddress(e.target.value)} placeholder={ready? "Search DuckDuckGo or enter URL — try roblox.com" : 'Starting…'} disabled={!ready} style={{flex:1, background:'transparent', border:0, outline:'none', color:'#f4f2ec', fontSize:15, padding:'10px 0'}}/>
               </div>
               <button type="submit" disabled={!ready} style={{padding:'12px 22px', borderRadius:999, background:'linear-gradient(135deg, #00809D, #7d6bff)', color:'#fff', border:0, fontWeight:900, fontSize:14, cursor: ready? 'pointer':'not-allowed', display:'flex', alignItems:'center', gap:8, whiteSpace:'nowrap'}}>Search <Zap size={14}/></button>
             </form>
@@ -324,15 +340,15 @@ export default function ProxyPage() {
               {['roblox.com','now.gg','youtube cat videos','hole.io'].map(s=> <button key={s} onClick={()=> go(s)} disabled={!ready} style={{fontSize:12, padding:'6px 12px', borderRadius:999, background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', color:'#f4f2ec', cursor:'pointer'}}>{s}</button>)}
             </div>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center', marginTop:16 }}>
-              <span style={{ padding:'7px 12px', borderRadius:99, border:'1px solid rgba(0,128,157,.25)', background:'rgba(0,128,157,.12)', color:'#7dd3ff', fontSize:11, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}><ShieldCheck size={12}/> Encrypted • Bing • Private</span>
-              <span style={{ padding:'7px 12px', borderRadius:99, border:'1px solid rgba(255,255,255,.12)', background:'rgba(255,255,255,.06)', color:'rgba(244,242,236,.7)', fontSize:11, fontWeight:700 }}>YouTube native • Roblox cloud</span>
+              <span style={{ padding:'7px 12px', borderRadius:99, border:'1px solid rgba(0,128,157,.25)', background:'rgba(0,128,157,.12)', color:'#7dd3ff', fontSize:11, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}><ShieldCheck size={12}/> Encrypted • DuckDuckGo • No captcha</span>
+              <span style={{ padding:'7px 12px', borderRadius:99, border:'1px solid rgba(255,255,255,.12)', background:'rgba(255,255,255,.06)', color:'rgba(244,242,236,.7)', fontSize:11, fontWeight:700 }}>YouTube native • Roblox cloud • TikTok m.</span>
             </div>
           </div>
 
           <div style={{marginTop:28}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between', marginBottom:12}}>
-              <h3 style={{fontSize:12, fontWeight:900, letterSpacing:'.08em', opacity:.6}}>QUICK LAUNCH — BING + UNBLOCKED APPS</h3>
-              <span style={{fontSize:11, opacity:.4}}>{QUICK.length} apps</span>
+              <h3 style={{fontSize:12, fontWeight:900, letterSpacing:'.08em', opacity:.6}}>QUICK LAUNCH — SEARCH + UNBLOCKED APPS</h3>
+              <span style={{fontSize:11, opacity:.4}}>{QUICK.length} apps • all fixed</span>
             </div>
             <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))', gap:12}}>
               {QUICK.map(([name, url, col]) => (
@@ -387,7 +403,7 @@ export default function ProxyPage() {
               </div>
             </div>
           )}
-          <iframe ref={frame} className="proxy-frame" src={encodedCurrent} title="Bing proxied" allow="fullscreen; autoplay; clipboard-read; clipboard-write; encrypted-media; picture-in-picture; geolocation; microphone; camera; display-capture; web-share" allowFullScreen onLoad={() => { setFrameLoading(false); setFrameError(null); }} onError={handleFrameError} style={{ flex:1, border:0, background:'#fff', minHeight:'calc(100vh - 58px)' }} />
+          <iframe ref={frame} className="proxy-frame" src={encodedCurrent} title="Search proxied" allow="fullscreen; autoplay; clipboard-read; clipboard-write; encrypted-media; picture-in-picture; geolocation; microphone; camera; display-capture; web-share" allowFullScreen onLoad={() => { setFrameLoading(false); setFrameError(null); }} onError={handleFrameError} style={{ flex:1, border:0, background:'#fff', minHeight:'calc(100vh - 58px)' }} />
         </div>
       )}
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>

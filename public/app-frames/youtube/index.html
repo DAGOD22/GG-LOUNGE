@@ -76,6 +76,7 @@
         } else {
           // YouTube fallback: if UV tunnel fails, send to our Piped YouTube which works without bare
           if(name==='youtube'){ location.href='/games/youtube/index.html'; return; }
+          if(name==='bing'){ location.href='/proxy?url='+encodeURIComponent(target); return; }
           showErr('ServiceWorker not controlling after 6 tries — try Refresh or open via Proxy. Some browsers block workers in private mode.', bare);
           // don't redirect to /service/ which would 404 without SW
           setTimeout(go, 2500);

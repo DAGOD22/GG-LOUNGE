@@ -713,7 +713,7 @@ export default function Page() {
         <div className="toolbar">
           <div className="search-wrap" style={{position:'relative'}}>
             <Search size={17} />
-            <input id="main-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search 192 titles, genres, moods" aria-label="Search games" style={{flex:1}} />
+            <input id="main-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${allGames.length} titles, genres, moods`} aria-label="Search games" style={{flex:1}} />
             {query && <button onClick={()=> setQuery('')} aria-label="Clear search" style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',width:22,height:22,borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',display:'grid',placeItems:'center',cursor:'pointer',color:'var(--muted)'}}><X size={12}/></button>}
           </div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>

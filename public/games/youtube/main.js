@@ -578,7 +578,23 @@
         paint(page.items || [], false);
         document.getElementById("more-btn").style.display = next ? "block" : "none";
       }, function (err) {
-        errorBox("Search failed", err.message || "Network error", renderSearch);
+        var fallbackUrl = "/proxy?url=" + encodeURIComponent("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(state.q + " site:youtube.com"));
+        errorBox("Search failed \u2014 Piped is down", (err.message || "Network error") + " \u2014 try another server or search via proxy.", renderSearch);
+        setTimeout(function(){
+          var row = main.querySelector(".btn-row");
+          if(row && !document.getElementById("fallback-ddg")){
+            var a = document.createElement("a");
+            a.id = "fallback-ddg";
+            a.href = fallbackUrl;
+            a.textContent = "Search YouTube via DuckDuckGo (proxy)";
+            a.className = "btn ghost";
+            a.style.textDecoration = "none";
+            a.style.display = "inline-flex";
+            a.style.alignItems = "center";
+            a.style.gap = "6px";
+            row.appendChild(a);
+          }
+        }, 80);
       });
   }
 
