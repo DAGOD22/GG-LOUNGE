@@ -374,31 +374,32 @@ export function GameModal({
           } catch {}
         }, 350)
       }
-      // detect broken CDN / X-Frame-Options / missing files — hardened (#8)
-      setTimeout(() => {
+      // PROD X-Frame detection: immediate null doc check + hardened 2200ms fallback
+      try {
+        // immediate signal: cross-origin block gives null document or throws on access
+        if (!doc || !doc.body) {
+          setFrameError('This game blocks embedding (X-Frame-Options). Open in a new tab — it will work there.')
+          return
+        }
+        try { void doc.body.innerHTML } catch { setFrameError('This host forbids iframes (X-Frame-Options). Use “Open in new tab”.'); return }
+      } catch {}
+      const xFrameTimer = setTimeout(() => {
         try {
           let blocked = false
           try {
             const txt2 = doc.body?.innerHTML?.slice(0, 800) || ''
             if (/refused to connect|ERR_BLOCKED|blocked by| X-Frame-Options/i.test(txt2)) blocked = true
           } catch { blocked = true }
-          if (blocked) {
-            setFrameError('This game blocks embedding (X-Frame-Options). Open in a new tab — it will work there.')
-            return
-          }
+          if (blocked) { setFrameError('This game blocks embedding (X-Frame-Options). Open in a new tab — it will work there.'); return }
           const txt = (doc.body?.innerText || '').slice(0, 2500)
           const hasCanvas = !!doc.querySelector('canvas')
           const hasGame = !!doc.querySelector('iframe,canvas,embed,object,#gameContainer,#content,.game')
           const bodyChildren = doc.body ? doc.body.children.length : 0
-          if (!hasCanvas && !hasGame && bodyChildren === 0) {
-            setFrameError('The game looks empty — its files may be blocked on this network. Try opening in a new tab or via Proxy.')
-          } else if (!hasCanvas && !hasGame && /404|Failed to download|NOT FOUND|cannot fetch|NetworkError|refused/i.test(txt) && txt.length < 2500 && txt.length > 20) {
-            setFrameError('This game didn’t load. Try again or open in a new tab.')
-          } else if (bodyChildren > 0 && txt.trim().length < 30 && !hasCanvas && !hasGame) {
-            setFrameError('Embedding failed — this host forbids iframes. Use “Open in new tab”.')
-          }
+          if (!hasCanvas && !hasGame && bodyChildren === 0) setFrameError('The game looks empty — its files may be blocked on this network. Try opening in a new tab or via Proxy.')
+          else if (!hasCanvas && !hasGame && /404|Failed to download|NOT FOUND|cannot fetch|NetworkError|refused/i.test(txt) && txt.length < 2500 && txt.length > 20) setFrameError('This game didn’t load. Try again or open in a new tab.')
+          else if (bodyChildren > 0 && txt.trim().length < 30 && !hasCanvas && !hasGame) setFrameError('Embedding failed — this host forbids iframes. Use “Open in new tab”.')
         } catch {}
-      }, 3800)
+      }, 2200)
     } catch {}
   }, [applySaveToFrame])
 

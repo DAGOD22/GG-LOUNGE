@@ -175,12 +175,14 @@ export const CONTROLS_LEGEND: Record<string,string> = {
   default: 'Arrows / WASD • Space • Enter • R to restart'
 }
 export function hashDay(str:string){ let h=0; for(let i=0;i<str.length;i++) h=(h*31+str.charCodeAt(i))>>>0; return h }
+export function normalizeTitle(s:string){ return s.toLowerCase().replace(/[^a-z0-9]/g,'') }
+export function getHashColor(id:string){ return pubColors[hashDay(id) % pubColors.length] }
 export function gameOfDayIndex(len:number, dateStr?:string){ const d=dateStr|| new Date().toISOString().slice(0,10); return hashDay(d)%len }
 
 // Content ratings — fixes horror mixed with kids (#12)
 export type Rating = 'E' | 'E10' | 'T' | 'M'
 export const MATURE_IDS = new Set(['granny','fnaf','fnaw','happy-wheels','baldis-basics','backrooms','house-of-hazards','monster-survival','they-are-coming','zombie-outbreak-arena','gta-mods','slender','short-life'])
-export const TEEN_IDS = new Set(['shell-shockers','krunker','1v1-lol','ev-io','pixel-shooter','smashkarts','stumble-guys','fall-guys','among-us','house-of-hazards'])
+export const TEEN_IDS = new Set(['shell-shockers','krunker','1v1-lol','ev-io','pixel-shooter','smashkarts','stumble-guys','fall-guys','among-us','awesome-tanks2'])
 export function getGameRating(id:string): Rating {
   if (MATURE_IDS.has(id)) return 'M'
   if (TEEN_IDS.has(id)) return 'T'

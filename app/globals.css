@@ -327,4 +327,27 @@ mark.hl{background:rgba(215,243,74,.35);color:inherit;padding:0 2px;border-radiu
 [data-theme="light"] .shelf-card-art,[data-theme="light"] .game-card{background:#fff; border-color:rgba(0,0,0,.08)}
 [data-theme="light"] .view-toggle{background:rgba(0,0,0,.06); border-color:rgba(0,0,0,.12)}
 [data-theme="light"] .hero-stats{background:rgba(255,255,255,.7)!important; border-color:rgba(0,0,0,.08)!important}
+/* === PROD light mode comprehensive (covers all remaining rgba white surfaces) === */
+[data-theme="light"] .site-header{ background:rgba(255,255,255,.92); backdrop-filter:blur(8px) }
+[data-theme="light"] .hero{ background:radial-gradient(600px 400px at 15% 10%, rgba(125,107,255,.06), transparent 60%), radial-gradient(700px 500px at 85% 15%, rgba(215,243,74,.06), transparent 60%), var(--background) }
+[data-theme="light"] .spotlight{ background:linear-gradient(145deg, rgba(215,243,74,.08), rgba(125,107,255,.06) 55%, rgba(255,255,255,.9)), #fff; border-color:rgba(0,0,0,.08); box-shadow:0 20px 40px rgba(0,0,0,.06) }
+[data-theme="light"] .catalog{ background:transparent }
+[data-theme="light"] .toolbar{ background:transparent }
+[data-theme="light"] .view-toggle button{ color:#4b5563 }
+[data-theme="light"] .view-toggle button.active{ background:#111118; color:#fff }
+[data-theme="light"] .shelf-card{ background:#fff; border-color:rgba(0,0,0,.08) }
+[data-theme="light"] .game-info p:last-of-type{ color:#4b5563 }
+[data-theme="light"] .empty-state{ background:#fff; border-color:rgba(0,0,0,.12); color:#4b5563 }
+[data-theme="light"] .empty-state h3{ color:#111118 }
+[data-theme="light"] .modal-bar{ background:rgba(255,255,255,.96); border-color:rgba(0,0,0,.08) }
+[data-theme="light"] .frame-wrap{ background:#fff; border-color:rgba(0,0,0,.08) }
+[data-theme="light"] .frame-wrap .game-frame{ background:#fff }
+[data-theme="light"] .game-modal{ background:rgba(255,255,255,.88); backdrop-filter:blur(16px) }
+[data-theme="light"] .proxy-bar{ background:rgba(255,255,255,.9); border-color:rgba(0,0,0,.08) }
+[data-theme="light"] .proxy-form{ background:#fff; border-color:rgba(0,0,0,.12) }
+[data-theme="light"] .admin-panel{ background:#fff; border-color:rgba(0,0,0,.08) }
+[data-theme="light"] .visit-row,[data-theme="light"] .ban-row,[data-theme="light"] .request-row{ background:#fff; border-color:rgba(0,0,0,.08) }
+[data-theme="light"] .btn-mini{ background:#fff; border-color:rgba(0,0,0,.12); color:#111118 }
+[data-theme="light"] .btn-mini:hover{ background:#f4f4f5 }
+[data-theme="light"] kbd{ background:#fff; border-color:rgba(0,0,0,.12); color:#111118 }
 

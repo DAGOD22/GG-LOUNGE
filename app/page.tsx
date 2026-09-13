@@ -7,7 +7,8 @@ import dynamic from 'next/dynamic'
 import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, CONTROLS_LEGEND, hashDay, gameOfDayIndex, PROXY_TILES } from '@/lib/games'
 import type { Game } from '@/lib/games'
 import { GameCard, ShelfCard } from '@/components/GameCard'
-import { HomeDashboard } from '@/components/HomeDashboard'
+import { LibraryToolbar } from '@/components/LibraryToolbar'
+const HomeDashboard = dynamic(() => import('@/components/HomeDashboard').then(m => m.HomeDashboard), { ssr: false, loading: () => null })
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { AuthDialog } from '@/components/AuthDialog'
 const GameModal = dynamic(() => import('@/components/GameModal').then(m => m.GameModal), { ssr: false, loading: () => null })
@@ -255,11 +256,21 @@ export default function Page() {
           if(filter === 'Favorites') return favorites.includes(g.id)
           return g.genre === filter
         })
-        if (hideLow) fuzzy = fuzzy.filter(g=> !LOW_QUALITY_HINTS.has(g.id))
+        if (hideLow) { fuzzy = fuzzy.filter(g=> !LOW_QUALITY_HINTS.has(g.id)); const seen2=new Set<string>(); fuzzy = fuzzy.filter(g=>{ const n=g.title.toLowerCase().replace(/[^a-z0-9]/g,''); if(seen2.has(n)) return false; seen2.add(n); return true }) }
         if (showStaffOnly) fuzzy = fuzzy.filter(g=> STAFF_PICKS.includes(g.id))
         if (fuzzy.length > 0) base = fuzzy
       }
-      if (hideLow) base = base.filter(g=> !LOW_QUALITY_HINTS.has(g.id))
+      if (hideLow) {
+        base = base.filter(g=> !LOW_QUALITY_HINTS.has(g.id))
+        // PROD dedupe: exact normalized title dedupe (covers duplicates like "Slope" vs "slope-ball")
+        const seen = new Set<string>()
+        base = base.filter(g=> {
+          const n = g.title.toLowerCase().replace(/[^a-z0-9]/g,'')
+          if(seen.has(n)) return false
+          seen.add(n)
+          return true
+        })
+      }
       if (showStaffOnly) base = base.filter(g=> STAFF_PICKS.includes(g.id))
       // sorting
       if (sortBy==='popular') base = [...base].sort((a,b)=> (playCounts[b.id]||0) - (playCounts[a.id]||0))
@@ -315,18 +326,11 @@ export default function Page() {
   const [serverLeaderboard, setServerLeaderboard] = useState<{gameId:string,count:number}[]>([])
   useEffect(()=>{
     let alive=true
-    fetch('/api/leaderboard?limit=5').then(r=> r.ok? r.json(): null).then((d:any)=>{
-      if(!alive) return
-      if(d?.leaderboard && Array.isArray(d.leaderboard)) setServerLeaderboard(d.leaderboard)
-    }).catch(()=>{})
-    const id=setInterval(()=>{
-      fetch('/api/leaderboard?limit=5').then(r=> r.ok? r.json(): null).then((d:any)=>{
-        if(!alive) return
-        if(d?.leaderboard) setServerLeaderboard(d.leaderboard)
-      }).catch(()=>{})
-    }, 30000)
+    const fetchLB=()=> fetch('/api/leaderboard?limit=5').then(r=> r.ok? r.json(): null).then((d:any)=>{ if(!alive) return; if(d?.leaderboard && Array.isArray(d.leaderboard)) setServerLeaderboard(d.leaderboard) }).catch(()=>{})
+    fetchLB()
+    const id=setInterval(()=>{ if(document.visibilityState!=='hidden') fetchLB() }, 30000)
     return ()=> { alive=false; clearInterval(id)}
-  }, [playCounts, authUser]) // refresh when you play or auth changes
+  }, [playCounts]) // PROD: guests + signed-in both poll, no authUser dep
   const leaderboard = useMemo(()=>{
     if(serverLeaderboard.length>0){
       const map = new Map(allGames.map(g=> [g.id, g] as const))
@@ -376,6 +380,9 @@ export default function Page() {
         image: (typeof window!=='undefined' ? window.location.origin : 'https://gg-lounge.vercel.app') + (g.icon || ''),
         genre: g.genre,
         applicationCategory: 'Game',
+        operatingSystem: 'Web Browser',
+        offers: { '@type':'Offer', price:'0', priceCurrency:'USD', availability:'https://schema.org/InStock' },
+        author: { '@type':'Organization', name:'GG-Lounge Studios' }
       }
     }))
   }), [allGames])
@@ -597,32 +604,8 @@ export default function Page() {
             <span><strong>{visibleGames.length.toString().padStart(2, '0')}</strong> available now</span>
           </div>
         </div>
-        <div className="toolbar">
-          <div className="search-wrap" style={{position:'relative'}}>
-            <Search size={17} />
-            <input id="main-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${allGames.length} titles, genres, moods`} aria-label="Search games" style={{flex:1}} />
-            {query && <button onClick={()=> setQuery('')} aria-label="Clear search" style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',width:22,height:22,borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',display:'grid',placeItems:'center',cursor:'pointer',color:'var(--muted)'}}><X size={12}/></button>}
-          </div>
-          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            <div style={{display:'flex',gap:6,alignItems:'center',padding:'4px 6px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.04)'}}>
-              <ListFilter size={12}/><span style={{fontSize:11,fontWeight:800}}>Sort</span>
-              <select value={sortBy} onChange={e=> setSortBy(e.target.value as any)} aria-label="Sort games" style={{background:'transparent',color:'var(--foreground)',border:0,fontSize:12,fontWeight:700,outline:'none'}}>
-                <option value="featured">Featured</option>
-                <option value="popular">Most played</option>
-                <option value="newest">Newest</option>
-                <option value="az">A-Z</option>
-              </select>
-            </div>
-            <div className="view-toggle" role="group" aria-label="View toggle">
-              <button className={view==='shelves'?'active':''} onClick={()=> setView('shelves')} aria-label="Shelves view"><Rows3 size={16}/> Shelves</button>
-              <button className={view==='grid'?'active':''} onClick={()=> setView('grid')} aria-label="Grid view"><LayoutGrid size={16}/> Grid</button>
-            </div>
-            <button onClick={shufflePick} className="btn-mini" title="Random game"><Shuffle size={14}/> Shuffle</button>
-            <button onClick={()=> setHideLow(v=>!v)} aria-pressed={hideLow} title="Hide low quality duplicates" style={{padding:'6px 10px',borderRadius:999,border: hideLow?'1px solid var(--lime)':'1px solid var(--line)',background: hideLow?'var(--lime)':'rgba(255,255,255,.06)',color: hideLow?'#0b0d12':'var(--foreground)',fontWeight:800,fontSize:11,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><Filter size={12}/>{hideLow?'Filtered':'Filter duplicates'}</button>
-            <button onClick={()=> setShowStaffOnly(v=>!v)} aria-pressed={showStaffOnly} title="Staff picks only" style={{padding:'6px 10px',borderRadius:999,border: showStaffOnly?'1px solid var(--lime)':'1px solid var(--line)',background: showStaffOnly?'var(--lime)':'rgba(255,255,255,.06)',color: showStaffOnly?'#0b0d12':'var(--foreground)',fontWeight:800,fontSize:11,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><Star size={12} fill={showStaffOnly?'currentColor':'none'}/>{showStaffOnly?'Staff only':'All'}</button>
-          </div>
-        </div>
-        <div className="filter-tabs" role="tablist" aria-label="Filter games">
+                <LibraryToolbar query={query} setQuery={setQuery} allGames={allGames} sortBy={sortBy} setSortBy={setSortBy} view={view} setView={setView} hideLow={hideLow} setHideLow={setHideLow} showStaffOnly={showStaffOnly} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} />
+<div className="filter-tabs" role="tablist" aria-label="Filter games">
           {filters.filter(f=> f==='All games' || f==='Favorites' || (filterCounts[f]??0)>0).map((item) => (
             <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)} role="tab" aria-selected={filter === item}>
               {item} <span style={{opacity:.7,fontWeight:700,marginLeft:4,fontSize:11}}>({filterCounts[item]??0})</span>
