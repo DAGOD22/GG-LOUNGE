@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { MAX_ICON_BYTES, createRequest, createSimpleRequest, listRequests, upvoteRequest, validateGameHtml } from "@/lib/db";
+import { MAX_ICON_BYTES, createRequest, createSimpleRequest, listRequests, upvoteRequest, validateGameHtml, checkUpvoteCooldown } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 // Fix 10: rate limits for game requests — 5 creates/min + 10 upvotes/min per IP
 const reqRate = new Map<string, { count: number; reset: number }>();
 const upvoteRate = new Map<string, { count: number; reset: number }>();
-const upvoteCooldown = new Map<string, number>(); // ip:requestId -> last vote timestamp (PROD 30s server cooldown mirrors client)
+// upvoteCooldown now persistent via DB (lib/db.ts checkUpvoteCooldown)
 function hitLimit(map: Map<string,{count:number;reset:number}>, ip: string, max: number): boolean {
   const now = Date.now();
   const e = map.get(ip);
@@ -45,15 +45,13 @@ export async function POST(request: Request) {
     // upvote shortcut
     if (typeof (body as any).upvoteId === "string" && (body as any).upvoteId.trim()) {
       const id = (body as any).upvoteId.trim();
-      const cdKey = ip + ":" + id
-      const last = upvoteCooldown.get(cdKey) || 0
-      if (Date.now() - last < 30000) {
-        return NextResponse.json({ error: "Cooldown — wait 30s between votes on the same request." }, { status: 429, headers: { "Retry-After": "30" } });
+      const cd = await checkUpvoteCooldown(ip, id, 30000)
+      if (!cd.allowed) {
+        return NextResponse.json({ error: `Cooldown — wait ${cd.retryAfter}s between votes on the same request.` }, { status: 429, headers: { "Retry-After": String(cd.retryAfter) } });
       }
       if (!hitLimit(upvoteRate, ip, 10)) {
         return NextResponse.json({ error: "Too many votes — wait a minute and try again." }, { status: 429, headers: { "Retry-After": "60" } });
       }
-      upvoteCooldown.set(cdKey, Date.now())
       const updated = await upvoteRequest(id);
       if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
       return NextResponse.json({ ok: true, request: updated });

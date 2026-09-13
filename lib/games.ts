@@ -177,6 +177,8 @@ export const CONTROLS_LEGEND: Record<string,string> = {
 export function hashDay(str:string){ let h=0; for(let i=0;i<str.length;i++) h=(h*31+str.charCodeAt(i))>>>0; return h }
 export function normalizeTitle(s:string){ return s.toLowerCase().replace(/[^a-z0-9]/g,'') }
 export function getHashColor(id:string){ return pubColors[hashDay(id) % pubColors.length] }
+export function levenshtein(a:string,b:string){ const m=a.length, n=b.length; if(m===0) return n; if(n===0) return m; const dp=Array.from({length:m+1},()=>Array(n+1).fill(0)); for(let i=0;i<=m;i++) dp[i][0]=i; for(let j=0;j<=n;j++) dp[0][j]=j; for(let i=1;i<=m;i++) for(let j=1;j<=n;j++) dp[i][j]= a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]); return dp[m][n] }
+export function isNearDuplicate(a:string,b:string){ const na=normalizeTitle(a), nb=normalizeTitle(b); if(na===nb) return true; if(Math.abs(na.length-nb.length)>2) return false; const d=levenshtein(na,nb); return d<=2 && Math.min(na.length,nb.length)>=5 }
 export function gameOfDayIndex(len:number, dateStr?:string){ const d=dateStr|| new Date().toISOString().slice(0,10); return hashDay(d)%len }
 
 // Content ratings — fixes horror mixed with kids (#12)

@@ -4,10 +4,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Fuse from 'fuse.js'
 import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap, LayoutGrid, Rows3, Shuffle, ExternalLink, Copy, AlertCircle, Loader2, ChevronLeft, ChevronRight, Sun, Moon, Download, Flag, Flame, Crown, Gift, Monitor, Keyboard, Bug, ThumbsUp, Globe, MessageSquare, Star, Timer, WifiOff, Wifi, Filter, ArrowUpDown, Eye, EyeOff, ShieldAlert, ListFilter, Users, LogIn, LogOut, User, Cloud, CloudOff, Save, Menu } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, CONTROLS_LEGEND, hashDay, gameOfDayIndex, PROXY_TILES } from '@/lib/games'
+import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, CONTROLS_LEGEND, hashDay, gameOfDayIndex, PROXY_TILES, isNearDuplicate, normalizeTitle } from '@/lib/games'
 import type { Game } from '@/lib/games'
 import { GameCard, ShelfCard } from '@/components/GameCard'
 import { LibraryToolbar } from '@/components/LibraryToolbar'
+import { CatalogGrid } from '@/components/CatalogGrid'
+import { RequestPanel } from '@/components/RequestPanel'
 const HomeDashboard = dynamic(() => import('@/components/HomeDashboard').then(m => m.HomeDashboard), { ssr: false, loading: () => null })
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { AuthDialog } from '@/components/AuthDialog'
@@ -52,6 +54,19 @@ export default function Page() {
   const [streak, setStreak] = useState(1)
   const [showDashboard, setShowDashboard] = useState(false)
 
+  // PROD: handle ?play= id from /g/[id] SEO landing (auto-open modal)
+  useEffect(()=>{
+    try{
+      const sp = new URLSearchParams(window.location.search)
+      const pid = sp.get('play')
+      if(pid){
+        const g = allGames.find(x=> x.id===pid)
+        if(g) launch(g)
+        // clean URL without reload
+        const url = new URL(window.location.href); url.searchParams.delete('play'); history.replaceState(null,'', url.toString())
+      }
+    }catch{}
+  }, [allGames])
   const featuredGames = useMemo(()=> games.filter(g=> FEATURED_IDS.includes(g.id)), [])
 
   useEffect(() => {
@@ -256,20 +271,19 @@ export default function Page() {
           if(filter === 'Favorites') return favorites.includes(g.id)
           return g.genre === filter
         })
-        if (hideLow) { fuzzy = fuzzy.filter(g=> !LOW_QUALITY_HINTS.has(g.id)); const seen2=new Set<string>(); fuzzy = fuzzy.filter(g=>{ const n=g.title.toLowerCase().replace(/[^a-z0-9]/g,''); if(seen2.has(n)) return false; seen2.add(n); return true }) }
+        if (hideLow) { fuzzy = fuzzy.filter(g=> !LOW_QUALITY_HINTS.has(g.id)); const kept2: Game[] = []; for(const g of fuzzy){ if(!kept2.some(k=> isNearDuplicate(k.title,g.title))) kept2.push(g) } fuzzy=kept2 }
         if (showStaffOnly) fuzzy = fuzzy.filter(g=> STAFF_PICKS.includes(g.id))
         if (fuzzy.length > 0) base = fuzzy
       }
       if (hideLow) {
         base = base.filter(g=> !LOW_QUALITY_HINTS.has(g.id))
-        // PROD dedupe: exact normalized title dedupe (covers duplicates like "Slope" vs "slope-ball")
-        const seen = new Set<string>()
-        base = base.filter(g=> {
-          const n = g.title.toLowerCase().replace(/[^a-z0-9]/g,'')
-          if(seen.has(n)) return false
-          seen.add(n)
-          return true
-        })
+        // PROD dedupe: exact + Levenshtein near-duplicate (honest: catches "Slope" vs "Slope Ball", "Paper.io 2" vs "Paper io 2")
+        const kept: Game[] = []
+        for(const g of base){
+          const dup = kept.some(k=> isNearDuplicate(k.title, g.title))
+          if(!dup) kept.push(g)
+        }
+        base = kept
       }
       if (showStaffOnly) base = base.filter(g=> STAFF_PICKS.includes(g.id))
       // sorting
@@ -340,10 +354,9 @@ export default function Page() {
       }).filter(Boolean) as {game:typeof allGames[number], count:number}[]
       if(rows.length>0) return rows.slice(0,5)
     }
-    // Fallback to local playCounts — show for everyone, guests see most played locally
-    const entries = allGames.map(g=> ({ game:g, count: playCounts[g.id]||0})).sort((a,b)=> b.count - a.count).slice(0,5)
-    if(entries.every(e=> e.count===0)) return featuredGames.slice(0,5).map((g,i)=> ({ game:g, count: 0}))
-    return entries
+    // PROD honest global: never fake with local playCounts
+    if(serverLeaderboard.length===0) return featuredGames.slice(0,5).map((g,i)=> ({ game:g, count: 0}))
+    return featuredGames.slice(0,5).map((g,i)=> ({ game:g, count: 0}))
   }, [allGames, playCounts, serverLeaderboard, authUser, featuredGames])
   // JSON-LD for SEO - top games as ItemList
   function highlight(text:string, q:string){
@@ -613,72 +626,7 @@ export default function Page() {
           ))}
         </div>
 
-        {/* Content */}
-        {view === 'shelves' && filter==='All games' && !query.trim() ? (
-          <div className="shelves">
-            <div className="shelf">
-              <div className="shelf-head">
-                <h3><Star size={14} fill="var(--lime)" color="var(--lime)"/> Staff Picks <span>{staffGames.length}</span></h3>
-                <div className="shelf-actions"><span style={{fontSize:11,color:'var(--muted)',fontWeight:700}}>Hand-curated • no filler</span></div>
-              </div>
-                            <div className="shelf-track" style={{contentVisibility:'auto'}}>
-                {staffGames.map((game,i)=> (
-                  <ShelfCard key={`staff-${game.id}`} game={game} index={i} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} priority={i < 2} />
-                ))}
-              </div>
-            </div>
-            {grouped.map(([genre, list])=> (
-              <div key={genre} className="shelf">
-                <div className="shelf-head">
-                  <h3>{genre} <span>{list.length}</span></h3>
-                  <div className="shelf-actions">
-                    <button className="shelf-nav" aria-label={`Scroll ${genre} left`} onClick={e=>{ const tr = (e.currentTarget.parentElement?.parentElement?.nextElementSibling as HTMLElement); if(tr) tr.scrollBy({left:-380,behavior:'smooth'})}}><ChevronLeft size={16}/></button>
-                    <button className="shelf-nav" aria-label={`Scroll ${genre} right`} onClick={e=>{ const tr = (e.currentTarget.parentElement?.parentElement?.nextElementSibling as HTMLElement); if(tr) tr.scrollBy({left:380,behavior:'smooth'})}}><ChevronRight size={16}/></button>
-                    <button className="btn-mini" onClick={()=> setFilter(genre)}>View all</button>
-                  </div>
-                </div>
-                                <div className="shelf-track" style={{contentVisibility:'auto'}}>
-                  {list.slice(0,14).map((game, index)=> (
-                    <ShelfCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} />
-                  ))}
-                </div>
-              </div>
-            ))}
-            {grouped.length===0 && <div className="empty-state"><Zap size={22}/><h3>No games found</h3><p>Try a different search or clear the filter.</p><div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center',marginTop:10}}><button onClick={()=> setQuery('')} className="btn-mini">Clear search</button><button onClick={()=> setFilter('All games')} className="btn-mini">All games</button><button onClick={shufflePick} className="btn-mini"><Shuffle size={12}/> Surprise me</button>{['stack','cookie-clicker','drive-mad','slope'].map(id=> <button key={id} onClick={()=> { const g=allGames.find(x=> x.id===id); if(g) launch(g) }} className="btn-mini">{allGames.find(x=>x.id===id)?.title||id}</button>)}</div></div>}
-          </div>
-        ) : (
-          <>
-                        {allGames.length===games.length && published.length===0 ? <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(280px,1fr))",gap:16, marginBottom:16}}>{Array.from({length:4}).map((_,i)=><div key={i} className="skeleton" style={{height:220}}/> )}</div> : null}
-                        <div className="game-grid" style={{contentVisibility:'auto',containIntrinsicSize:'0 600px'}}>
-              {paginatedGames.map((game, index) => (
-                <GameCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} priority={index < 4} />
-              ))}
-            </div>
-            {visibleGames.length === 0 && (
-              <div className="empty-state" role="status" aria-live="polite">
-                <Zap size={22} />
-                <h3>No games found for “{query || filter}”</h3>
-                <p>Try a different search or clear the filter — here are some quick picks.</p>
-                <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center',marginTop:12}}>
-                  <button onClick={()=> { setQuery(''); setFilter('All games'); setHideLow(false); setShowStaffOnly(false) }} style={{padding:'8px 14px',borderRadius:999,border:'1px solid var(--lime)',background:'var(--lime)',color:'#0b0d12',fontWeight:800,cursor:'pointer'}}>Clear all filters</button>
-                  <button onClick={shufflePick} style={{padding:'8px 14px',borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',color:'var(--foreground)',fontWeight:800,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><Shuffle size={12}/> Surprise me</button>
-                  {staffGames.slice(0,4).map(g=> <button key={g.id} onClick={()=> launch(g)} style={{padding:'8px 12px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',fontWeight:700,cursor:'pointer'}}>{g.title}</button>)}
-                </div>
-                <p style={{marginTop:10,fontSize:11,color:'var(--muted)'}}>💡 Tip: Press <kbd style={{padding:'2px 6px',border:'1px solid var(--line)',borderRadius:6,fontSize:10}}>/</kbd> to instantly search — try “stak” → finds “Stack” with typo tolerance.</p>
-              </div>
-            )}
-            {visibleGames.length > paginatedGames.length && (
-              <>
-                <div ref={loadMoreRef} style={{height:1}} aria-hidden="true" />
-                <div style={{display:'flex',justifyContent:'center',marginTop:18}}>
-                  <button onClick={()=> setVisibleCount(c=> c+36)} style={{padding:'10px 18px',borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',color:'var(--foreground)',fontWeight:800,cursor:'pointer'}}>Load more — {visibleGames.length - paginatedGames.length} remaining</button>
-                </div>
-              </>
-            )}
-            <p style={{textAlign:'center',marginTop:10,fontSize:11,color:'var(--muted)'}} aria-live="polite">Showing {paginatedGames.length} of {visibleGames.length} • {allGames.length} total</p>
-          </>
-        )}
-
+        <CatalogGrid view={view} filter={filter} query={query} visibleGames={visibleGames} paginatedGames={paginatedGames} grouped={grouped} staffGames={staffGames} allGames={allGames} favorites={favorites} toggleFavorite={toggleFavorite} launch={launch} loadMoreRef={loadMoreRef} visibleCount={visibleCount} setVisibleCount={setVisibleCount} setQuery={setQuery} setFilter={setFilter} setHideLow={setHideLow} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} />
             <HomeDashboard
         gameOfDay={gameOfDay} allGames={allGames} leaderboard={leaderboard}
         favorites={favorites} recentlyPlayed={recentlyPlayed}
@@ -690,27 +638,7 @@ export default function Page() {
       />
 
       {/* Requests + Upvotes */}
-        <div style={{marginTop:18,border:'1px solid var(--line)',borderRadius:16,background:'var(--panel)',padding:14}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
-            <p className="eyebrow" style={{margin:0,display:'flex',alignItems:'center',gap:6}}><MessageSquare size={12}/> REQUEST A GAME — upvote what you want</p>
-            <a href="/request-game" style={{fontSize:12,fontWeight:800,display:'inline-flex',alignItems:'center',gap:6,color:'var(--foreground)',textDecoration:'none'}}>Full request page <ArrowUpRight size={12}/></a>
-          </div>
-          <div style={{display:'flex',gap:8,marginTop:12,flexWrap:'wrap'}}>
-            <input value={newReqTitle} onChange={e=> setNewReqTitle(e.target.value)} placeholder="Type a game you want…" style={{flex:1,minWidth:220,padding:'10px 12px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',outline:'none'}} onKeyDown={e=> e.key==='Enter'&&submitRequest()} />
-            <button onClick={submitRequest} style={{padding:'10px 16px',borderRadius:999,background:'var(--lime)',color:'#0b0d12',border:'1px solid var(--lime)',fontWeight:900,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><Sparkles size={14}/> Request</button>
-          </div>
-          {requests.length>0 ? (
-            <div style={{display:'grid',gap:8,marginTop:14,maxHeight:260,overflowY:'auto',paddingRight:4}}>
-              {requests.slice(0,8).map(r=> (
-                <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:12,border:'1px solid var(--line)',background:'rgba(255,255,255,.03)'}}>
-                  <span style={{flex:1,minWidth:0}}><strong style={{fontSize:13}}>{r.title}</strong> <span style={{fontSize:11,color:'var(--muted)',marginLeft:6}}>{r.status}</span></span>
-                  <span style={{fontSize:12,fontWeight:800,display:'flex',alignItems:'center',gap:4}}><ThumbsUp size={12}/> {r.votes}</span>
-                  <button disabled={requestVotes.includes(r.id)} onClick={()=> upvoteRequest(r.id)} style={{padding:'6px 10px',borderRadius:999,border: requestVotes.includes(r.id)?'1px solid var(--line)':'1px solid var(--lime)',background: requestVotes.includes(r.id)?'transparent':'var(--lime)',color: requestVotes.includes(r.id)?'var(--muted)':'#0b0d12',fontWeight:900,fontSize:11,cursor: requestVotes.includes(r.id)?'default':'pointer'}}>{requestVotes.includes(r.id)?'Voted':'Upvote'}</button>
-                </div>
-              ))}
-            </div>
-          ) : <p style={{marginTop:12,color:'var(--muted)',fontSize:13}}>No requests yet — be the first to ask for a game.</p>}
-        </div>
+                <RequestPanel requests={requests} requestVotes={requestVotes} newReqTitle={newReqTitle} setNewReqTitle={setNewReqTitle} submitRequest={submitRequest} upvoteRequest={upvoteRequest} />
       </section>
       <footer id="about">
         <div className="footer-top">

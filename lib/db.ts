@@ -205,6 +205,13 @@ export function migrate(): Promise<void> {
           "banned_until" TIMESTAMPTZ,
           "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
+        CREATE TABLE IF NOT EXISTS "upvote_cooldown" (
+          "ip" TEXT NOT NULL,
+          "request_id" TEXT NOT NULL,
+          "last_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY ("ip", "request_id")
+        );
+        CREATE INDEX IF NOT EXISTS "upvote_cooldown_last_idx" ON "upvote_cooldown" ("last_at");
       `);
       // Tolerate tables created by older schemas.
       await p.query(`ALTER TABLE "banned_user" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMPTZ`);
@@ -533,6 +540,37 @@ export async function recordGateFailure(ip: string): Promise<{ banned: boolean; 
   return { banned: true, expiresAt: bannedUntilStr, banLevel: newBanLevel - 1 };
 }
 
+export async function checkUpvoteCooldown(ip: string, requestId: string, cooldownMs=30000): Promise<{allowed:boolean, retryAfter:number}>{
+  const normIp = ip.slice(0,80)
+  if(getMode()==="postgres"){
+    await migrate()
+    const rows = await pgQuery<any>('SELECT last_at FROM upvote_cooldown WHERE ip=$1 AND request_id=$2', [normIp, requestId])
+    if(rows[0]){
+      const last = new Date(rows[0].last_at as string).getTime()
+      const diff = Date.now() - last
+      if(diff < cooldownMs) return {allowed:false, retryAfter: Math.ceil((cooldownMs - diff)/1000)}
+      await pgQuery('UPDATE upvote_cooldown SET last_at=NOW() WHERE ip=$1 AND request_id=$2', [normIp, requestId])
+      return {allowed:true, retryAfter:0}
+    }
+    await pgQuery('INSERT INTO upvote_cooldown (ip, request_id) VALUES ($1,$2) ON CONFLICT (ip, request_id) DO UPDATE SET last_at=NOW()', [normIp, requestId])
+    return {allowed:true, retryAfter:0}
+  }
+  // local fallback: file-backed via withLocalLock
+  let allowed = true
+  let retry = 0
+  await withLocalLock(async (s:any)=>{
+    s.upvoteCooldown = s.upvoteCooldown || {}
+    const key = normIp + ':' + requestId
+    const last = s.upvoteCooldown[key] ? new Date(s.upvoteCooldown[key]).getTime() : 0
+    const diff = Date.now() - last
+    if(diff < cooldownMs){ allowed=false; retry=Math.ceil((cooldownMs-diff)/1000); return }
+    s.upvoteCooldown[key]= new Date().toISOString()
+    // prune old entries >1h (keep 2000 max)
+    const keys = Object.keys(s.upvoteCooldown)
+    if(keys.length>2000){ for(const k of keys){ if(Date.now()- new Date(s.upvoteCooldown[k]).getTime() > 3600000) delete s.upvoteCooldown[k] } }
+  })
+  return {allowed, retryAfter: retry}
+}
 export async function recordGateSuccess(ip: string): Promise<void> {
   const norm = ip.slice(0, 80);
   const st = await getGateState(norm);

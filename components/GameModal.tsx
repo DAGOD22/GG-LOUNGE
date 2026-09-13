@@ -293,7 +293,23 @@ export function GameModal({
     return ()=> clearInterval(tick)
   }, [game, authUser])
 
+  // PROD: honest X-Frame check via HEAD fetch (local files have no header, external would)
+  const [xFrameBlocked, setXFrameBlocked] = useState(false)
+  useEffect(()=>{
+    setXFrameBlocked(false)
+    let alive=true
+    // For local /games/* files, header check is cheap HEAD; for external, this detects X-Frame-Options
+    fetch(game.path, { method:'HEAD' }).then(r=>{
+      if(!alive) return
+      const xfo = r.headers.get('x-frame-options') || r.headers.get('X-Frame-Options')
+      const csp = r.headers.get('content-security-policy') || ''
+      if(xfo && /DENY|SAMEORIGIN/i.test(xfo)) setXFrameBlocked(true)
+      else if(/frame-ancestors\s+[^;]*'none'/i.test(csp)) setXFrameBlocked(true)
+    }).catch(()=>{})
+    return ()=>{ alive=false }
+  }, [game.path])
   const handleFrameLoad = useCallback(() => {
+    if(xFrameBlocked){ setFrameLoading(false); setFrameError('This game blocks embedding (X-Frame-Options). Open in a new tab — it will work there.'); return }
     setFrameLoading(false)
     setFrameError(null)
     const iframe = frameRef.current
