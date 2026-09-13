@@ -59,7 +59,7 @@ export function HomeDashboard({
                     <button key={e.game.id} onClick={()=> launch(e.game)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 10px',borderRadius:12,border:'1px solid var(--line)',background:'rgba(255,255,255,.03)',cursor:'pointer',textAlign:'left'}}>
                       <span style={{width:28,height:28,borderRadius:999,background: i===0?'var(--lime)': i===1?'#cbd5e1': i===2?'#fdba74':'rgba(255,255,255,.08)',color: i<3?'#0b0d12':'var(--foreground)',display:'grid',placeItems:'center',fontWeight:900,fontSize:12}}>{i+1}</span>
                       {e.game.icon ? <img src={e.game.icon} alt="" style={{width:36,height:36,borderRadius:10,objectFit:'cover', flexShrink:0, border:'1px solid rgba(255,255,255,.12)'}} onError={(ev:any)=> (ev.currentTarget.style.display='none')} /> : <span style={{width:36,height:36,borderRadius:10,background:'var(--line)',display:'grid',placeItems:'center',fontWeight:900,fontSize:12,flexShrink:0}}>{e.game.mark}</span>}
-                      <span style={{flex:1,minWidth:0}}><strong style={{display:'block',fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{e.game.title}</strong><span style={{fontSize:11,color:'var(--muted)'}}>{e.game.genre} · {e.count} plays</span></span>
+                      <span style={{flex:1,minWidth:0}}><strong style={{display:'block',fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{e.game.title}</strong><span style={{fontSize:11,color:'var(--muted)'}}>{e.game.genre} · {e.count===0 ? '— be first!' : e.count + ' plays'}</span></span>
                       <Play size={14} fill="currentColor"/>
                     </button>
                   ))}

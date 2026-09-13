@@ -253,26 +253,26 @@ export default function Page() {
   const visibleGames = useMemo(
     () => {
       const q = query.trim().toLowerCase()
-      let base = allGames.filter((game) => {
-        if(q){
-          const hay = searchIndex.get(game.id) || `${game.title} ${game.genre} ${game.tone} ${game.description}`.toLowerCase()
-          if(!hay.includes(q)) return false
-        }
-        if(filter === 'All games') return true
-        if(filter === 'Favorites') return favorites.includes(game.id)
-        return game.genre === filter
-      })
-      // typo-tolerant fallback: if exact gave 0, try Fuse (handles stak -> stack)
-      if (q && base.length === 0) {
-        const results = fuse.search(query.trim(), { limit: 24 })
-        let fuzzy = results.map(r => r.item).filter(g => {
+      let base: Game[] = []
+      if(q){
+        // PROD honest: always use Fuse ranking (typo tolerant), not just fallback — users feel search is smart
+        const results = fuse.search(query.trim(), { limit: 80 })
+        const ranked = results.map(r=> r.item)
+        // also include exact substring matches that Fuse might miss (boost them to top)
+        const exact = allGames.filter(g=> (searchIndex.get(g.id)||'').includes(q))
+        const seen = new Set(ranked.map(g=> g.id))
+        base = [...exact.filter(g=> !seen.has(g.id)), ...ranked]
+        base = base.filter(g=>{
           if(filter === 'All games') return true
           if(filter === 'Favorites') return favorites.includes(g.id)
           return g.genre === filter
         })
-        if (hideLow) { fuzzy = fuzzy.filter(g=> !LOW_QUALITY_HINTS.has(g.id)); const kept2: Game[] = []; for(const g of fuzzy){ if(!kept2.some(k=> isNearDuplicate(k.title,g.title))) kept2.push(g) } fuzzy=kept2 }
-        if (showStaffOnly) fuzzy = fuzzy.filter(g=> STAFF_PICKS.includes(g.id))
-        if (fuzzy.length > 0) base = fuzzy
+      } else {
+        base = allGames.filter((game) => {
+          if(filter === 'All games') return true
+          if(filter === 'Favorites') return favorites.includes(game.id)
+          return game.genre === filter
+        })
       }
       if (hideLow) {
         base = base.filter(g=> !LOW_QUALITY_HINTS.has(g.id))
@@ -414,11 +414,15 @@ export default function Page() {
     if(pick) launch(pick)
   }
   function toggleTheme(){ setTheme(t=> t==='dark'?'light':'dark') }
+  const [installHint, setInstallHint] = useState<string|null>(null)
   async function doInstall(){
     const dp:any = installPrompt || (window as any).__gglDeferredPrompt
     if(dp && dp.prompt){ try{ dp.prompt(); const r= await dp.userChoice; if(r) { setInstallable(false); setInstallPrompt(null); (window as any).__gglDeferredPrompt=null } }catch{} return }
-    // fallback: hint
-    alert('To install: open browser menu → Install app / Add to Home Screen')
+    // honest iOS: show inline hint, not alert
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    if(isIOS) setInstallHint('On iPhone: tap Share → Add to Home Screen')
+    else setInstallHint('In browser menu: Install app / Add to Home Screen')
+    setTimeout(()=> setInstallHint(null), 4000)
   }
     async function submitRequest(){
     const title = newReqTitle.trim()
@@ -537,6 +541,7 @@ export default function Page() {
         <span style={{display:'flex',alignItems:'center',gap:10,fontWeight:800,fontSize:13}}><span style={{width:32,height:32,borderRadius:999,background:'var(--lime)',display:'grid',placeItems:'center',color:'#0b0d12'}}><Download size={16}/></span> Install GG Lounge — play offline & launch like an app</span>
         <span style={{display:'flex',gap:8}}><button onClick={doInstall} style={{padding:'8px 14px',borderRadius:999,background:'#0b0d12',color:'#fff',border:'1px solid rgba(255,255,255,.15)',fontWeight:800,cursor:'pointer'}}>Install</button><button onClick={()=> setInstallable(false)} style={{padding:'8px 10px',borderRadius:999,background:'transparent',border:'1px solid var(--line)',color:'var(--foreground)',cursor:'pointer'}}>Dismiss</button></span>
       </div>}
+      {installHint && <div role="status" style={{margin:'10px 18px 0', padding:'10px 14px', borderRadius:12, background:'rgba(255,255,255,.06)', border:'1px solid var(--line)', fontSize:13, textAlign:'center'}}>{installHint}</div>}
       <section className="hero" id="top" style={{position:"relative", overflow:"hidden", background:"radial-gradient(600px 400px at 15% 10%, rgba(125,107,255,.14), transparent 60%), radial-gradient(700px 500px at 85% 15%, rgba(215,243,74,.12), transparent 60%), radial-gradient(500px 400px at 50% 90%, rgba(255,108,131,.08), transparent 60%), var(--background)"}}>
         <div className="hero-copy">
           <p className="eyebrow">
@@ -617,7 +622,13 @@ export default function Page() {
           </div>
         </div>
                 <LibraryToolbar query={query} setQuery={setQuery} allGames={allGames} sortBy={sortBy} setSortBy={setSortBy} view={view} setView={setView} hideLow={hideLow} setHideLow={setHideLow} showStaffOnly={showStaffOnly} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} />
-<div className="filter-tabs" role="tablist" aria-label="Filter games">
+        {favorites.length>0 && filter!=='Favorites' && (
+          <div style={{marginBottom:12, padding:'10px 14px', borderRadius:12, background:'linear-gradient(135deg, rgba(215,243,74,.14), rgba(125,107,255,.08))', border:'1px solid rgba(215,243,74,.28)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
+            <span style={{fontSize:13, fontWeight:800, display:'flex', alignItems:'center', gap:8}}><Heart size={14} fill="var(--coral)" color="var(--coral)"/> You have {favorites.length} favorite{favorites.length>1?'s':''}</span>
+            <button onClick={()=> setFilter('Favorites')} style={{padding:'7px 12px', borderRadius:999, background:'var(--lime)', color:'#0b0d12', border:0, fontWeight:900, fontSize:12, cursor:'pointer'}}>View favorites →</button>
+          </div>
+        )}
+        <div className="filter-tabs" role="tablist" aria-label="Filter games">
           {filters.filter(f=> f==='All games' || f==='Favorites' || (filterCounts[f]??0)>0).map((item) => (
             <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)} role="tab" aria-selected={filter === item}>
               {item} <span style={{opacity:.7,fontWeight:700,marginLeft:4,fontSize:11}}>({filterCounts[item]??0})</span>
