@@ -54,19 +54,6 @@ export default function Page() {
   const [streak, setStreak] = useState(1)
   const [showDashboard, setShowDashboard] = useState(false)
 
-  // PROD: handle ?play= id from /g/[id] SEO landing (auto-open modal)
-  useEffect(()=>{
-    try{
-      const sp = new URLSearchParams(window.location.search)
-      const pid = sp.get('play')
-      if(pid){
-        const g = allGames.find(x=> x.id===pid)
-        if(g) launch(g)
-        // clean URL without reload
-        const url = new URL(window.location.href); url.searchParams.delete('play'); history.replaceState(null,'', url.toString())
-      }
-    }catch{}
-  }, [allGames])
   const featuredGames = useMemo(()=> games.filter(g=> FEATURED_IDS.includes(g.id)), [])
 
   useEffect(() => {
@@ -248,6 +235,18 @@ export default function Page() {
   },[])
 
   const allGames = useMemo(() => [...games, ...published], [published])
+  // PROD: handle ?play= id from /g/[id] SEO landing (auto-open modal)
+  useEffect(()=>{
+    try{
+      const sp = new URLSearchParams(window.location.search)
+      const pid = sp.get('play')
+      if(pid){
+        const g = allGames.find(x=> x.id===pid)
+        if(g) launch(g)
+        const url = new URL(window.location.href); url.searchParams.delete('play'); history.replaceState(null,'', url.toString())
+      }
+    }catch{}
+  }, [allGames])
   // Fix 1: precomputed search index to avoid re-concatting strings on every keystroke
   const searchIndex = useMemo(() => new Map(allGames.map((g) => [g.id, `${g.title} ${g.genre} ${g.tone} ${g.description}`.toLowerCase()] as const)), [allGames])
   const fuse = useMemo(() => new Fuse(allGames, { keys: [{ name: 'title', weight: 0.5 }, { name: 'genre', weight: 0.2 }, { name: 'tone', weight: 0.15 }, { name: 'description', weight: 0.15 }], threshold: 0.3, distance: 100, ignoreLocation: true, minMatchCharLength: 2, includeScore: true }), [allGames])
