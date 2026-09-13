@@ -463,7 +463,7 @@ export const filters = ['All games', 'Idle', 'Arcade', 'Puzzle', 'Racing', 'Plat
 export const pubColors = ['cookie', 'drive', 'mining', 'devil', 'stack', 'hextris', 'twenty', 'youtube', 'neon', 'frost', 'sunset', 'forest', 'midnight', 'coral', 'plasma', 'aqua']
 export const FEATURED_IDS = ['cookie-clicker','stack','drive-mad','moto-x3m','among-us','retro-bowl','hole-io']
 export const STAFF_PICKS = ['cookie-clicker','retro-bowl','among-us','stack','hole-io','moto-x3m','drive-mad']
-export const LOW_QUALITY_HINTS = new Set(['spiral-roll','shape-transform','mr-dude','obby-snowboard','spiders','summer','real-pool-3d','gta-mods','cheese-chompers-3d','flashtetris','bad-ice-cream-2','slope-ball'])
+export const LOW_QUALITY_HINTS = new Set(['spiral-roll','shape-transform','mr-dude','obby-snowboard','spiders','summer','real-pool-3d','gta-mods','cheese-chompers-3d','flashtetris','bad-ice-cream-2','slope-ball','bad-simulator','volley-random','soccer-random','basket-bros','build-defend','red-vs-blue','gunspin','steep-descent','crazy-crash-landing','cyber-cars','extreme-racing','monster-truck'])
 export const CONTROLS_LEGEND: Record<string,string> = {
   Arcade: 'Arrows / WASD to move • Space to jump/action • R to restart',
   Platformer: 'Arrows / WASD • Space to jump • Shift to run • R to restart',

@@ -41,7 +41,7 @@ export default function Page() {
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [sortBy, setSortBy] = useState<'featured'|'popular'|'newest'|'az'>('featured')
   const [visibleCount, setVisibleCount] = useState(36)
-  const [hideLow, setHideLow] = useState(false)
+  const [hideLow, setHideLow] = useState(true)
   const [showStaffOnly, setShowStaffOnly] = useState(false)
   const [showAchievementsHub, setShowAchievementsHub] = useState(false)
   const [achSummary, setAchSummary] = useState<{total:number, unlocked:number, points:number} | null>(null)
@@ -219,7 +219,7 @@ export default function Page() {
 
     // instant search — debounce removed for immediate feedback, keep tiny 80ms to avoid jank but visible is instant
   useEffect(()=>{
-    const id=setTimeout(()=> setDebouncedQuery(query), 80)
+    const id=setTimeout(()=> setDebouncedQuery(query), 120)
     return ()=> clearTimeout(id)
   },[query])
   useEffect(()=>{ setVisibleCount(36) },[query, filter, sortBy, hideLow, showStaffOnly])
@@ -233,7 +233,7 @@ export default function Page() {
   const allGames = useMemo(() => [...games, ...published], [published])
   // Fix 1: precomputed search index to avoid re-concatting strings on every keystroke
   const searchIndex = useMemo(() => new Map(allGames.map((g) => [g.id, `${g.title} ${g.genre} ${g.tone} ${g.description}`.toLowerCase()] as const)), [allGames])
-  const fuse = useMemo(() => new Fuse(allGames, { keys: [{ name: 'title', weight: 0.5 }, { name: 'genre', weight: 0.2 }, { name: 'tone', weight: 0.15 }, { name: 'description', weight: 0.15 }], threshold: 0.35, distance: 80, ignoreLocation: true, minMatchCharLength: 2 }), [allGames])
+  const fuse = useMemo(() => new Fuse(allGames, { keys: [{ name: 'title', weight: 0.5 }, { name: 'genre', weight: 0.2 }, { name: 'tone', weight: 0.15 }, { name: 'description', weight: 0.15 }], threshold: 0.3, distance: 100, ignoreLocation: true, minMatchCharLength: 2, includeScore: true }), [allGames])
   const visibleGames = useMemo(
     () => {
       const q = query.trim().toLowerCase()
@@ -354,12 +354,19 @@ export default function Page() {
     '@context':'https://schema.org',
     '@type':'ItemList',
     name:'GG-Lounge Games',
-    itemListElement: allGames.slice(0,20).map((g,i)=> ({
+    numberOfItems: allGames.length,
+    itemListElement: allGames.slice(0,24).map((g,i)=> ({
       '@type':'ListItem',
       position:i+1,
-      name:g.title,
-      description:g.description,
-      url: typeof window!=='undefined' ? window.location.origin + '/#'+g.id : '/#'+g.id,
+      item: {
+        '@type':'VideoGame',
+        name:g.title,
+        description:g.description,
+        url: (typeof window!=='undefined' ? window.location.origin : 'https://gg-lounge.vercel.app') + g.path,
+        image: (typeof window!=='undefined' ? window.location.origin : 'https://gg-lounge.vercel.app') + (g.icon || ''),
+        genre: g.genre,
+        applicationCategory: 'Game',
+      }
     }))
   }), [allGames])
 
@@ -398,6 +405,13 @@ export default function Page() {
   }
   async function upvoteRequest(id:string){
     if(requestVotes.includes(id)) return
+    // 30s per-upvote cooldown to blunt spam even if localStorage cleared (#19)
+    try{
+      const key='ggl_upvote_'+id
+      const last=parseInt(localStorage.getItem(key)||'0',10)
+      if(Date.now()-last < 30000) return
+      localStorage.setItem(key, String(Date.now()))
+    }catch{}
     setRequestVotes(v=> [...v, id])
     setRequests(rs=> rs.map(r=> r.id===id? {...r, votes:r.votes+1}: r))
     try{ await fetch('/api/game-requests/'+id+'/upvote', { method:'POST' }).catch(()=> fetch('/api/game-requests', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ upvoteId:id })})) }catch{}
@@ -488,7 +502,7 @@ export default function Page() {
           onSwitch={setShowAuth}
         />
       )}
-      {!online && <div role="status" aria-live="polite" style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(255,92,92,.12)',border:'1px solid rgba(255,92,92,.3)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:13}}><WifiOff size={16}/> You’re offline — your games still work, browsing will resume when you’re back online.</div>}
+      {!online && <div role="status" aria-live="polite" style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(255,92,92,.12)',border:'1px solid rgba(255,92,92,.3)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:13}}><WifiOff size={16}/> You’re offline — browsing is limited. A few cached games may still work, but most need internet.</div>}
       {dbMode==='local' && !authUser && <div role="note" style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(255,190,70,.14)',border:'1px solid rgba(255,190,70,.3)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:12}}><AlertCircle size={14}/> Guest mode: progress saves locally. <button onClick={()=> setShowAuth('register')} style={{marginLeft:4, textDecoration:'underline', background:'none', border:0, color:'var(--foreground)', fontWeight:800, cursor:'pointer'}}>Sign in to keep it forever</button> — survives deploys.</div>}
       {installable && <div style={{margin:'12px 18px 0',padding:'12px 14px',borderRadius:14,background:'linear-gradient(135deg, rgba(204,255,0,.18), rgba(0,242,234,.14))',border:'1px solid rgba(204,255,0,.35)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
         <span style={{display:'flex',alignItems:'center',gap:10,fontWeight:800,fontSize:13}}><span style={{width:32,height:32,borderRadius:999,background:'var(--lime)',display:'grid',placeItems:'center',color:'#0b0d12'}}><Download size={16}/></span> Install GG Lounge — play offline & launch like an app</span>
@@ -599,7 +613,7 @@ export default function Page() {
           </div>
         </div>
         <div className="filter-tabs" role="tablist" aria-label="Filter games">
-          {filters.map((item) => (
+          {filters.filter(f=> f==='All games' || f==='Favorites' || (filterCounts[f]??0)>0).map((item) => (
             <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)} role="tab" aria-selected={filter === item}>
               {item} <span style={{opacity:.7,fontWeight:700,marginLeft:4,fontSize:11}}>({filterCounts[item]??0})</span>
             </button>

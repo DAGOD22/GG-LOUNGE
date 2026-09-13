@@ -12,11 +12,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/apps`, lastModified: now, changeFrequency: 'weekly', priority: 0.6 },
     { url: `${base}/games/youtube`, lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
   ]
-  const gameUrls: MetadataRoute.Sitemap = games.slice(0, 100).map(g => ({
+  const gameUrls: MetadataRoute.Sitemap = games.map(g => ({
     url: `${base}${g.path}`,
     lastModified: now,
     changeFrequency: 'weekly' as const,
-    priority: 0.7,
+    priority: g.featured ? 0.9 : 0.7,
   }))
   return [...staticPages, ...gameUrls]
 }
