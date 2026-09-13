@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { Heart, Play, Keyboard } from 'lucide-react'
 import type { Game } from '@/lib/games'
-import { CONTROLS_LEGEND } from '@/lib/games'
+import { CONTROLS_LEGEND, getGameRating, getRatingColor } from '@/lib/games'
 
 function Highlight({ text, query }: { text:string; query:string }){
   if(!query) return <>{text}</>
@@ -35,9 +35,12 @@ export function GameCard({
   const [imgError, setImgError] = useState(false)
   const showIcon = !!imgSrc && !imgError
   const controls = (CONTROLS_LEGEND as any)[game.genre] || CONTROLS_LEGEND.default
+  const rating = getGameRating(game.id)
+  const ratingColor = getRatingColor(rating)
 
   return (
     <article className={`game-card ${game.color}`} style={{ contentVisibility: 'auto' as any }}>
+      <span aria-label={`Rating ${rating}`} title={rating==='M'?'Mature 17+ — horror/violence': rating==='T'?'Teen 13+': 'Everyone'} style={{position:'absolute', top:10, left:10, zIndex:3, fontSize:9, fontWeight:900, letterSpacing:'.06em', padding:'3px 6px', borderRadius:999, background: ratingColor, color: rating==='M'?'#fff':'#0b0d12', border:'1px solid rgba(0,0,0,.12)', lineHeight:1}}>{rating}</span>
       <button
         className="favorite-button"
         onClick={() => onToggle(game.id)}
@@ -125,8 +128,11 @@ export function ShelfCard({
   const [imgError, setImgError] = useState(false)
   const showIcon = !!imgSrc && !imgError
   const controls = (CONTROLS_LEGEND as any)[game.genre] || CONTROLS_LEGEND.default
+  const rating2 = getGameRating(game.id)
+  const ratingColor2 = getRatingColor(rating2)
   return (
     <article className={`shelf-card-art ${game.color}`} style={{ contentVisibility: 'auto' as any }}>
+      <span aria-label={`Rating ${rating2}`} title={rating2==='M'?'Mature 17+': rating2==='T'?'Teen 13+':'Everyone'} style={{position:'absolute', top:8, left:8, zIndex:3, fontSize:8, fontWeight:900, letterSpacing:'.06em', padding:'2px 5px', borderRadius:999, background: ratingColor2, color: rating2==='M'?'#fff':'#0b0d12', border:'1px solid rgba(0,0,0,.12)', lineHeight:1}}>{rating2}</span>
       <button className="favorite-button" onClick={() => onToggle(game.id)} aria-label={`${isFavorite ? 'Remove' : 'Add'} ${game.title}`}>
         <Heart size={15} fill={isFavorite ? 'currentColor' : 'none'} />
       </button>

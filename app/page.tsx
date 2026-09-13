@@ -48,6 +48,7 @@ export default function Page() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [dbMode, setDbMode] = useState<'postgres'|'local'|null>(null)
   const [streak, setStreak] = useState(1)
+  const [showDashboard, setShowDashboard] = useState(false)
 
   const featuredGames = useMemo(()=> games.filter(g=> FEATURED_IDS.includes(g.id)), [])
 
@@ -561,6 +562,121 @@ export default function Page() {
         </div>
       </section>
 
+      <section className="catalog" id="games">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">THE ARCADE FLOOR</p>
+            <h2>Pick your poison<span>.</span></h2>
+          </div>
+          <div className="collection-note">
+            <Trophy size={16} />
+            <span><strong>{visibleGames.length.toString().padStart(2, '0')}</strong> available now</span>
+          </div>
+        </div>
+        <div className="toolbar">
+          <div className="search-wrap" style={{position:'relative'}}>
+            <Search size={17} />
+            <input id="main-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${allGames.length} titles, genres, moods`} aria-label="Search games" style={{flex:1}} />
+            {query && <button onClick={()=> setQuery('')} aria-label="Clear search" style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',width:22,height:22,borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',display:'grid',placeItems:'center',cursor:'pointer',color:'var(--muted)'}}><X size={12}/></button>}
+          </div>
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <div style={{display:'flex',gap:6,alignItems:'center',padding:'4px 6px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.04)'}}>
+              <ListFilter size={12}/><span style={{fontSize:11,fontWeight:800}}>Sort</span>
+              <select value={sortBy} onChange={e=> setSortBy(e.target.value as any)} aria-label="Sort games" style={{background:'transparent',color:'var(--foreground)',border:0,fontSize:12,fontWeight:700,outline:'none'}}>
+                <option value="featured">Featured</option>
+                <option value="popular">Most played</option>
+                <option value="newest">Newest</option>
+                <option value="az">A-Z</option>
+              </select>
+            </div>
+            <div className="view-toggle" role="group" aria-label="View toggle">
+              <button className={view==='shelves'?'active':''} onClick={()=> setView('shelves')} aria-label="Shelves view"><Rows3 size={16}/> Shelves</button>
+              <button className={view==='grid'?'active':''} onClick={()=> setView('grid')} aria-label="Grid view"><LayoutGrid size={16}/> Grid</button>
+            </div>
+            <button onClick={shufflePick} className="btn-mini" title="Random game"><Shuffle size={14}/> Shuffle</button>
+            <button onClick={()=> setHideLow(v=>!v)} aria-pressed={hideLow} title="Hide low quality duplicates" style={{padding:'6px 10px',borderRadius:999,border: hideLow?'1px solid var(--lime)':'1px solid var(--line)',background: hideLow?'var(--lime)':'rgba(255,255,255,.06)',color: hideLow?'#0b0d12':'var(--foreground)',fontWeight:800,fontSize:11,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><Filter size={12}/>{hideLow?'Filtered':'Filter duplicates'}</button>
+            <button onClick={()=> setShowStaffOnly(v=>!v)} aria-pressed={showStaffOnly} title="Staff picks only" style={{padding:'6px 10px',borderRadius:999,border: showStaffOnly?'1px solid var(--lime)':'1px solid var(--line)',background: showStaffOnly?'var(--lime)':'rgba(255,255,255,.06)',color: showStaffOnly?'#0b0d12':'var(--foreground)',fontWeight:800,fontSize:11,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><Star size={12} fill={showStaffOnly?'currentColor':'none'}/>{showStaffOnly?'Staff only':'All'}</button>
+          </div>
+        </div>
+        <div className="filter-tabs" role="tablist" aria-label="Filter games">
+          {filters.map((item) => (
+            <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)} role="tab" aria-selected={filter === item}>
+              {item} <span style={{opacity:.7,fontWeight:700,marginLeft:4,fontSize:11}}>({filterCounts[item]??0})</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        {view === 'shelves' && filter==='All games' && !query.trim() ? (
+          <div className="shelves">
+            <div className="shelf">
+              <div className="shelf-head">
+                <h3><Star size={14} fill="var(--lime)" color="var(--lime)"/> Staff Picks <span>{staffGames.length}</span></h3>
+                <div className="shelf-actions"><span style={{fontSize:11,color:'var(--muted)',fontWeight:700}}>Hand-curated • no filler</span></div>
+              </div>
+                            <div className="shelf-track" style={{contentVisibility:'auto'}}>
+                {staffGames.map((game,i)=> (
+                  <ShelfCard key={`staff-${game.id}`} game={game} index={i} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} priority={i < 2} />
+                ))}
+              </div>
+            </div>
+            {grouped.map(([genre, list])=> (
+              <div key={genre} className="shelf">
+                <div className="shelf-head">
+                  <h3>{genre} <span>{list.length}</span></h3>
+                  <div className="shelf-actions">
+                    <button className="shelf-nav" aria-label={`Scroll ${genre} left`} onClick={e=>{ const tr = (e.currentTarget.parentElement?.parentElement?.nextElementSibling as HTMLElement); if(tr) tr.scrollBy({left:-380,behavior:'smooth'})}}><ChevronLeft size={16}/></button>
+                    <button className="shelf-nav" aria-label={`Scroll ${genre} right`} onClick={e=>{ const tr = (e.currentTarget.parentElement?.parentElement?.nextElementSibling as HTMLElement); if(tr) tr.scrollBy({left:380,behavior:'smooth'})}}><ChevronRight size={16}/></button>
+                    <button className="btn-mini" onClick={()=> setFilter(genre)}>View all</button>
+                  </div>
+                </div>
+                                <div className="shelf-track" style={{contentVisibility:'auto'}}>
+                  {list.slice(0,14).map((game, index)=> (
+                    <ShelfCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} />
+                  ))}
+                </div>
+              </div>
+            ))}
+            {grouped.length===0 && <div className="empty-state"><Zap size={22}/><h3>No games found</h3><p>Try a different search or clear the filter.</p><div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center',marginTop:10}}><button onClick={()=> setQuery('')} className="btn-mini">Clear search</button><button onClick={()=> setFilter('All games')} className="btn-mini">All games</button><button onClick={shufflePick} className="btn-mini"><Shuffle size={12}/> Surprise me</button>{['stack','cookie-clicker','drive-mad','slope'].map(id=> <button key={id} onClick={()=> { const g=allGames.find(x=> x.id===id); if(g) launch(g) }} className="btn-mini">{allGames.find(x=>x.id===id)?.title||id}</button>)}</div></div>}
+          </div>
+        ) : (
+          <>
+                        {allGames.length===games.length && published.length===0 ? <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(280px,1fr))",gap:16, marginBottom:16}}>{Array.from({length:4}).map((_,i)=><div key={i} className="skeleton" style={{height:220}}/> )}</div> : null}
+                        <div className="game-grid" style={{contentVisibility:'auto',containIntrinsicSize:'0 600px'}}>
+              {paginatedGames.map((game, index) => (
+                <GameCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} priority={index < 4} />
+              ))}
+            </div>
+            {visibleGames.length === 0 && (
+              <div className="empty-state" role="status" aria-live="polite">
+                <Zap size={22} />
+                <h3>No games found for “{query || filter}”</h3>
+                <p>Try a different search or clear the filter — here are some quick picks.</p>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center',marginTop:12}}>
+                  <button onClick={()=> { setQuery(''); setFilter('All games'); setHideLow(false); setShowStaffOnly(false) }} style={{padding:'8px 14px',borderRadius:999,border:'1px solid var(--lime)',background:'var(--lime)',color:'#0b0d12',fontWeight:800,cursor:'pointer'}}>Clear all filters</button>
+                  <button onClick={shufflePick} style={{padding:'8px 14px',borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',color:'var(--foreground)',fontWeight:800,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><Shuffle size={12}/> Surprise me</button>
+                  {staffGames.slice(0,4).map(g=> <button key={g.id} onClick={()=> launch(g)} style={{padding:'8px 12px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',fontWeight:700,cursor:'pointer'}}>{g.title}</button>)}
+                </div>
+                <p style={{marginTop:10,fontSize:11,color:'var(--muted)'}}>💡 Tip: Press <kbd style={{padding:'2px 6px',border:'1px solid var(--line)',borderRadius:6,fontSize:10}}>/</kbd> to instantly search — try “stak” → finds “Stack” with typo tolerance.</p>
+              </div>
+            )}
+            {visibleGames.length > paginatedGames.length && (
+              <div style={{display:'flex',justifyContent:'center',marginTop:18}}>
+                <button onClick={()=> setVisibleCount(c=> c+36)} style={{padding:'10px 18px',borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',color:'var(--foreground)',fontWeight:800,cursor:'pointer'}}>Load more — {visibleGames.length - paginatedGames.length} remaining</button>
+              </div>
+            )}
+            <p style={{textAlign:'center',marginTop:10,fontSize:11,color:'var(--muted)'}} aria-live="polite">Showing {paginatedGames.length} of {visibleGames.length} • {allGames.length} total</p>
+          </>
+        )}
+
+      {/* Dashboard — collapsed by default to fix homepage wall (Fix #4) */}
+      <section className="catalog" style={{paddingTop:12, paddingBottom:8}}>
+        <button onClick={()=> setShowDashboard(v=>!v)} style={{width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', borderRadius:14, border:'1px solid var(--line)', background: showDashboard ? 'rgba(215,243,74,.10)' : 'var(--panel)', cursor:'pointer'}}>
+          <span style={{display:'flex', alignItems:'center', gap:10, fontWeight:900, fontSize:13}}><Sparkles size={14} color="var(--lime)"/> Lounge dashboard <span style={{fontSize:11, fontWeight:700, color:'var(--muted)'}}>Game of Day • Leaderboard • Your Lounge • Achievements</span></span>
+          <span style={{display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:800, color: showDashboard ? '#0b0d12' : 'var(--foreground)', background: showDashboard ? 'var(--lime)' : 'rgba(255,255,255,.08)', padding:'6px 12px', borderRadius:999}}>{showDashboard ? 'Hide' : 'Show'} <ChevronRight size={12} style={{transform: showDashboard ? 'rotate(90deg)' : 'rotate(0deg)', transition:'transform .2s'}}/></span>
+        </button>
+        {showDashboard && (
+          <div style={{display:'grid', gap:14, marginTop:14}}>
       {/* Game of the Day + Proxy Quick Bar */}
       <section className="catalog" style={{paddingTop:14,paddingBottom:6}}>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))',gap:14}}>
@@ -681,130 +797,11 @@ export default function Page() {
         </div>
       </section>
 
-      {/* Recently played */}
-      {recentlyPlayed.length>0 && (
-        <section className="catalog" style={{paddingTop:8,paddingBottom:10}}>
-          <div className="section-heading" style={{marginBottom:14}}>
-            <div><p className="eyebrow">CONTINUE PLAYING</p><h3 style={{margin:'6px 0 0',fontSize:20,letterSpacing:'-0.04em'}}>Pick up where you left off</h3></div>
-            <button onClick={()=> setRecentlyPlayed([])} style={{fontSize:12,color:'rgba(255,255,255,.5)',background:'none',border:0,cursor:'pointer',textDecoration:'underline'}}>Clear</button>
+      
           </div>
-          <div className="shelf-track">
-            {allGames.filter(g=> recentlyPlayed.includes(g.id)).slice(0,12).map(g=> (
-              <button key={g.id} className={`shelf-card ${g.color}`} onClick={()=> launch(g)}>
-                <span className="shelf-mark">{g.mark}</span>
-                <span className="shelf-title">{g.title}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="catalog" id="games">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">THE ARCADE FLOOR</p>
-            <h2>Pick your poison<span>.</span></h2>
-          </div>
-          <div className="collection-note">
-            <Trophy size={16} />
-            <span><strong>{visibleGames.length.toString().padStart(2, '0')}</strong> available now</span>
-          </div>
-        </div>
-        <div className="toolbar">
-          <div className="search-wrap" style={{position:'relative'}}>
-            <Search size={17} />
-            <input id="main-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${allGames.length} titles, genres, moods`} aria-label="Search games" style={{flex:1}} />
-            {query && <button onClick={()=> setQuery('')} aria-label="Clear search" style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',width:22,height:22,borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',display:'grid',placeItems:'center',cursor:'pointer',color:'var(--muted)'}}><X size={12}/></button>}
-          </div>
-          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            <div style={{display:'flex',gap:6,alignItems:'center',padding:'4px 6px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.04)'}}>
-              <ListFilter size={12}/><span style={{fontSize:11,fontWeight:800}}>Sort</span>
-              <select value={sortBy} onChange={e=> setSortBy(e.target.value as any)} aria-label="Sort games" style={{background:'transparent',color:'var(--foreground)',border:0,fontSize:12,fontWeight:700,outline:'none'}}>
-                <option value="featured">Featured</option>
-                <option value="popular">Most played</option>
-                <option value="newest">Newest</option>
-                <option value="az">A-Z</option>
-              </select>
-            </div>
-            <div className="view-toggle" role="group" aria-label="View toggle">
-              <button className={view==='shelves'?'active':''} onClick={()=> setView('shelves')} aria-label="Shelves view"><Rows3 size={16}/> Shelves</button>
-              <button className={view==='grid'?'active':''} onClick={()=> setView('grid')} aria-label="Grid view"><LayoutGrid size={16}/> Grid</button>
-            </div>
-            <button onClick={shufflePick} className="btn-mini" title="Random game"><Shuffle size={14}/> Shuffle</button>
-            <button onClick={()=> setHideLow(v=>!v)} aria-pressed={hideLow} title="Hide low quality duplicates" style={{padding:'6px 10px',borderRadius:999,border: hideLow?'1px solid var(--lime)':'1px solid var(--line)',background: hideLow?'var(--lime)':'rgba(255,255,255,.06)',color: hideLow?'#0b0d12':'var(--foreground)',fontWeight:800,fontSize:11,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><Filter size={12}/>{hideLow?'Filtered':'Filter duplicates'}</button>
-            <button onClick={()=> setShowStaffOnly(v=>!v)} aria-pressed={showStaffOnly} title="Staff picks only" style={{padding:'6px 10px',borderRadius:999,border: showStaffOnly?'1px solid var(--lime)':'1px solid var(--line)',background: showStaffOnly?'var(--lime)':'rgba(255,255,255,.06)',color: showStaffOnly?'#0b0d12':'var(--foreground)',fontWeight:800,fontSize:11,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><Star size={12} fill={showStaffOnly?'currentColor':'none'}/>{showStaffOnly?'Staff only':'All'}</button>
-          </div>
-        </div>
-        <div className="filter-tabs" role="tablist" aria-label="Filter games">
-          {filters.map((item) => (
-            <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)} role="tab" aria-selected={filter === item}>
-              {item} <span style={{opacity:.7,fontWeight:700,marginLeft:4,fontSize:11}}>({filterCounts[item]??0})</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Content */}
-        {view === 'shelves' && filter==='All games' && !query.trim() ? (
-          <div className="shelves">
-            <div className="shelf">
-              <div className="shelf-head">
-                <h3><Star size={14} fill="var(--lime)" color="var(--lime)"/> Staff Picks <span>{staffGames.length}</span></h3>
-                <div className="shelf-actions"><span style={{fontSize:11,color:'var(--muted)',fontWeight:700}}>Hand-curated • no filler</span></div>
-              </div>
-                            <div className="shelf-track" style={{contentVisibility:'auto'}}>
-                {staffGames.map((game,i)=> (
-                  <ShelfCard key={`staff-${game.id}`} game={game} index={i} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} priority={i < 2} />
-                ))}
-              </div>
-            </div>
-            {grouped.map(([genre, list])=> (
-              <div key={genre} className="shelf">
-                <div className="shelf-head">
-                  <h3>{genre} <span>{list.length}</span></h3>
-                  <div className="shelf-actions">
-                    <button className="shelf-nav" aria-label={`Scroll ${genre} left`} onClick={e=>{ const tr = (e.currentTarget.parentElement?.parentElement?.nextElementSibling as HTMLElement); if(tr) tr.scrollBy({left:-380,behavior:'smooth'})}}><ChevronLeft size={16}/></button>
-                    <button className="shelf-nav" aria-label={`Scroll ${genre} right`} onClick={e=>{ const tr = (e.currentTarget.parentElement?.parentElement?.nextElementSibling as HTMLElement); if(tr) tr.scrollBy({left:380,behavior:'smooth'})}}><ChevronRight size={16}/></button>
-                    <button className="btn-mini" onClick={()=> setFilter(genre)}>View all</button>
-                  </div>
-                </div>
-                                <div className="shelf-track" style={{contentVisibility:'auto'}}>
-                  {list.slice(0,14).map((game, index)=> (
-                    <ShelfCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} />
-                  ))}
-                </div>
-              </div>
-            ))}
-            {grouped.length===0 && <div className="empty-state"><Zap size={22}/><h3>No games found</h3><p>Try a different search or clear the filter.</p><div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center',marginTop:10}}><button onClick={()=> setQuery('')} className="btn-mini">Clear search</button><button onClick={()=> setFilter('All games')} className="btn-mini">All games</button><button onClick={shufflePick} className="btn-mini"><Shuffle size={12}/> Surprise me</button>{['stack','cookie-clicker','drive-mad','slope'].map(id=> <button key={id} onClick={()=> { const g=allGames.find(x=> x.id===id); if(g) launch(g) }} className="btn-mini">{allGames.find(x=>x.id===id)?.title||id}</button>)}</div></div>}
-          </div>
-        ) : (
-          <>
-                        {allGames.length===games.length && published.length===0 ? <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(280px,1fr))",gap:16, marginBottom:16}}>{Array.from({length:4}).map((_,i)=><div key={i} className="skeleton" style={{height:220}}/> )}</div> : null}
-                        <div className="game-grid" style={{contentVisibility:'auto',containIntrinsicSize:'0 600px'}}>
-              {paginatedGames.map((game, index) => (
-                <GameCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} priority={index < 4} />
-              ))}
-            </div>
-            {visibleGames.length === 0 && (
-              <div className="empty-state" role="status" aria-live="polite">
-                <Zap size={22} />
-                <h3>No games found for “{query || filter}”</h3>
-                <p>Try a different search or clear the filter — here are some quick picks.</p>
-                <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center',marginTop:12}}>
-                  <button onClick={()=> { setQuery(''); setFilter('All games'); setHideLow(false); setShowStaffOnly(false) }} style={{padding:'8px 14px',borderRadius:999,border:'1px solid var(--lime)',background:'var(--lime)',color:'#0b0d12',fontWeight:800,cursor:'pointer'}}>Clear all filters</button>
-                  <button onClick={shufflePick} style={{padding:'8px 14px',borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',color:'var(--foreground)',fontWeight:800,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><Shuffle size={12}/> Surprise me</button>
-                  {staffGames.slice(0,4).map(g=> <button key={g.id} onClick={()=> launch(g)} style={{padding:'8px 12px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',fontWeight:700,cursor:'pointer'}}>{g.title}</button>)}
-                </div>
-                <p style={{marginTop:10,fontSize:11,color:'var(--muted)'}}>💡 Tip: Press <kbd style={{padding:'2px 6px',border:'1px solid var(--line)',borderRadius:6,fontSize:10}}>/</kbd> to instantly search — try “stak” → finds “Stack” with typo tolerance.</p>
-              </div>
-            )}
-            {visibleGames.length > paginatedGames.length && (
-              <div style={{display:'flex',justifyContent:'center',marginTop:18}}>
-                <button onClick={()=> setVisibleCount(c=> c+36)} style={{padding:'10px 18px',borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',color:'var(--foreground)',fontWeight:800,cursor:'pointer'}}>Load more — {visibleGames.length - paginatedGames.length} remaining</button>
-              </div>
-            )}
-            <p style={{textAlign:'center',marginTop:10,fontSize:11,color:'var(--muted)'}} aria-live="polite">Showing {paginatedGames.length} of {visibleGames.length} • {allGames.length} total</p>
-          </>
         )}
+      </section>
+
       {/* Requests + Upvotes */}
         <div style={{marginTop:18,border:'1px solid var(--line)',borderRadius:16,background:'var(--panel)',padding:14}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
