@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Fuse from 'fuse.js'
 import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap, LayoutGrid, Rows3, Shuffle, ExternalLink, Copy, AlertCircle, Loader2, ChevronLeft, ChevronRight, Sun, Moon, Download, Flag, Flame, Crown, Gift, Monitor, Keyboard, Bug, ThumbsUp, Globe, MessageSquare, Star, Timer, WifiOff, Wifi, Filter, ArrowUpDown, Eye, EyeOff, ShieldAlert, ListFilter, Users, LogIn, LogOut, User, Cloud, CloudOff, Save, Menu } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, CONTROLS_LEGEND, hashDay, gameOfDayIndex, PROXY_TILES } from '@/lib/games'
 import type { Game } from '@/lib/games'
 import { GameCard, ShelfCard } from '@/components/GameCard'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
-import { GameModal } from '@/components/GameModal'
 import { AuthDialog } from '@/components/AuthDialog'
-import { AchievementsHub } from '@/components/AchievementsHub'
+const GameModal = dynamic(() => import('@/components/GameModal').then(m => m.GameModal), { ssr: false, loading: () => null })
+const AchievementsHub = dynamic(() => import('@/components/AchievementsHub').then(m => m.AchievementsHub), { ssr: false, loading: () => null })
 
 type PublishedListing = { id: string; title: string; icon: string | null }
 type RequestItem = { id: string; title: string; votes: number; status: string }
@@ -502,7 +503,7 @@ export default function Page() {
             <br />
             <em>Play forever.</em>
           </h1>
-          <p className="hero-text">A handpicked, no-filler collection of browser games for the minutes between everything.</p>
+          <p className="hero-text">A handpicked, no-filler collection of browser games for the minutes between everything. <span style={{opacity:.8}}><Keyboard size={12} style={{display:'inline',verticalAlign:'-2px'}}/> {CONTROLS_LEGEND.default} — hover any card to see its controls.</span></p>
           <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:14}}>
             <a className="hero-link" href="#games">
               Enter the lounge <ArrowUpRight size={15} />
@@ -752,7 +753,7 @@ export default function Page() {
               </div>
                             <div className="shelf-track" style={{contentVisibility:'auto'}}>
                 {staffGames.map((game,i)=> (
-                  <ShelfCard key={`staff-${game.id}`} game={game} index={i} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} />
+                  <ShelfCard key={`staff-${game.id}`} game={game} index={i} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} priority={i < 2} />
                 ))}
               </div>
             </div>
@@ -773,21 +774,27 @@ export default function Page() {
                 </div>
               </div>
             ))}
-            {grouped.length===0 && <div className="empty-state"><Zap size={22}/><h3>No games found</h3><p>Try a different search or clear the filter.</p></div>}
+            {grouped.length===0 && <div className="empty-state"><Zap size={22}/><h3>No games found</h3><p>Try a different search or clear the filter.</p><div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center',marginTop:10}}><button onClick={()=> setQuery('')} className="btn-mini">Clear search</button><button onClick={()=> setFilter('All games')} className="btn-mini">All games</button><button onClick={shufflePick} className="btn-mini"><Shuffle size={12}/> Surprise me</button>{['stack','cookie-clicker','drive-mad','slope'].map(id=> <button key={id} onClick={()=> { const g=allGames.find(x=> x.id===id); if(g) launch(g) }} className="btn-mini">{allGames.find(x=>x.id===id)?.title||id}</button>)}</div></div>}
           </div>
         ) : (
           <>
                         {allGames.length===games.length && published.length===0 ? <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(280px,1fr))",gap:16, marginBottom:16}}>{Array.from({length:4}).map((_,i)=><div key={i} className="skeleton" style={{height:220}}/> )}</div> : null}
-            <div className="game-grid" style={{contentVisibility:'auto',containIntrinsicSize:'0 600px'}}>
+                        <div className="game-grid" style={{contentVisibility:'auto',containIntrinsicSize:'0 600px'}}>
               {paginatedGames.map((game, index) => (
-                <GameCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} />
+                <GameCard key={game.id} game={game} index={index} isFavorite={favorites.includes(game.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} priority={index < 4} />
               ))}
             </div>
             {visibleGames.length === 0 && (
               <div className="empty-state" role="status" aria-live="polite">
                 <Zap size={22} />
-                <h3>No games found</h3>
-                <p>Try a different search or clear the filter.</p>
+                <h3>No games found for “{query || filter}”</h3>
+                <p>Try a different search or clear the filter — here are some quick picks.</p>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center',marginTop:12}}>
+                  <button onClick={()=> { setQuery(''); setFilter('All games'); setHideLow(false); setShowStaffOnly(false) }} style={{padding:'8px 14px',borderRadius:999,border:'1px solid var(--lime)',background:'var(--lime)',color:'#0b0d12',fontWeight:800,cursor:'pointer'}}>Clear all filters</button>
+                  <button onClick={shufflePick} style={{padding:'8px 14px',borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',color:'var(--foreground)',fontWeight:800,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><Shuffle size={12}/> Surprise me</button>
+                  {staffGames.slice(0,4).map(g=> <button key={g.id} onClick={()=> launch(g)} style={{padding:'8px 12px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',fontWeight:700,cursor:'pointer'}}>{g.title}</button>)}
+                </div>
+                <p style={{marginTop:10,fontSize:11,color:'var(--muted)'}}>💡 Tip: Press <kbd style={{padding:'2px 6px',border:'1px solid var(--line)',borderRadius:6,fontSize:10}}>/</kbd> to instantly search — try “stak” → finds “Stack” with typo tolerance.</p>
               </div>
             )}
             {visibleGames.length > paginatedGames.length && (

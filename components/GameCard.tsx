@@ -1,7 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { Heart, Play } from 'lucide-react'
+import { Heart, Play, Keyboard } from 'lucide-react'
 import type { Game } from '@/lib/games'
+import { CONTROLS_LEGEND } from '@/lib/games'
 
 function Highlight({ text, query }: { text:string; query:string }){
   if(!query) return <>{text}</>
@@ -19,6 +20,7 @@ export function GameCard({
   onLaunch,
   variant = 'grid',
   query = '',
+  priority = false,
 }: {
   game: Game
   index: number
@@ -27,10 +29,12 @@ export function GameCard({
   onLaunch: (g: Game) => void
   variant?: 'grid' | 'shelf'
   query?: string
+  priority?: boolean
 }) {
   const [imgSrc, setImgSrc] = useState(game.icon || '')
   const [imgError, setImgError] = useState(false)
   const showIcon = !!imgSrc && !imgError
+  const controls = (CONTROLS_LEGEND as any)[game.genre] || CONTROLS_LEGEND.default
 
   return (
     <article className={`game-card ${game.color}`} style={{ contentVisibility: 'auto' as any }}>
@@ -55,8 +59,9 @@ export function GameCard({
             className="game-icon game-icon--cover"
             src={imgSrc}
             alt={`${game.title} icon`}
-            loading="lazy"
+            loading={priority ? 'eager' : 'lazy'}
             decoding="async"
+            fetchPriority={priority ? 'high' : 'auto' as any}
             onError={() => {
               if (imgSrc.endsWith('.webp')) setImgSrc(imgSrc.replace('.webp', '.png'))
               else setImgError(true)
@@ -71,6 +76,9 @@ export function GameCard({
         <div className="game-art-overlay" aria-hidden="true">
           <small>{String(index + 1).padStart(2, '0')}</small>
           <span className="art-play"><Play size={14} fill="currentColor" /></span>
+        </div>
+        <div className="game-hover-controls" aria-hidden="true" style={{position:'absolute', bottom:8, left:8, right:8, background:'rgba(11,13,18,.88)', backdropFilter:'blur(8px)', border:'1px solid rgba(255,255,255,.14)', borderRadius:10, padding:'7px 8px', display:'flex', alignItems:'center', gap:6, opacity:0, transform:'translateY(4px)', transition:'all .18s', pointerEvents:'none'}}>
+          <Keyboard size={12} color="var(--lime)" style={{flexShrink:0}} /><span style={{fontSize:10, fontWeight:700, color:'#fff', lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{controls}</span>
         </div>
       </div>
       <div className="game-info">
@@ -103,6 +111,7 @@ export function ShelfCard({
   onToggle,
   onLaunch,
   query = '',
+  priority = false,
 }: {
   game: Game
   index: number
@@ -110,10 +119,12 @@ export function ShelfCard({
   onToggle: (id: string) => void
   onLaunch: (g: Game) => void
   query?: string
+  priority?: boolean
 }) {
   const [imgSrc, setImgSrc] = useState(game.icon || '')
   const [imgError, setImgError] = useState(false)
   const showIcon = !!imgSrc && !imgError
+  const controls = (CONTROLS_LEGEND as any)[game.genre] || CONTROLS_LEGEND.default
   return (
     <article className={`shelf-card-art ${game.color}`} style={{ contentVisibility: 'auto' as any }}>
       <button className="favorite-button" onClick={() => onToggle(game.id)} aria-label={`${isFavorite ? 'Remove' : 'Add'} ${game.title}`}>
@@ -132,8 +143,9 @@ export function ShelfCard({
             className="game-icon game-icon--cover"
             src={imgSrc}
             alt={`${game.title} icon`}
-            loading="lazy"
+            loading={priority ? 'eager' : 'lazy'}
             decoding="async"
+            fetchPriority={priority ? 'high' : 'auto' as any}
             onError={() => {
               if (imgSrc.endsWith('.webp')) setImgSrc(imgSrc.replace('.webp', '.png'))
               else setImgError(true)
@@ -148,6 +160,9 @@ export function ShelfCard({
         <div className="game-art-overlay" aria-hidden="true">
           <small>{String(index + 1).padStart(2, '0')}</small>
           <span className="art-play"><Play size={12} fill="currentColor" /></span>
+        </div>
+        <div className="game-hover-controls" aria-hidden="true" style={{position:'absolute', bottom:6, left:6, right:6, background:'rgba(11,13,18,.88)', backdropFilter:'blur(8px)', border:'1px solid rgba(255,255,255,.14)', borderRadius:9, padding:'6px 7px', display:'flex', alignItems:'center', gap:5, opacity:0, transform:'translateY(4px)', transition:'all .18s', pointerEvents:'none'}}>
+          <Keyboard size={11} color="var(--lime)" style={{flexShrink:0}} /><span style={{fontSize:9, fontWeight:700, color:'#fff', lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{controls}</span>
         </div>
       </div>
       <div className="shelf-info">
