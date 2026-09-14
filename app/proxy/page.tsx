@@ -34,7 +34,7 @@ const QUICK: [string, string, string][] = [
   ['Bing', 'https://www.bing.com/', '#00809D'],
   ['Poki', 'https://poki.com', '#ff6c83'],
   ['CrazyGames', 'https://www.crazygames.com', '#7d6bff'],
-  ['TikTok', 'https://www.tiktok.com/foryou', '#000000'],
+  ['TikTok', 'https://m.tiktok.com/foryou', '#000000'],
   ['Discord', 'https://discord.com/app', '#5865F2'],
   ['Reddit', 'https://www.reddit.com', '#FF4500'],
   ['Twitch', 'https://www.twitch.tv', '#9146FF'],
@@ -264,8 +264,8 @@ export default function ProxyPage() {
         if (u.pathname.includes('/play/') && !u.pathname.endsWith('/')) { /* keep as is */ }
         url = u.toString();
       }
-      // DuckDuckGo html search is already lightweight; ensure https
-      if (u.hostname.includes('duckduckgo.com') || u.hostname.includes('search.brave.com')) {
+      // Bing search — ensure https
+      if (u.hostname.includes('bing.com') || u.hostname.includes('duckduckgo.com') || u.hostname.includes('search.brave.com')) {
         u.protocol = 'https:'; url = u.toString();
       }
     } catch {}
@@ -340,7 +340,7 @@ export default function ProxyPage() {
               {['roblox.com','now.gg','youtube cat videos','hole.io'].map(s=> <button key={s} onClick={()=> go(s)} disabled={!ready} style={{fontSize:12, padding:'6px 12px', borderRadius:999, background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', color:'#f4f2ec', cursor:'pointer'}}>{s}</button>)}
             </div>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center', marginTop:16 }}>
-              <span style={{ padding:'7px 12px', borderRadius:99, border:'1px solid rgba(0,128,157,.25)', background:'rgba(0,128,157,.12)', color:'#7dd3ff', fontSize:11, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}><ShieldCheck size={12}/> Encrypted • DuckDuckGo • No captcha</span>
+              <span style={{ padding:'7px 12px', borderRadius:99, border:'1px solid rgba(0,128,157,.25)', background:'rgba(0,128,157,.12)', color:'#7dd3ff', fontSize:11, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}><ShieldCheck size={12}/> Encrypted • Bing • Fast</span>
               <span style={{ padding:'7px 12px', borderRadius:99, border:'1px solid rgba(255,255,255,.12)', background:'rgba(255,255,255,.06)', color:'rgba(244,242,236,.7)', fontSize:11, fontWeight:700 }}>YouTube native • Roblox cloud • TikTok m.</span>
             </div>
           </div>
