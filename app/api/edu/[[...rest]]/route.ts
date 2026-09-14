@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  */
 
 const DIRECTORY = "/api/bare/";
-const ALIAS_PREFIXES = ["/api/bare/", "/api/edu/", "/api/learn/", "/api/t/"] as const;
+const ALIAS_PREFIXES = ["/api/bare/", "/api/edu/", "/api/learn/", "/api/t/", "/api/math/", "/api/science/", "/api/history/", "/api/english/"] as const;
 const bare = createBareServer(DIRECTORY, {
   logErrors: false,
   maintainer: { email: "gg@lounge.local", website: "https://gg-lounge.local" },
@@ -84,7 +84,7 @@ async function handle(req: Request): Promise<Response> {
     }
   }
   // If path is exactly /api/edu or /api/learn or /api/t without trailing slash, treat as bare root
-  if (effectivePath === rawPath && (rawPath === "/api/edu" || rawPath === "/api/learn" || rawPath === "/api/t")) {
+  if (effectivePath === rawPath && (rawPath === "/api/edu" || rawPath === "/api/learn" || rawPath === "/api/t" || rawPath === "/api/math" || rawPath === "/api/science" || rawPath === "/api/history" || rawPath === "/api/english")) {
     effectivePath = DIRECTORY;
   }
 

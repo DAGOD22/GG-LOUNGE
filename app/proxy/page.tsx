@@ -10,7 +10,7 @@ declare global {
 }
 
 // Smart automatic bare — user never picks, we rotate invisibly
-const LOCAL_BARES = ['/api/bare/', '/api/edu/', '/api/learn/', '/api/t/'] as const;
+const LOCAL_BARES = ['/api/bare/', '/api/edu/', '/api/learn/', '/api/t/', '/api/math/', '/api/science/', '/api/history/', '/api/english/'] as const;
 const PUBLIC_BARES = [
   'https://bare.noblocc.uk/',
   'https://bare.holy.how/',
@@ -151,7 +151,13 @@ export default function ProxyPage() {
             }
           }
         }
-        if (!chosen) { chosen = '/api/bare/'; if (!cancelled) setStatus('Connecting…'); }
+        if (!chosen) {
+          // School: no bare reachable (keyword filter) — enter limited school mode where search uses /api/search
+          chosen = '/api/bare/';
+          setBareHealth(h=> ({...h, [chosen]:{ok:false, ms:9999}}))
+          if (!cancelled) { setStatus('School network — limited mode (search works, bare retrying)'); setReady(true); }
+          // Still try to boot bare in background, but don't block
+        }
         if (cancelled) return;
         setBare(chosen);
         localStorage.setItem('gg_bare', chosen);
@@ -231,6 +237,18 @@ export default function ProxyPage() {
     const bareToUse = opts?.bareOverride || bare;
     if (bareToUse && cfg.bare !== bareToUse) try { cfg.bare = bareToUse.endsWith('/') ? bareToUse : bareToUse + '/'; } catch {}
     let url = raw.trim(); if (!url) return;
+    const isSearchQuery = !/^https?:\/\//i.test(raw) && !raw.includes('.')
+    // School: if bare is unhealthy and this is a search, use same-origin /api/search (no bare needed)
+    const bareBlockedAtSchool = (bareHealth[bare] && !bareHealth[bare].ok && bare.startsWith('/api/')) || status.includes('School network')
+    if (isSearchQuery && bareBlockedAtSchool) {
+      // Use school-friendly same-origin search — works even when bare is keyword-blocked
+      const q = raw.trim()
+      const searchUrl = `/api/search?q=${encodeURIComponent(q)}`
+      setFrameError(null); setFrameLoading(true)
+      setHistoryStack(h => [...h, `bing: ${q}`].slice(-40))
+      setTabs(prev => prev.map(t => t.id === activeId ? { ...t, encoded: searchUrl, raw: searchUrl, title: `Search: ${q}` } : t))
+      return
+    }
     if (!/^https?:\/\//i.test(url)) {
       if (url.includes('.') && !url.includes(' ')) url = 'https://' + url;
       else url = BING_URL + encodeURIComponent(url);
