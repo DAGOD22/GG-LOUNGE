@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ADMIN_COOKIE, adminPassword, adminSignature, isAdmin, isDev } from "@/lib/auth";
 import {
   addBan,
+  pool,
   deleteGame,
   deleteRequest,
   getMode,
@@ -119,6 +120,15 @@ export async function DELETE(request: Request) {
     if (type === "ban") await removeBan(id);
     else if (type === "game") await deleteGame(id);
     else if (type === "request") await deleteRequest(id);
+    // Chat moderation came in with main's member platform and it is Postgres-only:
+    // there is no chat table in the local JSON mode, so say so rather than
+    // quietly deleting nothing.
+    else if (type === "message") {
+      if (getMode() !== "postgres") {
+        return NextResponse.json({ error: "Chat moderation needs the Postgres database" }, { status: 409 });
+      }
+      await pool.query('DELETE FROM "chat_message" WHERE "id"=$1', [id]);
+    }
     else return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     return NextResponse.json({ ok: true });
   } catch (err) {

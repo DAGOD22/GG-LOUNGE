@@ -135,6 +135,7 @@ export default function Page() {
   const [favorites, setFavorites] = useState<string[]>([])
   const [activeGame, setActiveGame] = useState<Game | null>(null)
   const [published, setPublished] = useState<Game[]>([])
+  const [isLaunching, setIsLaunching] = useState(false)
   const ui = useGgProfile()
 
   useEffect(() => {
@@ -171,8 +172,21 @@ export default function Page() {
     [allGames, favorites, filter, query],
   )
 
+  // The catalogue hands every title a short glitch intro; the timer is what puts
+  // it away again, so a game that loads instantly is never covered by the splash.
+  useEffect(() => {
+    if (!isLaunching) return
+    const timer = window.setTimeout(() => setIsLaunching(false), 2200)
+    return () => window.clearTimeout(timer)
+  }, [isLaunching])
+
   function launch(game: Game) {
     setActiveGame(game)
+    setIsLaunching(true)
+  }
+  function closeGame() {
+    setActiveGame(null)
+    setIsLaunching(false)
   }
   function toggleFavorite(id: string) {
     setFavorites((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
@@ -180,6 +194,7 @@ export default function Page() {
 
   return (
     <main className="lounge-shell">
+      <style>{`.game-stage{position:relative;flex:1;min-height:0;overflow:hidden;background:#090a0e}.game-frame{position:relative;z-index:1;width:100%;height:100%;min-height:0;display:block}.launch-splash{position:absolute;inset:0;z-index:2;display:grid;place-content:center;justify-items:center;gap:18px;background:#090a0e;color:#f4f2ec;overflow:hidden;transition:opacity .8s cubic-bezier(.7,0,.2,1),visibility .8s}.launch-splash:before{content:'';position:absolute;inset:-20%;background:repeating-linear-gradient(0deg,transparent 0 7px,rgba(215,243,74,.06) 8px 9px);animation:scan 1.2s linear infinite}.launch-splash strong{position:relative;font-size:clamp(2.8rem,8vw,7rem);line-height:.8;letter-spacing:-.09em;text-align:center;text-shadow:4px 0 #ff6c83,-4px 0 #7d6bff;animation:glitch 1.1s steps(2) infinite}.launch-splash em{color:#d7f34a;font-style:normal}.launch-kicker,.launch-line{position:relative;color:#d7f34a;font-size:10px;font-weight:900;letter-spacing:.25em}.launch-line{width:140px;height:2px;background:#d7f34a;box-shadow:0 0 24px #d7f34a}.game-stage:not(.is-launching) .launch-splash{opacity:0;visibility:hidden;pointer-events:none}@media(max-height:540px) and (orientation:landscape){.launch-splash strong{font-size:clamp(1.6rem,6vw,2.6rem)}}@keyframes scan{to{transform:translateY(20px)}}@keyframes glitch{0%,100%{transform:translate(0)}30%{transform:translate(2px,-1px)}32%{transform:translate(-3px,1px)}65%{transform:translate(1px,2px)}}`}</style>
       <div className="noise" aria-hidden="true" />
       <header className="site-header">
         <a href="#top" className="brand" aria-label="GG-Lounge home">
@@ -394,12 +409,22 @@ export default function Page() {
               <button onClick={() => document.querySelector<HTMLIFrameElement>('.game-frame')?.requestFullscreen()} aria-label="Fullscreen">
                 <Maximize2 size={18} />
               </button>
-              <button onClick={() => setActiveGame(null)} aria-label="Close game">
+              <button onClick={closeGame} aria-label="Close game">
                 <X size={20} />
               </button>
             </div>
           </div>
-          <iframe className="game-frame" src={activeGame.path} title={activeGame.title} allow="fullscreen; autoplay; gamepad; keyboard-map" />
+          <div className={`game-stage ${isLaunching ? 'is-launching' : ''}`}>
+            <div className="launch-splash" aria-hidden={!isLaunching}>
+              <span className="launch-kicker">GG-LOUNGE / ORIGINALS</span>
+              <strong>
+                HOSTED ON<br />
+                <em>GG-LOUNGE</em>
+              </strong>
+              <span className="launch-line" />
+            </div>
+            <iframe className="game-frame" src={activeGame.path} title={activeGame.title} allow="fullscreen; autoplay; gamepad; keyboard-map" />
+          </div>
         </div>
       )}
     </main>

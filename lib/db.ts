@@ -12,6 +12,13 @@ import { Pool } from "pg";
 
 export type DbMode = "postgres" | "local";
 
+/**
+ * Re-exported for main's member platform (better-auth, chat, notes) which talks to
+ * pg directly. This file keeps its own dual-mode helpers; the pool is the escape
+ * hatch those routes need without importing lib/db/index twice under different names.
+ */
+export { pool } from "./db/index";
+
 export interface Ban {
   id: string;
   identifier: string;

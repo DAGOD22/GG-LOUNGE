@@ -1,13 +1,25 @@
-﻿<!DOCTYPE html>
-<html>
+<!DOCTYPE html>
 
-<!-- Mirrored from dedragames.com/games/ovo/1.4.4/ by HTTrack Website Copier/3.x [XR&CO'2014], Sat, 05 Feb 2022 16:30:34 GMT -->
+
+<!-- Ultimate Game Stash file--> 
+<!-- For the regularly updating doc go to https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/ -->
+
+
+<html>
 <head>
+	<!-- Google tag (gtag.js) -->
+  <base href="https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/ovomod/">
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-06HTML1QC5"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date()); 
+
+        gtag('config', 'G-06HTML1QC5');
+    </script>
     <meta charset="UTF-8" />
 	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
 	<title>OvO</title>
-	
-	
 	<!-- Standardised web app manifest -->
 	<link rel="manifest" href="appmanifest.json" />
 	
@@ -71,7 +83,7 @@
 			<!-- This text is displayed if the visitor's browser does not support HTML5.
 			You can change it, but it is a good idea to link to a description of a browser
 			and provide some links to download some popular HTML5-compatible browsers. -->
-			<h1>Your browser does not appear to support HTML5.  Try upgrading your browser to the latest version.  <a href="http://www.whatbrowser.org/">What is a browser?</a>
+			<h1>Your browser does not appear to support HTML5.  Try upgrading your browser to the latest version.  <a href="http://www.whatbrowser.org">What is a browser?</a>
 			<br/><br/><a href="http://www.microsoft.com/windows/internet-explorer/default.aspx">Microsoft Internet Explorer</a><br/>
 			<a href="http://www.mozilla.com/firefox/">Mozilla Firefox</a><br/>
 			<a href="http://www.google.com/chrome/">Google Chrome</a><br/>
@@ -84,7 +96,27 @@
 	
 	<!-- Construct 2 exported games require jQuery. -->
 	<script src="jquery-3.4.1.min.js"></script>
-
+<script>
+(function() {
+    // Intercept ALL image creation
+    var OriginalImage = window.Image;
+    window.Image = function() {
+        var img = new OriginalImage();
+        img.crossOrigin = "anonymous";
+        return img;
+    };
+    
+    // Also intercept createElement for img tags
+    var originalCreateElement = document.createElement.bind(document);
+    document.createElement = function(tagName) {
+        var element = originalCreateElement(tagName);
+        if (tagName.toLowerCase() === 'img') {
+            element.crossOrigin = "anonymous";
+        }
+        return element;
+    };
+})();
+</script>
 	<script src="GameAnalytics.js"></script>
 	<script src="Tween.js"></script>
 	<script src="html2canvas.min.js"></script>
@@ -94,10 +126,18 @@
 	
     <!-- The runtime script.  You can rename it, but don't forget to rename the reference here as well.
     This file will have been minified and obfuscated if you enabled "Minify script" during export. -->
-	<script src="c2runtime.js"></script>
+<!-- The <base> above points at the mirror, which carries the renamed mod runtime
+     (c7runtime.js). This folder ships the vanilla c2runtime.js, so if the mirror is
+     blocked - or the mod ever drops the rename - the game still boots. -->
+	<script>
+	(function () {
+		function add(src, onerror) { var s = document.createElement('script'); s.src = src; s.onerror = onerror; document.head.appendChild(s); }
+		add('c7runtime.js', function () { add('/games/ovo/c2runtime.js'); });
+	})();
+	</script>
 
     <script>
-		// Start the Construct 2 project running on window load.
+		// Start the Construct 2 project running on window load. 
 		jQuery(document).ready(function ()
 		{			
 			// Create new runtime using the c2canvas
@@ -143,7 +183,22 @@
 			}
 		};
     </script>
+	<script type="text/javascript">
+		
+        var VERSION = VERSION || (function(){
+            return {
+                version : function() {
+                    return "CTLE"
+                },
+				skinVersion : function() {
+					return "1.4.5"
+				},
+				replayVersion : function() {
+					return "1.4.4"
+				},
+            };
+        }());
+    </script>
+    <script src="https://cdn.jsdelivr.net/gh/Arjun99ab/ovo@main/src/modloaders/modloader.js" id="modloader" type="module" defer></script>
 <script src="/gg/gg-boot.js"></script></body> 
-
-<!-- Mirrored from dedragames.com/games/ovo/1.4.4/ by HTTrack Website Copier/3.x [XR&CO'2014], Sat, 05 Feb 2022 16:30:44 GMT -->
 </html> 
