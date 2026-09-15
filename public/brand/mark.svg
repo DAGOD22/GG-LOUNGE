@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="GG Lounge">
+  <defs>
+    <linearGradient id="gg-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#171b28"/>
+      <stop offset=".55" stop-color="#0d0f16"/>
+      <stop offset="1" stop-color="#1b1533"/>
+    </linearGradient>
+    <linearGradient id="gg-lime" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#def75c"/>
+      <stop offset="1" stop-color="#b0d635"/>
+    </linearGradient>
+  </defs>
+  <rect x="1.5" y="1.5" width="509.0" height="509.0" rx="105.0" fill="url(#gg-bg)"/>
+  <rect x="9.5" y="9.5" width="493.0" height="493.0" rx="97.3" fill="none" stroke="rgba(222,247,92,.45)" stroke-width="7.4"/>
+  <g fill="none" stroke="url(#gg-lime)" stroke-linecap="butt">
+    <path d="M304.7 361.6A125.4 125.4 0 1 1 304.7 140.1" stroke-width="58.9"/>
+    <path d="M361.2 250.9V328.7" stroke-width="54.8"/>
+  </g>
+  <path d="M248.3 250.9H361.2" fill="none" stroke="#ff6b8a" stroke-width="49.5" stroke-linecap="round"/>
+</svg>

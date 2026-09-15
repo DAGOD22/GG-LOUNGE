@@ -41,6 +41,7 @@ export default function ProxyPage() {
   const [address, setAddress] = useState('');
   const [current, setCurrent] = useState('');
   const [status, setStatus] = useState('Starting proxy…');
+  const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
   const frame = useRef<HTMLIFrameElement>(null);
 
@@ -51,9 +52,10 @@ export default function ProxyPage() {
         // Pick a working bare server: local first, then public fallbacks.
         let bare = '/api/bare/';
         try {
-          const r = await fetch('/api/bare/', { cache: 'no-store' });
-          if (!r.ok) throw new Error('local down');
-          await r.json();
+          // Any answer below 500 means our own relay is alive (the bare root
+          // replies to ?type=meta; a bare 404 still proves the route exists).
+          const r = await fetch('/api/bare/?type=meta&local=1', { cache: 'no-store' });
+          if (r.status >= 500) throw new Error('local down');
         } catch {
           bare = '';
           for (const pub of PUBLIC_BARES) {
@@ -82,7 +84,11 @@ export default function ProxyPage() {
           setStatus(bare === '/api/bare/' ? 'Connected • lounge proxy' : 'Connected • fallback proxy');
         }
       } catch (err) {
-        if (!cancelled) setStatus('Proxy failed to start: ' + (err instanceof Error ? err.message : 'error'));
+        if (!cancelled) {
+          const reason = err instanceof Error ? err.message : 'error';
+          setStatus('Proxy failed to start: ' + reason);
+          setError(reason);
+        }
       }
     }
     void boot();
@@ -91,9 +97,20 @@ export default function ProxyPage() {
     };
   }, []);
 
+  function retry() {
+    setError('');
+    setStatus('Restarting proxy…');
+    // The service worker + uv scripts are one-shot per document, so a full
+    // reload is the only reliable way to re-run the handshake.
+    window.location.reload();
+  }
+
   function go(raw: string) {
     const enc = window.__uv$config?.encodeUrl;
-    if (!enc) return;
+    if (!enc) {
+      setStatus('Proxy is still starting - give it a second.');
+      return;
+    }
     let url = raw.trim();
     if (!url) return;
     if (!/^https?:\/\//i.test(url)) {
@@ -147,7 +164,14 @@ export default function ProxyPage() {
             aria-label="URL or search"
           />
         </form>
-        <span className={`proxy-status ${ready ? 'ok' : ''}`}>{status}</span>
+        <span className={`proxy-status ${ready ? 'ok' : ''} ${error ? 'bad' : ''}`}>
+          {status}
+          {error ? (
+            <button type="button" className="proxy-retry" onClick={retry}>
+              Retry
+            </button>
+          ) : null}
+        </span>
       </header>
       {!current ? (
         <section className="proxy-home">

@@ -383,7 +383,9 @@ export async function publishDirect(
   title: string,
   icon: string | null,
   html: string,
-  id = randomUUID(),
+  // annotated, otherwise the default value narrows this to crypto's UUID
+  // template-literal type and callers holding a plain string id are rejected
+  id: string = randomUUID(),
 ): Promise<PublishedGame> {
   const createdAt = new Date().toISOString();
   if (getMode() === "postgres") {

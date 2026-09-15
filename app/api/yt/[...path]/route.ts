@@ -5,6 +5,7 @@ import {
   cacheSet,
   fetchWithTimeout,
   sameOriginImageUrl,
+  sameOriginMediaUrl,
   type ProviderResult,
 } from "../lib";
 import {
@@ -28,6 +29,8 @@ import {
 } from "../upstream";
 
 export const runtime = "nodejs";
+/** Vercel Hobby caps functions at 60s; asking for more fails the build. */
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 /**
@@ -60,8 +63,25 @@ function providerOrder(req: Request, forced?: string | null): Provider[] {
   return ALL_PROVIDERS;
 }
 
+/** Any list of cards in a response gets its images relayed, so grids and up-next
+ *  rows never ask the browser to reach a blocked CDN. */
+function relayAny(data: any): any {
+  if (Array.isArray(data)) return relayCards(data);
+  if (!data || typeof data !== "object") return data;
+  const out: any = { ...data };
+  for (const key of ["items", "relatedStreams", "comments", "channels", "playlists", "videos", "streams"]) {
+    if (Array.isArray(out[key])) out[key] = relayCards(out[key]);
+  }
+  if (Array.isArray(out.chapters)) {
+    out.chapters = out.chapters.map((c: any) =>
+      c?.image && /^https?:/.test(c.image) ? { ...c, image: sameOriginImageUrl(String(c.image)) } : c,
+    );
+  }
+  return out;
+}
+
 function ok(data: unknown, via: string, ttl = 60, extra?: Record<string, string>) {
-  return NextResponse.json(data, {
+  return NextResponse.json(relayAny(data), {
     headers: {
       "x-yt-via": via,
       "Cache-Control": `public, s-maxage=${ttl}, stale-while-revalidate=${ttl * 2}`,
@@ -158,6 +178,63 @@ async function channelFor(provider: Provider, handle: string, token: string | nu
  * related videos) — splice them in from /next so the UI never looks half-fed,
  * and hand any third-party image URL through our own image proxy.
  */
+/**
+ * Playback fix for school networks: a stream URL is useless if the browser has
+ * to fetch it from googlevideo.com itself, so every media URL in a streams
+ * payload is rewritten to our own relay (signed, Range-aware, HLS-aware) and
+ * tagged with the InnerTube client that produced it. `urlDirect` is kept so the
+ * player can still fall back to the CDN when the relay is the problem.
+ */
+export function proxyMediaUrls(data: any): any {
+  if (!data || typeof data !== "object") return data;
+  const client = typeof data.ggClient === "string" ? data.ggClient : null;
+  const out: any = { ...data };
+  delete out.ggClient;
+  const mapList = (key: string, patch?: (item: any) => any) => {
+    if (!Array.isArray(out[key])) return;
+    out[key] = out[key].map((item: any) => {
+      if (!item || typeof item !== "object") return item;
+      const next = patch ? patch(item) : item;
+      const raw = typeof next?.url === "string" ? next.url : "";
+      if (!raw || raw.startsWith("/")) return next;
+      return { ...next, url: sameOriginMediaUrl(raw, client), urlDirect: raw };
+    });
+  };
+  mapList("videoStreams");
+  mapList("audioStreams");
+  mapList("subtitles");
+  if (typeof out.hls === "string" && out.hls && !out.hls.startsWith("/")) {
+    out.hlsDirect = out.hls;
+    out.hls = sameOriginMediaUrl(out.hls, client);
+  }
+  if (typeof out.thumbnailUrl === "string" && /^https?:/.test(out.thumbnailUrl)) {
+    out.thumbnailUrl = sameOriginImageUrl(out.thumbnailUrl);
+  }
+  if (typeof out.uploaderAvatar === "string" && /^https?:/.test(out.uploaderAvatar)) {
+    out.uploaderAvatar = sameOriginImageUrl(out.uploaderAvatar);
+  }
+  // Thumbnails inside related/feed cards go through the image relay too.
+  if (Array.isArray(out.relatedStreams)) {
+    out.relatedStreams = out.relatedStreams.map((r: any) =>
+      r?.thumbnail && /^https?:/.test(r.thumbnail) ? { ...r, thumbnail: sameOriginImageUrl(String(r.thumbnail)) } : r,
+    );
+  }
+  return out;
+}
+
+/** Rewrite card thumbnails/avatars to the image relay (feeds, search, channels). */
+function relayCards(items: any[]): any[] {
+  return (Array.isArray(items) ? items : []).map((card: any) => {
+    if (!card || typeof card !== "object") return card;
+    const out = { ...card };
+    for (const key of ["thumbnail", "uploaderAvatar", "avatarUrl", "bannerUrl", "thumbnailUrl"]) {
+      const value = out[key];
+      if (typeof value === "string" && /^https?:/.test(value)) out[key] = sameOriginImageUrl(value);
+    }
+    return out;
+  });
+}
+
 async function hydrateStreams(data: any, id: string): Promise<any> {
   const out = { ...data };
   if (!out.videoStreams) out.videoStreams = [];
@@ -210,7 +287,7 @@ export async function GET(req: Request, context: { params: Promise<{ path: strin
       for (const provider of order) {
         const res = await feedFor(provider, root === "home" ? "home" : "trending", region);
         if (res.ok && asArray(res.data).length) {
-          const items = asArray(res.data);
+          const items = asArray(res.data).map(relayCards);
           cacheSet(cacheKey, items, 180);
           return ok(items, res.via, 180);
         }
@@ -306,7 +383,7 @@ export async function GET(req: Request, context: { params: Promise<{ path: strin
       for (const provider of order) {
         const res = await streamsFor(provider, id);
         if (res.ok && res.status !== 404) {
-          const data = await hydrateStreams(res.data, id);
+          const data = proxyMediaUrls(await hydrateStreams(res.data, id));
           const playable =
             data.videoStreams.length || data.audioStreams.length || data.hls || data.livestream;
           if (playable) {

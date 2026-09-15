@@ -147,7 +147,7 @@
   document.addEventListener("error", function (ev) {
     var t = ev.target;
     if (t && t.tagName === "IMG" && !t.getAttribute("data-direct-retried") &&
-        t.src.indexOf(API_BASE + "/img?url=") >= 0) {
+        (t.src.indexOf("/img?url=") >= 0 || t.src.indexOf("/api/yt/img?") >= 0)) {
       t.setAttribute("data-direct-retried", "1");
       try {
         var u = new URL(t.src, location.href).searchParams.get("url");
@@ -224,13 +224,25 @@
     return m ? m[1] + "/" + m[2] : null;
   }
 
+  // The API already relays media/images through the lounge (see proxyMediaUrls
+  // in app/api/yt/[...path]/route.ts), so these helpers must be idempotent -
+  // wrapping an already-relay path would send a relative URL upstream.
+  function isRelayed(u) {
+    return typeof u === "string" && (u.indexOf("/api/yt/media?") === 0 || u.indexOf("/api/yt/img?") === 0 ||
+      u.indexOf(API_BASE + "/media?") === 0 || u.indexOf(API_BASE + "/img?") === 0);
+  }
+  function directUrl(s) {
+    return (s && (s.urlDirect || (isRelayed(s.url) ? "" : s.url))) || "";
+  }
   function mediaUrl(u) {
     if (!u) return "";
+    if (isRelayed(u)) return u;
     if (prefs.schoolMode) return API_BASE + "/media?url=" + encodeURIComponent(u);
     return u;
   }
   function imgUrl(u, fallback) {
     if (!u) return fallback || "";
+    if (isRelayed(u)) return u;
     // School mode proxies images same-origin too (auto-falls back to direct
     // via the global IMG error handler below if the proxy is unreachable).
     if (prefs.strictImg || prefs.schoolMode) return API_BASE + "/img?url=" + encodeURIComponent(u);
@@ -651,8 +663,8 @@
       // In school mode, prefer non-googlevideo hosts (pipedproxy mirrors),
       // since school filters usually block video CDNs but not these.
       if (prefs.schoolMode) {
-        var ag = /googlevideo\.com/i.test(a.url || "") ? 1 : 0;
-        var bg = /googlevideo\.com/i.test(b.url || "") ? 1 : 0;
+        var ag = /googlevideo\.com/i.test(directUrl(a) || "") ? 1 : 0;
+        var bg = /googlevideo\.com/i.test(directUrl(b) || "") ? 1 : 0;
         if (ag !== bg) return ag - bg;
       }
       return (b.height || 0) - (a.height || 0);
@@ -704,25 +716,39 @@
     });
   }
 
-  function attachHls(video, hlsUrl) {
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = prefs.schoolMode ? hlsUrl : hlsUrl; // manifests use absolute proxy URLs
-      return;
+  function attachHls(video, hlsUrl, fallbackUrl) {
+    function plain() {
+      // Safari (and any HLS-native webview) can take the manifest directly; our
+      // relay serves rewritten m3u8s, so this works on both paths.
+      video.src = hlsUrl;
+      video.play().catch(function () {});
     }
+    if (video.canPlayType("application/vnd.apple.mpegurl")) { plain(); return; }
     ensureHls().then(function (Hls) {
-      if (!Hls.isSupported()) { video.src = hlsUrl; return; }
+      if (!Hls.isSupported()) { plain(); return; }
       var hls = new Hls({ maxBufferLength: 30 });
       if (prefs.schoolMode) {
         hls.config.xhrSetup = function (xhr, url) {
-          if (/^https?:/.test(url)) {
+          // Anything not already same-origin goes through the lounge relay.
+          if (/^https?:/.test(url) && url.indexOf(location.host) < 0) {
             xhr.open("GET", API_BASE + "/media?url=" + encodeURIComponent(url), true);
           }
         };
       }
+      var triedDirect = false;
+      hls.on(Hls.Events.ERROR, function (_ev, err) {
+        if (!err || !err.fatal || triedDirect || !fallbackUrl) return;
+        triedDirect = true;
+        try { hls.destroy(); } catch (e) { /* noop */ }
+        if (currentHls === hls) currentHls = null;
+        video.src = fallbackUrl;
+        video.play().catch(function () {});
+        toast("Relay hiccuped - trying the CDN directly");
+      });
       hls.loadSource(hlsUrl);
       hls.attachMedia(video);
       currentHls = hls;
-    }, function () { video.src = hlsUrl; });
+    }, function () { video.src = fallbackUrl || hlsUrl; });
   }
 
   function renderWatch() {
@@ -787,11 +813,16 @@
     var candidates = [];
     var candIdx = 0;
     if (defaultStream) {
+      // The lounge relay first (works when video CDNs are blocked), then the
+      // CDN itself (works when the relay is the bottleneck), then alternatives.
       if (prefs.schoolMode && proxyAlive !== false) candidates.push(mediaUrl(defaultStream.url));
-      candidates.push(defaultStream.url);
-      for (var ci = 0; ci < picked.muxed.length && candidates.length < 6; ci++) {
-        var cu = picked.muxed[ci].url;
-        if (cu && cu !== defaultStream.url && candidates.indexOf(cu) < 0) candidates.push(cu);
+      var direct = directUrl(defaultStream);
+      if (direct) candidates.push(direct);
+      if (!prefs.schoolMode) candidates.push(mediaUrl(defaultStream.url));
+      for (var ci = 0; ci < picked.muxed.length && candidates.length < 8; ci++) {
+        var cm = picked.muxed[ci];
+        var cu = (prefs.schoolMode ? mediaUrl(cm.url) : directUrl(cm)) || cm.url;
+        if (cu && candidates.indexOf(cu) < 0) candidates.push(cu);
       }
     }
     // "HLS (HD)" prefers the adaptive stream; "MP4" never touches it.
@@ -799,15 +830,15 @@
     if (wantHls && !candidates.length) candidates.push(prefs.schoolMode ? mediaUrl(data.hls) : data.hls);
 
     if (isLive && data.hls) {
-      attachHls(video, data.hls);
+      attachHls(video, data.hls, data.hlsDirect);
     } else if (wantHls) {
-      attachHls(video, data.hls);
+      attachHls(video, data.hls, data.hlsDirect);
     } else if (defaultStream) {
       video.src = candidates[0];
       applyVolume(video);
       attachCaptions(video, data);
     } else if (data.hls) {
-      attachHls(video, data.hls);
+      attachHls(video, data.hls, data.hlsDirect);
     } else {
       holder.innerHTML = '<div class="player-fallback">No playable stream from this server.<br>Try Engine → “HLS (HD)”, another server, or School mode off.<br><br><button class="btn" id="official-btn">Play with official YouTube player</button></div>';
       document.getElementById("official-btn").onclick = function () { officialEmbed(id, holder); };
@@ -884,14 +915,14 @@
         var wasPlaying = !video.paused;
         if (val === "__audio") {
           var best = picked.audio.slice().sort(function (a, b) { return (b.bitrate || 0) - (a.bitrate || 0); })[0];
-          if (best) { video.src = mediaUrl(best.url); candidates = proxyAlive === false ? [best.url] : [mediaUrl(best.url), best.url]; candIdx = 0; }
+          if (best) { candidates = [mediaUrl(best.url)]; var bd = directUrl(best); if (bd) candidates.push(bd); video.src = candidates[0]; candIdx = 0; }
         } else {
           var target = picked.muxed[0];
           for (var k = 0; k < picked.muxed.length; k++) {
             if (qualityLabel(picked.muxed[k]) === val) target = picked.muxed[k];
           }
           if (val === "auto") target = picked.muxed[0];
-          if (target) { video.src = mediaUrl(target.url); candidates = proxyAlive === false ? [target.url] : [mediaUrl(target.url), target.url]; candIdx = 0; }
+          if (target) { candidates = [mediaUrl(target.url)]; var td = directUrl(target); if (td) candidates.push(td); video.src = candidates[0]; candIdx = 0; }
         }
         video.currentTime = t;
         if (wasPlaying) video.play().catch(function () {});

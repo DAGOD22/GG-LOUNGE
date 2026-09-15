@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { tiktokFeed, tiktokFromPage, tiktokPost, tiktokSearch } from "../lib";
 
 export const runtime = "nodejs";
+/** Vercel Hobby caps functions at 60s; asking for more fails the build. */
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 /**

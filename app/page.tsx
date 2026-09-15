@@ -207,6 +207,16 @@ export default function Page() {
           <span className="live-dot" /> {allGames.length} titles / open all night
         </div>
       </header>
+      {/* phone/tablet chip nav: the desktop header nav is hidden below 761px,
+          so these are how anyone reaches the proxy, settings or requests */}
+      <nav className="mobile-nav" aria-label="Quick navigation">
+        <a href="#games">Games</a>
+        <a href="/games/youtube/index.html">YouTube</a>
+        <a href="/games/tiktok/index.html">TikTok</a>
+        <a href="/proxy">Proxy</a>
+        <a href="/settings">Settings</a>
+        <a href="/request-game">Request</a>
+      </nav>
       <section className="hero" id="top">
         <div className="hero-copy">
           <p className="eyebrow">

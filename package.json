@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test:yt": "node scripts/yt-parsers.test.mjs"
+    "test:yt": "node scripts/yt-parsers.test.mjs",
+    "test:games": "node scripts/game-smoke.test.mjs",
+    "test": "node scripts/yt-parsers.test.mjs && node scripts/game-smoke.test.mjs",
+    "icons": "python3 scripts/gen-icons.py"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

@@ -62,6 +62,31 @@ export const TIKTOK_MIRRORS = [
 const UPSTREAM_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
+/**
+ * googlevideo URLs are bound to the client that produced them: fetch an
+ * ANDROID-client URL with a desktop UA and the CDN answers 403. Both halves of
+ * the pipeline (player request + media relay) must agree, so the user agent per
+ * InnerTube client lives here.
+ */
+export const CLIENT_UA: Record<string, string> = {
+  ANDROID: "com.google.android.youtube/19.44.38 (Linux; U; Android 11; en_US) gzip",
+  IOS: "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 17_2 like Mac OS X)",
+  MWEB:
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1",
+  TVHTML5_SIMPLY_EMBEDDED_PLAYER:
+    "Mozilla/5.0 (CrKey armv7l 12.5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+  WEB: UPSTREAM_UA,
+  DEFAULT: UPSTREAM_UA,
+};
+
+export function clientUa(client?: string | null): string {
+  const key = String(client || "").toUpperCase();
+  return CLIENT_UA[key] || UPSTREAM_UA;
+}
+
+/** Google's CDN wants a plausible youtube context on every media request. */
+export const MEDIA_REFERRER = "https://www.youtube.com/watch?v=";
+
 // ---------------------------------------------------------------- allowlist --
 
 /**
@@ -202,12 +227,17 @@ export function verifyMediaSignature(url: string, sig: string | null): boolean {
   return diff === 0;
 }
 
-/** Turn an upstream URL into a same-origin media URL (proxy path + sig). */
-export function sameOriginMediaUrl(raw: string): string {
+/**
+ * Turn an upstream URL into a same-origin media URL (proxy path + sig).
+ * `client` carries which InnerTube identity produced the URL so the relay can
+ * replay it with the matching user agent.
+ */
+export function sameOriginMediaUrl(raw: string, client?: string | null): string {
   const u = new URL("/api/yt/media", "http://x");
   u.searchParams.set("url", raw);
   const sig = signMediaUrl(raw);
   if (sig) u.searchParams.set("s", sig);
+  if (client) u.searchParams.set("c", String(client).toUpperCase());
   return u.pathname + u.search;
 }
 

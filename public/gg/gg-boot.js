@@ -321,6 +321,14 @@
    * DB-served) keep their own artwork unless they opt in with
    * <meta name="gg-bg" content="on">.
    */
+  function isTouchOnly() {
+    try {
+      return !!(window.matchMedia && (!window.matchMedia('(hover: hover)').matches && !window.matchMedia('(pointer: fine)').matches));
+    } catch (e) {
+      return false;
+    }
+  }
+
   function bgAllowed() {
     try {
       var m = document.querySelector('meta[name="gg-bg"]');
@@ -451,6 +459,10 @@
   function applyTheme() {
     var t = resolvedTheme();
     var style = styleTag();
+    if (isTouchOnly() && (bg.cursor === 'spotlight' || bg.cursor === 'trail' || bg.cursor === 'magnet')) {
+      // no pointer to follow on a phone: fall back to the plain animation
+      bg = Object.assign({}, bg, { cursor: 'none' });
+    }
     if (!bgAllowed()) {
       // Plain arcade games keep their own look; they still get the cloak and the
       // panic key, just not the lounge's theme or backdrop.

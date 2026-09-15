@@ -64,8 +64,18 @@ export async function GET(req: Request) {
     `/api/gg/icon.svg?label=${encodeURIComponent(short.slice(0, 1).toUpperCase())}&color=${encodeURIComponent(
       customIcon ? "%23ffffff" : "%23d7f34a",
     )}&bg=${encodeURIComponent(theme)}&size=${size}`;
-  icons.push({ src: iconUrl(192), sizes: "192x192", type: "image/svg+xml", purpose: "any" });
-  icons.push({ src: iconUrl(512), sizes: "512x512", type: "image/svg+xml", purpose: "any" });
+  // Real brand PNGs when this is "GG-Lounge"; generated letter badges once the
+  // student cloaks the install, because a lime G on the launcher is the tell.
+  const brand = (size: number, maskable = false) =>
+    maskable ? "/brand/maskable-512.png" : `/brand/icon-${size}.png`;
+  if (isCloaked || customIcon) {
+    icons.push({ src: iconUrl(192), sizes: "192x192", type: "image/svg+xml", purpose: "any" });
+    icons.push({ src: iconUrl(512), sizes: "512x512", type: "image/svg+xml", purpose: "any" });
+  } else {
+    icons.push({ src: brand(192), sizes: "192x192", type: "image/png", purpose: "any" });
+    icons.push({ src: brand(512), sizes: "512x512", type: "image/png", purpose: "any" });
+    icons.push({ src: "/brand/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" });
+  }
 
   const manifest = {
     id: "gg-lounge",

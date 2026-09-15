@@ -1,4 +1,6 @@
 import {
+  MEDIA_REFERRER,
+  clientUa,
   isAllowedMediaUrl,
   isBlockedHost,
   sameOriginMediaUrl,
@@ -6,6 +8,8 @@ import {
 } from "../lib";
 
 export const runtime = "nodejs";
+/** Vercel Hobby caps functions at 60s; asking for more fails the build. */
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 const UA =
@@ -52,36 +56,71 @@ export async function GET(req: Request) {
     });
   }
 
-  const headers: Record<string, string> = {
-    "User-Agent": UA,
-    Accept: "*/*",
-    "Accept-Encoding": "identity",
-    "Accept-Language": "en-US,en;q=0.9",
-    Referer: "https://www.youtube.com/",
-  };
   const range = req.headers.get("range");
-  if (range) headers.Range = range;
+  const client = searchParams.get("c");
+  // The client identity that produced this URL decides the user agent; if a
+  // school network or Google still refuses, fall back through the desktop and
+  // android agents rather than giving up on the video.
+  const agents: string[] = [];
+  for (const candidate of [clientUa(client), UA, clientUa("ANDROID"), clientUa("MWEB")]) {
+    if (candidate && !agents.includes(candidate)) agents.push(candidate);
+  }
+  const referer = /googlevideo|youtube/.test(target.hostname)
+    ? MEDIA_REFERRER + (searchParams.get("v") || "")
+    : target.origin + "/";
 
-  let upstream: Response;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 25000);
-  try {
-    upstream = await fetch(target.toString(), {
-      headers,
-      signal: controller.signal,
-      redirect: "follow",
-    });
-  } catch (err) {
-    clearTimeout(timer);
+  let upstream: Response | null = null;
+  let lastError = "fetch failed";
+  for (const agent of agents) {
+    const headers: Record<string, string> = {
+      "User-Agent": agent,
+      Accept: "*/*",
+      "Accept-Encoding": "identity",
+      "Accept-Language": "en-US,en;q=0.9",
+      Referer: referer.includes("?") ? referer : referer + (referer.endsWith("/") ? "" : "/"),
+      Origin: /googlevideo|youtube/.test(target.hostname) ? "https://www.youtube.com" : target.origin,
+      "Sec-Fetch-Dest": "video",
+      "Sec-Fetch-Mode": "no-cors",
+      "Sec-Fetch-Site": "cross-site",
+    };
+    if (range) headers.Range = range;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    try {
+      const res = await fetch(target.toString(), {
+        headers,
+        signal: controller.signal,
+        redirect: "follow",
+      });
+      clearTimeout(timer);
+      if (res.ok || res.status === 206) {
+        upstream = res;
+        break;
+      }
+      // 403/429 on one agent is usually the agent, not the video: try the next.
+      lastError = `HTTP ${res.status} with ${agent.slice(0, 28)}…`;
+      if (res.status !== 403 && res.status !== 429 && res.status !== 400) {
+        upstream = res; // real answer (404 etc.) - stop retrying
+        break;
+      }
+    } catch (err) {
+      clearTimeout(timer);
+      lastError = err instanceof Error ? err.message : "fetch failed";
+    }
+  }
+
+  if (!upstream) {
     return new Response(
       JSON.stringify({
         error: "Upstream unreachable",
-        detail: err instanceof Error ? err.message : "fetch failed",
+        detail: lastError,
       }),
-      { status: 502, headers: { "content-type": "application/json" } },
+      {
+        status: 502,
+        headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
+      },
     );
   }
-  clearTimeout(timer);
 
   if (!upstream.ok && upstream.status !== 206) {
     const body = await upstream.text().catch(() => "");

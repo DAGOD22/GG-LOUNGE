@@ -40,7 +40,35 @@ for (const file of ["innertube.ts", "upstream.ts"]) {
 }
 
 const yt = await import(pathToFileURL(join(workDir, "innertube.ts")).href);
+
+// The dispatcher also exposes a pure rewriter; extract just that function so the
+// test does not need next/server at runtime.
+const dispatcher = readFileSync(join(sourceDir, "[...path]", "route.ts"), "utf8");
+const fnStart = dispatcher.indexOf("export function proxyMediaUrls");
+if (fnStart < 0) throw new Error("proxyMediaUrls not found in the dispatcher");
+let depth = 0;
+let i = dispatcher.indexOf("{", fnStart);
+let end = -1;
+for (; i < dispatcher.length; i++) {
+  if (dispatcher[i] === "{") depth++;
+  else if (dispatcher[i] === "}") {
+    depth--;
+    if (depth === 0) { end = i + 1; break; }
+  }
+}
+const shim =
+  `import * as lib from "./lib.ts";\n` +
+  dispatcher
+    .slice(fnStart, end)
+    .replace("export function", "function")
+    .replace(/sameOriginMediaUrl\(/g, "lib.sameOriginMediaUrl(")
+    .replace(/sameOriginImageUrl\(/g, "lib.sameOriginImageUrl(") +
+  `\nexport { proxyMediaUrls };\n`;
 const lib = await import(pathToFileURL(join(workDir, "lib.ts")).href);
+// Stage the extracted function as a real .ts file (type stripping only applies
+// to files, not data: URLs) and import the dispatcher's rewriter that way.
+writeFileSync(join(workDir, "dispatcher-shim.ts"), shim);
+const route = await import(pathToFileURL(join(workDir, "dispatcher-shim.ts")).href);
 
 let passed = 0;
 let failed = 0;
@@ -592,6 +620,37 @@ await check("media + image URLs are rewritten through same-origin proxies", () =
   eq(lib.isBlockedHost("169.254.1.1"), true, "link-local blocked");
   eq(lib.isBlockedHost("metadata.google.internal"), true, "cloud metadata blocked");
   return "SSRF guards intact";
+});
+
+// --------------------------------------------------------- relay rewriting --
+
+await check("stream URLs are rewritten to the same-origin relay (school playback)", () => {
+  const raw = {
+    ggClient: "ANDROID",
+    videoStreams: [
+      { url: "https://rr1---sn-abc.googlevideo.com/videoplayback?itag=18&sig=x", quality: "360p", mimeType: "video/mp4" },
+    ],
+    audioStreams: [{ url: "https://rr1---sn-abc.googlevideo.com/videoplayback?itag=140", mimeType: "audio/mp4" }],
+    hls: "https://manifest.googlevideo.com/api/manifest/hls_playlist/x.m3u8",
+    subtitles: [{ code: "en", url: "https://www.youtube.com/api/timedtext?lang=en" }],
+    thumbnailUrl: "https://i.ytimg.com/vi/ddddddddddd/maxresdefault.jpg",
+    relatedStreams: [{ title: "R", thumbnail: "https://i.ytimg.com/vi/ggggggggggg/default.jpg" }],
+  };
+  const out = route.proxyMediaUrls(raw);
+  ok(out.videoStreams[0].url.startsWith("/api/yt/media?url="), "video proxied");
+  eq(new URL(out.videoStreams[0].url, "http://x").searchParams.get("url"), raw.videoStreams[0].url, "original url round-trips intact");
+  eq(out.videoStreams[0].url.includes("&c=ANDROID"), true, "client hint rides along");
+  eq(out.videoStreams[0].urlDirect, raw.videoStreams[0].url, "direct copy kept");
+  ok(out.audioStreams[0].url.startsWith("/api/yt/media?url="), "audio proxied");
+  ok(out.hls.startsWith("/api/yt/media?url="), "hls proxied");
+  eq(out.hlsDirect, raw.hls, "hls direct kept");
+  ok(out.subtitles[0].url.startsWith("/api/yt/media?url="), "captions proxied");
+  ok(out.thumbnailUrl.startsWith("/api/yt/img?url="), "thumbnail proxied");
+  ok(out.relatedStreams[0].thumbnail.startsWith("/api/yt/img?url="), "related thumbnail proxied");
+  ok(!("ggClient" in out), "internal client tag stripped");
+  const twice = route.proxyMediaUrls(out);
+  eq(twice.videoStreams[0].url, out.videoStreams[0].url, "idempotent (never double-wrapped)");
+  return "relay + client hint + urlDirect";
 });
 
 // --------------------------------------------------------------------- done --

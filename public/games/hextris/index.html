@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Hextris</title>
+<link rel="icon" href="/brand/icon-32.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#0d0f16" />
+<style>
+  :root{--bg:var(--gg-bg,#0d0f16);--text:var(--gg-text,#f2f4f8);--muted:var(--gg-muted,#98a0b3);--accent:var(--gg-accent,#def75c)}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:600 14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overscroll-behavior:none;user-select:none}
+  .wrap{min-height:100%;display:grid;place-items:center;padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom))}
+  .stage{position:relative;width:min(96vw,540px);display:flex;flex-direction:column;align-items:center;gap:10px}
+  canvas{display:block;width:100%;aspect-ratio:1/1;touch-action:none;border-radius:16px}
+  .hud{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%}
+  .stat{padding:6px 12px;border-radius:11px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);text-align:center}
+  .stat b{display:block;font-size:19px;letter-spacing:-.02em}
+  .stat small{display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .over{position:absolute;inset:0;display:none;place-items:center;z-index:3}
+  .over.show{display:grid}
+  .over .card{display:grid;gap:9px;justify-items:center;padding:26px 30px;border-radius:18px;background:rgba(9,11,16,.9);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px);text-align:center}
+  .over h2{margin:0;font-size:27px;letter-spacing:-.03em}
+  .over p{margin:0;color:var(--muted);font-size:12px}
+  button{font:inherit;font-weight:800;color:#0b0d12;background:var(--accent);border:0;border-radius:11px;padding:10px 18px;cursor:pointer}
+  .help{color:var(--muted);font-size:11px;text-align:center;letter-spacing:.03em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage">
+    <div class="hud">
+      <div class="stat"><b id="score">0</b><small>score</small></div>
+      <div class="stat"><b id="level">1</b><small>speed</small></div>
+      <div class="stat"><b id="best">0</b><small>best</small></div>
+    </div>
+    <canvas id="c" width="540" height="540"></canvas>
+    <div class="over" id="over"><div class="card"><h2 id="overTitle">Game over</h2><p id="overSub">a block crossed the top line</p><button id="restart">Play again</button></div></div>
+    <div class="help">Tap the <b>left</b> or <b>right</b> half (or <b>←→</b> / <b>A D</b>) to spin the three columns on that side. Line up three or more of a colour.</div>
+  </div>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ------------------------------------------------------------------ model --
+  var COLS = 6, ROWS = 6;
+  var COLORS = ['#f8f18c', '#ff5c5c', '#f7a53b', '#5ce1e6', '#b06cf5'];
+  var cv = document.getElementById('c');
+  var ctx = cv.getContext('2d');
+  var board = (function () {
+    var b = [];
+    for (var i = 0; i < COLS; i++) b.push([null, null, null, null, null, null]);
+    return b;
+  })();
+  var score = 0, best = 0, over = false, timer = null, spin = [0, 0, 0, 0, 0, 0];
+  var pops = [];
+
+  try { best = parseInt(localStorage.getItem('gghextris.best') || '0', 10) || 0; } catch (e) { best = 0; }
+
+  function reset() {
+    board = [];
+    for (var c = 0; c < COLS; c++) board.push([null, null, null, null, null, null]);
+    score = 0; over = false; pops = [];
+    // a friendly opening: two rows, no instant 3-lines
+    for (var r = 0; r < 2; r++) fillRow(r, true);
+    document.getElementById('over').classList.remove('show');
+    restartTimer();
+    draw();
+    hud();
+  }
+
+  function fillRow(r, gentle) {
+    var count = gentle ? 3 : 1 + ((Math.random() * 3) | 0);
+    var picks = [];
+    for (var c = 0; c < COLS; c++) picks.push(c);
+    for (var i = picks.length - 1; i > 0; i--) {
+      var j = (Math.random() * (i + 1)) | 0;
+      var t = picks[i]; picks[i] = picks[j]; picks[j] = t;
+    }
+    for (var k = 0; k < count && k < picks.length; k++) {
+      var col = picks[k];
+      var color = pickColor(col, r);
+      board[col][r] = color;
+    }
+  }
+
+  function pickColor(col, r) {
+    var left = col > 0 ? board[col - 1][r] : null;
+    var right = col < COLS - 1 ? board[col + 1][r] : null;
+    for (var guard = 0; guard < 6; guard++) {
+      var c = (Math.random() * COLORS.length) | 0;
+      if (left !== c && right !== c) return c;
+    }
+    return 0;
+  }
+
+  // odd columns sit half a cell higher: that is the hex stagger
+  function isOdd(c) { return c % 2 === 1; }
+  function neighbour(c, r, dir) {
+    // dir 0 = E, 1 = NE, 2 = SE, 3 = N, 4 = S, 5 = NW, 6 = SW
+    if (dir === 0) return [c + 1, r];
+    if (dir === 3) return [c, r + 1];
+    if (dir === 4) return [c, r - 1];
+    var up = isOdd(c) ? r : r + 1;      // NE / NW from even columns go up one
+    var down = isOdd(c) ? r - 1 : r;    // SE / SW
+    if (dir === 1) return [c + 1, up];
+    if (dir === 2) return [c + 1, down];
+    if (dir === 5) return [c - 1, up];
+    if (dir === 6) return [c - 1, down];
+    return [c, r];
+  }
+  function get(c, r) { return c < 0 || r < 0 || c >= COLS || r >= ROWS ? undefined : board[c][r]; }
+
+  // ------------------------------------------------------------- rotations --
+  /** Spin one side: the three columns on that side cycle toward the top, and the
+   *  block that leaves the top wraps to the bottom - that is the hex turn. */
+  function rotate(side, dir) {
+    if (over) return;
+    for (var c = side; c < COLS; c += 2) {
+      var col = board[c];
+      if (dir > 0) {
+        var top = col[ROWS - 1];
+        for (var r = ROWS - 1; r > 0; r--) col[r] = col[r - 1];
+        col[0] = top;
+        spin[c] = -1;
+      } else {
+        var bot = col[0];
+        for (var r2 = 0; r2 < ROWS - 1; r2++) col[r2] = col[r2 + 1];
+        col[ROWS - 1] = bot;
+        spin[c] = 1;
+      }
+    }
+    var cleared = resolve();
+    if (!cleared) pushUp();
+    else score += cleared * 10;
+    hud();
+    draw();
+  }
+
+  /** Every 2 columns share a turn direction so the board reads as one rotation. */
+  function turnLeft() { rotate(0, 1); rotate(1, -1); }
+  function turnRight() { rotate(0, -1); rotate(1, 1); }
+
+  function pushUp() {
+    for (var c = 0; c < COLS; c++) {
+      if (board[c][ROWS - 1] !== null && board[c][ROWS - 1] !== undefined) {
+        // a block is about to be squeezed off the top
+        gameOver();
+        return;
+      }
+    }
+    for (var c2 = 0; c2 < COLS; c2++) {
+      for (var r = ROWS - 1; r > 0; r--) board[c2][r] = board[c2][r - 1];
+      board[c2][0] = null;
+    }
+    fillRow(0, false);
+    resolve();
+  }
+
+  // ---------------------------------------------------------------- matches --
+  function findRuns() {
+    var mark = {}, found = 0;
+    var dirs = [0, 1, 2];
+    for (var c = 0; c < COLS; c++) {
+      for (var r = 0; r < ROWS; r++) {
+        var color = get(c, r);
+        if (color === null || color === undefined) continue;
+        for (var d = 0; d < dirs.length; d++) {
+          var run = [[c, r]];
+          var cc = c, rr = r;
+          while (true) {
+            var n = neighbour(cc, rr, dirs[d]);
+            if (get(n[0], n[1]) === color) { run.push(n); cc = n[0]; rr = n[1]; } else break;
+          }
+          if (run.length >= 3) {
+            found += run.length;
+            for (var i = 0; i < run.length; i++) mark[run[i][0] + ':' + run[i][1]] = color;
+          }
+        }
+      }
+    }
+    return { mark: mark, count: found };
+  }
+
+  function resolve() {
+    var res = findRuns();
+    var keys = Object.keys(res.mark);
+    if (!keys.length) return 0;
+    for (var i = 0; i < keys.length; i++) {
+      var p = keys[i].split(':');
+      pops.push({ c: +p[0], r: +p[1], t: 1, color: COLORS[res.mark[keys[i]]] });
+      board[+p[0]][+p[1]] = null;
+    }
+    // gravity inside each column
+    for (var c = 0; c < COLS; c++) {
+      var keep = [];
+      for (var r = 0; r < ROWS; r++) if (board[c][r] !== null && board[c][r] !== undefined) keep.push(board[c][r]);
+      for (var r2 = 0; r2 < ROWS; r2++) board[c][r2] = r2 < keep.length ? keep[r2] : null;
+    }
+    score += keys.length * 10 + (keys.length > 3 ? 20 : 0);
+    if (score > best) { best = score; try { localStorage.setItem('gghextris.best', String(best)); } catch (e) { /* noop */ } }
+    restartTimer();
+    return keys.length;
+  }
+
+  function gameOver() {
+    over = true;
+    if (timer) { clearInterval(timer); timer = null; }
+    document.getElementById('overTitle').textContent = 'Game over';
+    document.getElementById('overSub').textContent = 'score ' + score + ' / best ' + best;
+    document.getElementById('over').classList.add('show');
+  }
+
+  function speed() { return Math.max(430, 1150 - Math.floor(score / 120) * 65); }
+  function restartTimer() {
+    if (timer) clearInterval(timer);
+    if (over) return;
+    timer = setInterval(function () {
+      if (document.hidden || over) return;
+      pushUp();
+      hud();
+      draw();
+    }, speed());
+  }
+
+  function hud() {
+    document.getElementById('score').textContent = score;
+    document.getElementById('best').textContent = best;
+    document.getElementById('level').textContent = 1 + Math.floor(score / 120);
+  }
+
+  // ----------------------------------------------------------------- render --
+  var geom = null;
+  function layout(w) {
+    var pad = w * 0.045;
+    var cell = (w - pad * 2) / COLS;
+    var gap = cell * 0.09;
+    geom = { pad: pad, cell: cell, gap: gap, w: w };
+  }
+  function center(c, r) {
+    var g = geom;
+    var x = g.pad + g.cell * (c + 0.5);
+    var y = g.w - g.pad - g.cell * (r + 0.5) - (isOdd(c) ? 0 : g.cell * 0.16);
+    return [x, y];
+  }
+  function draw() {
+    var g = geom;
+    if (!g || !board) return;
+    ctx.clearRect(0, 0, g.w, g.w);
+    // hexagon plate
+    ctx.save();
+    hexPath(g.w / 2, g.w / 2, g.w * 0.48);
+    ctx.fillStyle = 'rgba(255,255,255,.035)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.09)';
+    ctx.lineWidth = Math.max(1, g.w * 0.006);
+    ctx.stroke();
+    ctx.clip();
+
+    // danger line
+    var lineY = g.w - g.pad - g.cell * ROWS + g.cell * 0.1;
+    ctx.strokeStyle = 'rgba(255,92,92,.35)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, lineY);
+    ctx.lineTo(g.w, lineY);
+    ctx.stroke();
+
+    for (var c = 0; c < COLS; c++) {
+      for (var r = 0; r < ROWS; r++) {
+        var v = board[c][r];
+        var p = center(c, r);
+        var size = g.cell - g.gap * 2;
+        if (v === null || v === undefined) {
+          ctx.fillStyle = 'rgba(255,255,255,.04)';
+          roundRect(p[0] - size / 2, p[1] - size / 2, size, size, size * 0.22);
+          ctx.fill();
+          continue;
+        }
+        var shift = spin[c] * g.cell * 0.22;
+        ctx.fillStyle = COLORS[v];
+        ctx.shadowColor = 'rgba(0,0,0,.35)';
+        ctx.shadowBlur = g.cell * 0.12;
+        ctx.shadowOffsetY = g.cell * 0.04;
+        roundRect(p[0] - size / 2, p[1] - size / 2 + shift, size, size, size * 0.22);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.fillStyle = 'rgba(255,255,255,.22)';
+        roundRect(p[0] - size / 2 + size * 0.1, p[1] - size / 2 + shift + size * 0.1, size * 0.8, size * 0.2, size * 0.1);
+        ctx.fill();
+      }
+    }
+    for (var i = 0; i < pops.length; i++) {
+      var q = pops[i];
+      var pc = center(q.c, q.r);
+      var s = (geom.cell - geom.gap * 2) * q.t;
+      ctx.globalAlpha = Math.max(0, q.t - 0.25);
+      ctx.fillStyle = q.color;
+      roundRect(pc[0] - s / 2, pc[1] - s / 2, s, s, s * 0.25);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      q.t -= 0.14;
+    }
+    pops = pops.filter(function (p2) { return p2.t > 0.05; });
+    ctx.restore();
+    if (pops.length || spin.some(function (s2) { return s2 !== 0; })) {
+      for (var k = 0; k < spin.length; k++) spin[k] *= 0.55;
+      requestAnimationFrame(draw);
+    }
+  }
+  function hexPath(cx, cy, rad) {
+    ctx.beginPath();
+    for (var i = 0; i < 6; i++) {
+      var a = Math.PI / 180 * (60 * i - 30);
+      var x = cx + rad * Math.cos(a), y = cy + rad * Math.sin(a);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  }
+  function roundRect(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function fit() {
+    var rect = cv.getBoundingClientRect();
+    var dpr = Math.min(3, window.devicePixelRatio || 1);
+    var side = Math.max(240, Math.round(rect.width));
+    cv.width = Math.round(side * dpr);
+    cv.height = Math.round(side * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    layout(side);
+    draw();
+  }
+  window.addEventListener('resize', fit);
+
+  // --------------------------------------------------------------- controls --
+  var sx = 0, sy = 0, hold = false;
+  cv.addEventListener('pointerdown', function (e) {
+    if (over) { reset(); return; }
+    hold = true; sx = e.clientX; sy = e.clientY;
+    var box = cv.getBoundingClientRect();
+    if (e.clientX - box.left < box.width / 2) turnLeft(); else turnRight();
+  });
+  cv.addEventListener('pointerup', function (e) {
+    if (!hold) return;
+    hold = false;
+    var dx = e.clientX - sx, dy = e.clientY - sy;
+    if (Math.abs(dx) > 46 && Math.abs(dx) > Math.abs(dy)) (dx > 0 ? turnRight : turnLeft)();
+  });
+  document.addEventListener('keydown', function (e) {
+    var k = e.key;
+    if (k === 'ArrowLeft' || k === 'a' || k === 'A') { e.preventDefault(); turnLeft(); }
+    else if (k === 'ArrowRight' || k === 'd' || k === 'D') { e.preventDefault(); turnRight(); }
+    else if (k === 'q' || k === 'Q') { e.preventDefault(); turnLeft(); }
+    else if (k === 'e' || k === 'E') { e.preventDefault(); turnRight(); }
+    else if (k === 'n' || k === 'N' || (over && (k === ' ' || k === 'Enter'))) { e.preventDefault(); reset(); }
+  });
+  document.getElementById('restart').addEventListener('click', reset);
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { if (timer) { clearInterval(timer); timer = null; } }
+    else if (!over) restartTimer();
+  });
+
+  fit();
+  reset();
+})();
+</script>
+<script src="/gg/gg-boot.js"></script>
+</body>
+</html>

@@ -361,3 +361,93 @@ input[type=color]{width:42px;height:38px;padding:0;border:1px solid var(--gg-lin
 .game-grid.compact .game-art{min-height:130px}
 .game-grid.compact .game-info h3{font-size:17px}
 @media(max-width:760px){.fab-stack{right:14px;bottom:14px}.hero-links{gap:14px}}
+
+/* ------------------------------------------------------------------- mobile --
+   Phones and tablets get their own rhythm: sticky chip nav, thumb-sized targets,
+   dynamic-viewport heights (so iOS Safari's URL bar stops clipping the game
+   frame), and no hover-only affordances. */
+html{-webkit-text-size-adjust:100%}
+body{-webkit-tap-highlight-color:transparent}
+button,a,.play-button,.filter-tabs button,.modal-actions button{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+@supports(height:100dvh){
+  .lounge-shell,.proxy-shell,.settings-shell,.admin-shell{min-height:100dvh}
+  .game-modal{height:100dvh}
+}
+.mobile-nav{display:none}
+@media(max-width:760px){
+  .site-header{height:64px;padding-inline:16px}
+  .brand{font-size:12px;letter-spacing:.1em}
+  .brand-mark{width:30px;height:30px;border-radius:9px}
+  .header-status{display:none}
+  .mobile-nav{display:flex;position:sticky;top:0;z-index:12;gap:8px;padding:9px 16px;overflow-x:auto;overscroll-behavior-x:contain;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--background) 88%,transparent);backdrop-filter:blur(12px);scrollbar-width:none}
+  .mobile-nav::-webkit-scrollbar{display:none}
+  .mobile-nav a{flex:0 0 auto;padding:10px 14px;border:1px solid var(--line);border-radius:99px;font-size:12px;font-weight:800;letter-spacing:.02em;color:var(--muted);white-space:nowrap;background:rgba(255,255,255,.045)}
+  .mobile-nav a:active{color:var(--ink);background:var(--lime);border-color:var(--lime)}
+  .mobile-nav a.hot{color:var(--ink);background:var(--lime);border-color:var(--lime)}
+  .hero{min-height:0;padding-top:26px;padding-bottom:44px;gap:26px}
+  .hero h1{font-size:clamp(2.9rem,15vw,4.2rem);letter-spacing:-.06em;margin-bottom:18px}
+  .hero-text{font-size:14px;margin-bottom:20px}
+  .hero-stats{flex-wrap:wrap;gap:14px 22px;margin-top:24px}
+  .spotlight{min-height:0;padding:18px;border-radius:22px}
+  .spotlight-mark{font-size:62px;text-shadow:6px 6px 0 var(--coral),12px 12px 0 var(--violet)}
+  .spotlight-art{min-height:120px}
+  .orbit-a{width:190px;height:78px}
+  .orbit-b{width:130px;height:180px}
+  .catalog{padding-top:14px;padding-bottom:76px}
+  .section-heading h2{font-size:27px}
+  .game-grid{gap:12px}
+  .game-card{grid-template-columns:1fr;min-height:0;border-radius:16px}
+  .game-card .game-art{min-height:148px}
+  .game-info{padding:15px 15px 14px}
+  .game-info h3{font-size:18px;margin:7px 0 6px}
+  .play-button{padding:11px 15px;font-size:12px}
+  .filter-tabs{gap:6px}
+  .filter-tabs button{padding:10px 13px;font-size:12px}
+  .search-wrap{padding:12px 14px}
+  .search-wrap input{font-size:16px}
+  .game-modal{padding:6px;gap:0}
+  .modal-bar{margin-bottom:6px;padding:2px}
+  .modal-bar strong{font-size:13px}
+  .modal-actions{gap:6px}
+  .modal-actions button{width:42px;height:42px;border-radius:11px}
+  .game-frame{border-width:0;border-radius:12px}
+  .fab-stack{right:12px;bottom:calc(12px + env(safe-area-inset-bottom))}
+  .gg-fab{padding:12px 14px;font-size:11px}
+  .proxy-bar{padding:8px 10px;gap:8px}
+  .proxy-brand{font-size:11px}
+  .proxy-form{order:3;flex-basis:100%;min-width:0;padding:10px 14px}
+  .proxy-status{order:4;flex-basis:100%;font-size:11px;white-space:normal}
+  .proxy-frame{min-height:calc(100dvh - 112px)}
+  .proxy-home{padding:22px 16px;gap:12px}
+  .proxy-home h1{font-size:clamp(30px,10vw,44px)}
+  .proxy-quick button{padding:11px 16px;font-size:13px}
+  .settings-shell{padding-bottom:70px}
+  .gg-keycap{min-height:52px}
+  footer{padding-inline:16px}
+}
+@media(max-width:520px){
+  h1{font-size:clamp(2.4rem,12.5vw,3.1rem)}
+  .collection-note{font-size:10px}
+  .game-art,.game-card .game-art{min-height:132px}
+  .game-mark{font-size:44px;text-shadow:4px 4px 0 rgba(0,0,0,.25)}
+}
+@media(hover:none){
+  .game-card:hover{transform:none;border-color:var(--line);box-shadow:none}
+  .circle-play:hover{transform:none}
+  .play-button:hover{color:var(--foreground);background:transparent;border-color:var(--line)}
+  .play-button:active{color:var(--ink);background:var(--lime);border-color:var(--lime)}
+  .game-card:active{transform:scale(.99)}
+}
+/* landscape phones: hand the game the whole screen, keep the chrome thin */
+@media(max-height:540px) and (orientation:landscape){
+  .game-modal{padding:0}
+  .modal-bar{position:sticky;top:0;z-index:2;margin:0;padding:4px 10px;background:rgba(6,7,10,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .modal-bar span,.modal-bar small{display:none}
+  .game-frame{border:0;border-radius:0;height:100dvh}
+}
+/* tablets: two-up grid stays readable without stealing the desktop layout */
+@media(min-width:761px) and (max-width:1080px){
+  .hero{grid-template-columns:1fr;gap:40px;min-height:0}
+  .spotlight{max-width:640px}
+  .game-grid{grid-template-columns:repeat(2,1fr)}
+}
