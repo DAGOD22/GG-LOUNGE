@@ -15,7 +15,11 @@ const DIRECTORY = "/api/bare/";
 const bare = createBareServer(DIRECTORY);
 
 function cleanText(value: string): string {
-  return value.replace(/[^\x20-\x7E]/g, "").slice(0, 200) || "OK";
+  return value.replace(/[\r\n]+/g, " ").trim() || "OK";
+}
+
+function cleanStatus(value: string): string {
+  return value.replace(/[^\x20-\x7E]/g, "").slice(0, 80) || "OK";
 }
 
 async function handle(req: Request): Promise<Response> {
@@ -33,7 +37,7 @@ async function handle(req: Request): Promise<Response> {
   // url/method/headers fields the bare library reads.
   let fakeReq: Readable & { url: string; method?: string; headers: Record<string, string> };
   if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") {
-    fakeReq = Object.assign(new Readable({ read() {} }), {
+    fakeReq = Object.assign(Readable.from([]), {
       url: barePath,
       method: req.method,
       headers,
@@ -62,7 +66,7 @@ async function handle(req: Request): Promise<Response> {
         resolve(
           new Response(Buffer.concat(chunks), {
             status,
-            statusText: cleanText(statusText),
+            statusText: cleanStatus(statusText),
             headers: outHeaders,
           }),
         );

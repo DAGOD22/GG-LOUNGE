@@ -173,3 +173,68 @@
 .admin-back{display:inline-block;margin-top:16px;color:rgba(255,255,255,.6);font-size:14px;text-decoration:none}
 .admin-back:hover{color:var(--lime)}
 @media(max-width:900px){.admin-grid{grid-template-columns:1fr}.stat-row{grid-template-columns:repeat(2,1fr)}.upload-form{grid-template-columns:1fr}}
+
+/* ---- Arcade View Switcher & Shelves Redesign ---- */
+.toolbar-controls{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.view-switcher{display:inline-flex;padding:3px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid var(--line);gap:3px}
+.view-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:9px;border:0;background:transparent;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s}
+.view-btn:hover{color:var(--foreground);background:rgba(255,255,255,.07)}
+.view-btn.active{color:var(--ink);background:var(--lime);font-weight:900;box-shadow:0 2px 10px rgba(215,243,74,.3)}
+
+/* Shelves View */
+.arcade-shelves{display:flex;flex-direction:column;gap:36px;margin-top:10px}
+.arcade-shelf{display:flex;flex-direction:column;gap:12px;position:relative}
+.shelf-header{display:flex;align-items:center;justify-content:space-between;padding-inline:4px}
+.shelf-title-wrap{display:flex;align-items:center;gap:10px}
+.shelf-title-wrap h3{margin:0;font-size:20px;letter-spacing:-.03em;display:flex;align-items:center;gap:8px}
+.shelf-title-wrap h3 span{color:var(--lime)}
+.shelf-badge{font-size:11px;font-weight:800;padding:2px 8px;border-radius:99px;background:rgba(255,255,255,.08);color:var(--muted)}
+.shelf-nav{display:flex;gap:6px}
+.shelf-nav button{width:32px;height:32px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--foreground);display:grid;place-items:center;cursor:pointer;transition:all .15s}
+.shelf-nav button:hover{background:var(--lime);color:var(--ink);border-color:var(--lime)}
+
+.shelf-track{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;padding:6px 2px 16px;scrollbar-width:thin;scrollbar-color:rgba(215,243,74,.3) transparent}
+.shelf-track::-webkit-scrollbar{height:6px}
+.shelf-track::-webkit-scrollbar-track{background:transparent}
+.shelf-track::-webkit-scrollbar-thumb{background:rgba(215,243,74,.25);border-radius:99px}
+.shelf-track::-webkit-scrollbar-thumb:hover{background:var(--lime)}
+
+.shelf-card{flex:0 0 195px;min-width:195px;scroll-snap-align:start;display:flex;flex-direction:column;position:relative;border:1px solid var(--line);border-radius:16px;background:var(--panel);overflow:hidden;transition:transform .2s,border-color .2s,box-shadow .2s;text-align:left;padding:0;cursor:pointer}
+.shelf-card:hover{transform:translateY(-6px);border-color:rgba(215,243,74,.5);box-shadow:0 16px 36px rgba(0,0,0,.35)}
+.shelf-card-art{height:120px;display:grid;place-items:center;position:relative;background:linear-gradient(145deg,rgba(255,255,255,.08),transparent);overflow:hidden}
+.shelf-card-mark{font-size:44px;font-weight:900;letter-spacing:-.12em;color:var(--foreground);transform:rotate(-8deg);text-shadow:3px 3px 0 rgba(0,0,0,.25)}
+.shelf-card-art .game-icon{width:64px;height:64px;border-radius:12px}
+.shelf-card-body{padding:12px 14px 14px;display:flex;flex-direction:column;justify-content:space-between;flex:1;gap:8px}
+.shelf-card-body h4{margin:0;font-size:14.5px;font-weight:800;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shelf-card-meta{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.shelf-kicker{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.shelf-play-btn{width:28px;height:28px;border-radius:8px;background:var(--lime);color:var(--ink);border:0;display:grid;place-items:center;cursor:pointer;flex:none;transition:transform .15s}
+.shelf-card:hover .shelf-play-btn{transform:scale(1.1)}
+.shelf-fav-btn{position:absolute;top:8px;right:8px;z-index:3;border:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--muted);cursor:pointer;transition:color .15s,background .15s}
+.shelf-fav-btn:hover{color:var(--coral);background:rgba(0,0,0,.7)}
+.shelf-fav-btn.active{color:var(--coral)}
+
+/* Compact Grid View */
+.compact-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:14px;margin-top:10px}
+.compact-card{display:flex;flex-direction:column;position:relative;border:1px solid var(--line);border-radius:15px;background:var(--panel);overflow:hidden;transition:transform .2s,border-color .2s,box-shadow .2s;text-align:left;padding:0;cursor:pointer}
+.compact-card:hover{transform:translateY(-5px);border-color:rgba(215,243,74,.5);box-shadow:0 14px 32px rgba(0,0,0,.3)}
+.compact-card-art{height:105px;display:grid;place-items:center;position:relative;background:linear-gradient(145deg,rgba(255,255,255,.08),transparent);overflow:hidden}
+.compact-card-mark{font-size:38px;font-weight:900;letter-spacing:-.12em;color:var(--foreground);transform:rotate(-8deg)}
+.compact-card-art .game-icon{width:56px;height:56px;border-radius:12px}
+.compact-card-body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px}
+.compact-card-body h4{margin:0;font-size:13.5px;font-weight:800;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.compact-kicker{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.compact-actions{display:flex;align-items:center;justify-content:space-between;margin-top:2px}
+.compact-play-btn{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:7px;border:0;background:var(--lime);color:var(--ink);font-size:11px;font-weight:900;cursor:pointer}
+.compact-play-btn:hover{filter:brightness(1.08)}
+
+/* Modal Actions Enhancement */
+.modal-btn{display:grid;place-items:center;width:38px;height:38px;border:1px solid var(--line);border-radius:9px;color:var(--foreground);background:var(--panel);cursor:pointer;text-decoration:none}
+.modal-btn:hover{color:var(--ink);background:var(--lime);border-color:var(--lime)}
+
+@media(max-width:760px){
+  .compact-grid{grid-template-columns:repeat(2,1fr)}
+  .shelf-card{flex:0 0 160px;min-width:160px}
+  .shelf-card-art{height:95px}
+  .shelf-card-mark{font-size:32px}
+}

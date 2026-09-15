@@ -49,12 +49,17 @@
         preRun: [
           () => {
             addRunDependency("load-idb");
-            FS.mkdir("/classicube");
-            FS.mount(IDBFS, {}, "/classicube");
-            FS.syncfs(true, (err) => {
-              assert(!err);
+            try {
+              FS.mkdir("/classicube");
+              FS.mount(IDBFS, {}, "/classicube");
+              FS.syncfs(true, (err) => {
+                if (err) console.warn("IDB sync error:", err);
+                removeRunDependency("load-idb");
+              });
+            } catch (e) {
+              console.warn("IDB mount error:", e);
               removeRunDependency("load-idb");
-            });
+            }
           },
         ],
         locateFile(path, prefix) {
@@ -84,12 +89,24 @@
         },
       };
 
-      if (parent !== window) {
-        const dupe = (event) => window.dispatchEvent(new event.constructor(event.type, Object.fromEntries(Object.getOwnPropertyNames(event.constructor.prototype).map((x) => [x, event[x]]))));
-
-        parent.addEventListener("keydown", dupe);
-        parent.addEventListener("keyup", dupe);
-      }
+      try {
+        if (parent !== window) {
+          const dupe = (e) => {
+            try {
+              window.dispatchEvent(new KeyboardEvent(e.type, {
+                key: e.key,
+                code: e.code,
+                keyCode: e.keyCode,
+                which: e.which,
+                bubbles: true,
+                cancelable: true,
+              }));
+            } catch (err) {}
+          };
+          parent.addEventListener("keydown", dupe);
+          parent.addEventListener("keyup", dupe);
+        }
+      } catch (err) {}
 
       document.addEventListener("click", () => {
         window.focus();

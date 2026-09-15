@@ -1395,7 +1395,7 @@ class Game {
 
     gameOver() {
         this.gameOverFlag = true;
-        this.showMessage('僵尸吃掉了你的脑子!', true);
+        this.showMessage('THE ZOMBIES ATE YOUR BRAINS!', true);
     }
 
     showMessage(text, permanent = false) {
@@ -1503,7 +1503,7 @@ class Game {
         if (this.frame % 3000 === 0) {
             this.wave++;
             this.updateUI();
-            this.showMessage(`第 ${this.wave} 波僵尸来袭!`);
+            this.showMessage(`Wave ${this.wave} is coming!`);
         }
     }
 
@@ -1707,5 +1707,5 @@ document.getElementById('startButton').addEventListener('click', async () => {
     document.getElementById('startScreen').classList.add('hidden');
     await game.init();
     game.startBGM();
-    game.showMessage('准备保卫你的花园!');
+    game.showMessage('Defend your garden!');
 });

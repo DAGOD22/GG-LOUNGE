@@ -1,7 +1,27 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap } from 'lucide-react'
+import {
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  ExternalLink,
+  Flame,
+  Gamepad2,
+  Heart,
+  Layers,
+  LayoutGrid,
+  Maximize2,
+  Play,
+  RotateCw,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Trophy,
+  X,
+  Zap,
+} from 'lucide-react'
 
 type Game = { id: string; title: string; subtitle: string; description: string; genre: string; tone: string; mark: string; color: string; path: string; icon?: string; featured?: boolean }
 
@@ -106,58 +126,267 @@ const games: Game[] = [
   { id: 'snow-rider-3d', title: 'Snow Rider 3D', subtitle: 'Shred the mountain.', description: 'Dodge trees and grab gifts on an endless snowy ride.', genre: 'Arcade', tone: 'Reflex', mark: 'SN', color: 'hextris', path: '/games/snow-rider-3d/index.html' },
   { id: 'granny', title: 'Granny', subtitle: 'Don’t make a sound.', description: 'Escape Granny’s house in 5 days — quietly.', genre: 'Arcade', tone: 'Horror', mark: 'GR', color: 'twenty', path: '/games/granny/index.html' },
 ]
-const filters = ['All games', 'Idle', 'Arcade', 'Puzzle', 'Racing', 'Platformer', 'Simulation', 'Sandbox', 'Video', 'Community', 'Proxy', 'Favorites']
-const pubColors = ['cookie', 'drive', 'mining', 'devil', 'stack', 'hextris', 'twenty', 'youtube']
+const filters = [
+  "All games",
+  "Idle",
+  "Arcade",
+  "Puzzle",
+  "Racing",
+  "Platformer",
+  "Simulation",
+  "Sandbox",
+  "Video",
+  "Community",
+  "Proxy",
+  "Favorites"
+];
+const pubColors = ["cookie", "drive", "mining", "devil", "stack", "hextris", "twenty", "youtube"];
 
-type PublishedListing = { id: string; title: string; icon: string | null }
+type PublishedListing = { id: string; title: string; icon: string | null };
+type ViewMode = "shelves" | "grid" | "cards";
 
 export default function Page() {
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState('All games')
-  const [favorites, setFavorites] = useState<string[]>([])
-  const [activeGame, setActiveGame] = useState<Game | null>(null)
-  const [published, setPublished] = useState<Game[]>([])
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("All games");
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [recent, setRecent] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>("shelves");
+  const [activeGame, setActiveGame] = useState<Game | null>(null);
+  const [published, setPublished] = useState<Game[]>([]);
 
   useEffect(() => {
-    fetch('/api/games')
+    try {
+      const savedFavs = localStorage.getItem("gg_favorites");
+      if (savedFavs) setFavorites(JSON.parse(savedFavs));
+      const savedRecent = localStorage.getItem("gg_recent_games");
+      if (savedRecent) setRecent(JSON.parse(savedRecent));
+      const savedView = localStorage.getItem("gg_view_mode") as ViewMode | null;
+      if (savedView === "shelves" || savedView === "grid" || savedView === "cards") setViewMode(savedView);
+    } catch {}
+
+    fetch("/api/games")
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { games?: PublishedListing[] } | null) => {
-        if (!d?.games) return
+        if (!d?.games) return;
         setPublished(
           d.games.map((g, i) => ({
-            id: 'pub-' + g.id,
+            id: "pub-" + g.id,
             title: g.title,
-            subtitle: 'Community upload.',
-            description: 'Published by the lounge community.',
-            genre: 'Community',
-            tone: 'Fresh',
-            mark: g.title.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'GG',
+            subtitle: "Community upload.",
+            description: "Published by the lounge community.",
+            genre: "Community",
+            tone: "Fresh",
+            mark: g.title.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "GG",
             color: pubColors[i % pubColors.length],
-            path: '/games/' + g.id,
+            path: "/games/" + g.id,
             icon: g.icon || undefined,
-          })),
-        )
+          }))
+        );
       })
-      .catch(() => {})
-  }, [])
+      .catch(() => {});
+  }, []);
 
-  const allGames = useMemo(() => [...games, ...published], [published])
+  const allGames = useMemo(() => [...games, ...published], [published]);
+
   const visibleGames = useMemo(
     () =>
       allGames.filter(
         (game) =>
-          `${game.title} ${game.genre} ${game.tone}`.toLowerCase().includes(query.toLowerCase()) &&
-          (filter === 'All games' || game.genre === filter || (filter === 'Favorites' && favorites.includes(game.id))),
+          `${game.title} ${game.genre} ${game.tone} ${game.subtitle}`.toLowerCase().includes(query.toLowerCase()) &&
+          (filter === "All games" || game.genre === filter || (filter === "Favorites" && favorites.includes(game.id)))
       ),
-    [allGames, favorites, filter, query],
-  )
+    [allGames, favorites, filter, query]
+  );
+
+  const shelfDefinitions = useMemo(() => {
+    const byId = (idList: string[]) =>
+      idList.map((id) => allGames.find((g) => g.id === id)).filter((g): g is Game => Boolean(g));
+
+    const list: { id: string; title: string; subtitle: string; icon: typeof Trophy; games: Game[] }[] = [];
+
+    if (recent.length > 0) {
+      const recentGames = recent.map((id) => allGames.find((g) => g.id === id)).filter((g): g is Game => Boolean(g));
+      if (recentGames.length > 0) {
+        list.push({ id: "shelf-recent", title: "Jump Back In", subtitle: "Recently played by you", icon: Clock, games: recentGames });
+      }
+    }
+
+    if (favorites.length > 0) {
+      const favGames = allGames.filter((g) => favorites.includes(g.id));
+      if (favGames.length > 0) {
+        list.push({ id: "shelf-favs", title: "Your Favorites", subtitle: "Starred arcade favorites", icon: Heart, games: favGames });
+      }
+    }
+
+    list.push({
+      id: "shelf-trending",
+      title: "Top Lounge Picks",
+      subtitle: "Most played right now",
+      icon: Flame,
+      games: byId([
+        "cookie-clicker",
+        "eaglercraftx",
+        "drift-boss",
+        "fnaf",
+        "granny",
+        "happy-wheels",
+        "run-3",
+        "poki",
+        "retro-bowl",
+        "level-devil",
+        "drive-mad",
+        "snow-rider-3d",
+        "plants-vs-zombies",
+        "slope",
+      ]),
+    });
+
+    list.push({
+      id: "shelf-classics",
+      title: "Retro & Flash Legends",
+      subtitle: "The immortal web game hall of fame",
+      icon: Trophy,
+      games: byId([
+        "happy-wheels",
+        "run-3",
+        "red-ball-4",
+        "fancypantsadventures",
+        "ducklife1",
+        "ducklife2",
+        "ducklife3",
+        "riddleschool",
+        "riddleschool2",
+        "riddleschool3",
+        "papaspizzaria",
+        "papasburgeria",
+        "escapingtheprison",
+        "stealingthediamond",
+        "breakingthebank",
+        "impossiblequiz",
+        "bloxors",
+        "learntofly",
+        "learntofly2",
+        "thisistheonlylevel",
+      ]),
+    });
+
+    list.push({
+      id: "shelf-action",
+      title: "Action & Precision",
+      subtitle: "Test your reflexes, timing, and momentum",
+      icon: Zap,
+      games: byId([
+        "level-devil",
+        "vex-8",
+        "ovo",
+        "drive-mad",
+        "geometry-dash",
+        "tunnel-rush",
+        "cluster-rush",
+        "jetpack-joyride",
+        "stickman-hook",
+        "ragdoll-archers",
+        "stickman-boost",
+        "slope-2",
+        "slope-ball",
+        "alienhominid",
+      ]),
+    });
+
+    list.push({
+      id: "shelf-puzzle",
+      title: "Puzzles & Strategy",
+      subtitle: "Strategy, logic, and pure flow state",
+      icon: Sparkles,
+      games: byId([
+        "2048",
+        "hextris",
+        "flashtetris",
+        "twitch-tetris",
+        "bad-ice-cream-2",
+        "bad-ice-cream-3",
+        "plants-vs-zombies",
+        "worlds-hardest-game",
+        "fireboywatergirlforesttemple",
+        "wordle",
+        "stack",
+      ]),
+    });
+
+    list.push({
+      id: "shelf-sandbox",
+      title: "Sandbox, 3D & Survival",
+      subtitle: "Open worlds, horror, and endless exploration",
+      icon: Layers,
+      games: byId([
+        "eaglercraftx",
+        "backrooms",
+        "fnaf",
+        "granny",
+        "snow-rider-3d",
+        "minecraft-classic",
+        "minecraftbeta",
+        "solar-smash",
+        "idle-mining",
+      ]),
+    });
+
+    list.push({
+      id: "shelf-sports",
+      title: "Sports & Racing",
+      subtitle: "High speed and competitive head-to-head duels",
+      icon: Gamepad2,
+      games: byId([
+        "drift-boss",
+        "drift-hunters",
+        "moto-x3m",
+        "basketball-stars",
+        "basket-random",
+        "rooftop-snipers",
+        "retro-bowl",
+        "stickman-golf",
+        "survival-race",
+      ]),
+    });
+
+    return list;
+  }, [allGames, favorites, recent]);
 
   function launch(game: Game) {
-    setActiveGame(game)
+    setActiveGame(game);
+    setRecent((prev) => {
+      const next = [game.id, ...prev.filter((id) => id !== game.id)].slice(0, 16);
+      try {
+        localStorage.setItem("gg_recent_games", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   }
-  function toggleFavorite(id: string) {
-    setFavorites((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+
+  function toggleFavorite(id: string, e?: React.MouseEvent) {
+    e?.stopPropagation();
+    setFavorites((current) => {
+      const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
+      try {
+        localStorage.setItem("gg_favorites", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   }
+
+  function changeViewMode(mode: ViewMode) {
+    setViewMode(mode);
+    try {
+      localStorage.setItem("gg_view_mode", mode);
+    } catch {}
+  }
+
+  function scrollShelf(id: string, delta: number) {
+    const el = document.getElementById(id);
+    if (el) el.scrollBy({ left: delta, behavior: "smooth" });
+  }
+
+  const isFiltering = filter !== "All games" || query.trim().length > 0;
 
   return (
     <main className="lounge-shell">
@@ -173,38 +402,43 @@ export default function Page() {
         </a>
         <nav className="header-nav" aria-label="Primary navigation">
           <a href="#games">Library</a>
-          <a href="#about">Studio</a>
-          <a href="/request-game">Request a game</a>
+          <a href="/proxy">Proxy</a>
+          <a href="/request-game">Request game</a>
           <a href="/admin">Admin</a>
         </nav>
         <div className="header-status">
-          <span className="live-dot" /> {allGames.length} titles / open all night
+          <span className="live-dot" />
+          <span>{allGames.length} GAMES ONLINE</span>
         </div>
       </header>
+
       <section className="hero" id="top">
-        <div className="hero-copy">
+        <div className="hero-content">
           <p className="eyebrow">
-            <Sparkles size={14} /> THE INDEPENDENT ARCADE
+            <Sparkles size={14} /> CURATED ARCADE LOUNGE
           </p>
           <h1>
-            Stay a while.
-            <br />
-            <em>Play forever.</em>
+            Play <em>unblocked</em> anywhere.
           </h1>
-          <p className="hero-text">A handpicked, no-filler collection of browser games for the minutes between everything.</p>
+          <p className="hero-text">
+            Hand-crafted, zero-lag browser games, school-unblocked video, and an integrated proxy — all running directly from clean local files.
+          </p>
           <a className="hero-link" href="#games">
-            Enter the lounge <ArrowUpRight size={15} />
+            Browse all {allGames.length} games <ArrowUpRight size={16} />
           </a>
           <div className="hero-stats">
-            <span>
-              <strong>{allGames.length}</strong> games
-            </span>
-            <span>
-              <strong>∞</strong> replay value
-            </span>
-            <span>
-              <strong>01</strong> lounge
-            </span>
+            <div>
+              <strong>{allGames.length}</strong>
+              <span>Installed games</span>
+            </div>
+            <div>
+              <strong>0</strong>
+              <span>External embeds</span>
+            </div>
+            <div>
+              <strong>100%</strong>
+              <span>School safe</span>
+            </div>
           </div>
         </div>
         <div className="spotlight">
@@ -234,6 +468,7 @@ export default function Page() {
           </div>
         </div>
       </section>
+
       <section className="catalog" id="games">
         <div className="section-heading">
           <div>
@@ -245,56 +480,255 @@ export default function Page() {
           <div className="collection-note">
             <Trophy size={16} />
             <span>
-              <strong>{visibleGames.length.toString().padStart(2, '0')}</strong> available now
+              <strong>{visibleGames.length.toString().padStart(2, "0")}</strong> games ready
             </span>
           </div>
         </div>
-        <div className="toolbar">
+
+        <div className="toolbar-controls">
           <div className="search-wrap">
             <Search size={17} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles, genres, moods" aria-label="Search games" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search 99+ titles, genres, moods…"
+              aria-label="Search games"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                style={{ background: "transparent", border: 0, color: "var(--muted)", cursor: "pointer", display: "grid" }}
+                aria-label="Clear search"
+              >
+                <X size={15} />
+              </button>
+            )}
           </div>
+
+          <div className="view-switcher" role="group" aria-label="Catalog view mode">
+            <button
+              type="button"
+              className={`view-btn ${viewMode === "shelves" && !isFiltering ? "active" : ""}`}
+              onClick={() => {
+                changeViewMode("shelves");
+                setFilter("All games");
+                setQuery("");
+              }}
+              title="Shelf View (curated categories)"
+            >
+              <Layers size={14} /> Shelves
+            </button>
+            <button
+              type="button"
+              className={`view-btn ${viewMode === "grid" || (viewMode === "shelves" && isFiltering) ? "active" : ""}`}
+              onClick={() => changeViewMode("grid")}
+              title="Compact Grid (dense arcade tiles)"
+            >
+              <LayoutGrid size={14} /> Compact Grid
+            </button>
+            <button
+              type="button"
+              className={`view-btn ${viewMode === "cards" ? "active" : ""}`}
+              onClick={() => changeViewMode("cards")}
+              title="Detailed Cards"
+            >
+              <Trophy size={14} /> Detailed Cards
+            </button>
+          </div>
+        </div>
+
+        <div className="toolbar">
           <div className="filter-tabs" role="tablist" aria-label="Filter games">
             {filters.map((item) => (
-              <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)} role="tab" aria-selected={filter === item}>
+              <button
+                key={item}
+                className={filter === item ? "active" : ""}
+                onClick={() => setFilter(item)}
+                role="tab"
+                aria-selected={filter === item}
+              >
                 {item}
               </button>
             ))}
           </div>
         </div>
-        <div className="game-grid">
-          {visibleGames.map((game, index) => (
-            <article className={`game-card ${game.color}`} key={game.id}>
-              <button
-                className="favorite-button"
-                onClick={() => toggleFavorite(game.id)}
-                aria-label={`${favorites.includes(game.id) ? 'Remove' : 'Add'} ${game.title} ${favorites.includes(game.id) ? 'from' : 'to'} favorites`}
+
+        {/* VIEW 1: CURATED CATEGORIZED SHELVES */}
+        {viewMode === "shelves" && !isFiltering && (
+          <div className="arcade-shelves">
+            {shelfDefinitions.map((shelf) => {
+              const ShelfIcon = shelf.icon;
+              return (
+                <section className="arcade-shelf" key={shelf.id}>
+                  <div className="shelf-header">
+                    <div className="shelf-title-wrap">
+                      <h3>
+                        <ShelfIcon size={18} />
+                        {shelf.title}
+                      </h3>
+                      <span className="shelf-badge">{shelf.games.length}</span>
+                    </div>
+                    <div className="shelf-nav">
+                      <button
+                        type="button"
+                        onClick={() => scrollShelf(shelf.id, -450)}
+                        aria-label={`Scroll ${shelf.title} left`}
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => scrollShelf(shelf.id, 450)}
+                        aria-label={`Scroll ${shelf.title} right`}
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="shelf-track" id={shelf.id}>
+                    {shelf.games.map((game) => (
+                      <div
+                        className="shelf-card"
+                        key={shelf.id + "-" + game.id}
+                        onClick={() => launch(game)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            launch(game);
+                          }
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className={`shelf-fav-btn ${favorites.includes(game.id) ? "active" : ""}`}
+                          onClick={(e) => toggleFavorite(game.id, e)}
+                          aria-label="Favorite"
+                        >
+                          <Heart size={14} fill={favorites.includes(game.id) ? "currentColor" : "none"} />
+                        </button>
+                        <div className={`shelf-card-art ${game.color}`}>
+                          {game.icon ? (
+                            <img className="game-icon" src={game.icon} alt="" />
+                          ) : (
+                            <span className="shelf-card-mark">{game.mark}</span>
+                          )}
+                        </div>
+                        <div className="shelf-card-body">
+                          <div>
+                            <h4>{game.title}</h4>
+                            <span className="shelf-kicker">{game.genre}</span>
+                          </div>
+                          <div className="shelf-card-meta">
+                            <span style={{ fontSize: "11px", color: "var(--muted)" }}>{game.tone}</span>
+                            <span className="shelf-play-btn">
+                              <Play size={12} fill="currentColor" />
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        )}
+
+        {/* VIEW 2: COMPACT ARCADE GRID */}
+        {(viewMode === "grid" || (viewMode === "shelves" && isFiltering)) && (
+          <div className="compact-grid">
+            {visibleGames.map((game) => (
+              <div
+                className="compact-card"
+                key={game.id}
+                onClick={() => launch(game)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    launch(game);
+                  }
+                }}
               >
-                <Heart size={17} fill={favorites.includes(game.id) ? 'currentColor' : 'none'} />
-              </button>
-              <div className="game-art">
-                {game.icon ? (
-                  <img className="game-icon" src={game.icon} alt="" />
-                ) : (
-                  <span className="game-mark">{game.mark}</span>
-                )}
-                <small>{String(index + 1).padStart(2, '0')}</small>
-              </div>
-              <div className="game-info">
-                <div>
-                  <p className="card-kicker">
-                    {game.genre} · {game.tone}
-                  </p>
-                  <h3>{game.title}</h3>
-                  <p>{game.description}</p>
-                </div>
-                <button className="play-button" onClick={() => launch(game)}>
-                  <Play size={13} fill="currentColor" /> Launch
+                <button
+                  type="button"
+                  className={`shelf-fav-btn ${favorites.includes(game.id) ? "active" : ""}`}
+                  onClick={(e) => toggleFavorite(game.id, e)}
+                  aria-label="Favorite"
+                >
+                  <Heart size={13} fill={favorites.includes(game.id) ? "currentColor" : "none"} />
                 </button>
+                <div className={`compact-card-art ${game.color}`}>
+                  {game.icon ? (
+                    <img className="game-icon" src={game.icon} alt="" />
+                  ) : (
+                    <span className="compact-card-mark">{game.mark}</span>
+                  )}
+                </div>
+                <div className="compact-card-body">
+                  <h4>{game.title}</h4>
+                  <span className="compact-kicker">
+                    {game.genre} · {game.tone}
+                  </span>
+                  <div className="compact-actions">
+                    <button
+                      type="button"
+                      className="compact-play-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        launch(game);
+                      }}
+                    >
+                      <Play size={11} fill="currentColor" /> Play
+                    </button>
+                  </div>
+                </div>
               </div>
-            </article>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
+
+        {/* VIEW 3: DETAILED CARDS */}
+        {viewMode === "cards" && (
+          <div className="game-grid">
+            {visibleGames.map((game, index) => (
+              <article className={`game-card ${game.color}`} key={game.id}>
+                <button
+                  className="favorite-button"
+                  onClick={() => toggleFavorite(game.id)}
+                  aria-label={`${favorites.includes(game.id) ? "Remove" : "Add"} ${game.title} ${favorites.includes(game.id) ? "from" : "to"} favorites`}
+                >
+                  <Heart size={17} fill={favorites.includes(game.id) ? "currentColor" : "none"} />
+                </button>
+                <div className="game-art">
+                  {game.icon ? (
+                    <img className="game-icon" src={game.icon} alt="" />
+                  ) : (
+                    <span className="game-mark">{game.mark}</span>
+                  )}
+                  <small>{String(index + 1).padStart(2, "0")}</small>
+                </div>
+                <div className="game-info">
+                  <div>
+                    <p className="card-kicker">
+                      {game.genre} · {game.tone}
+                    </p>
+                    <h3>{game.title}</h3>
+                    <p>{game.description}</p>
+                  </div>
+                  <button className="play-button" onClick={() => launch(game)}>
+                    <Play size={13} fill="currentColor" /> Launch
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+
         {visibleGames.length === 0 && (
           <div className="empty-state">
             <Zap size={22} />
@@ -303,6 +737,7 @@ export default function Page() {
           </div>
         )}
       </section>
+
       <footer id="about">
         <div className="footer-top">
           <div className="footer-brand">
@@ -324,10 +759,12 @@ export default function Page() {
           <span>Games remain property of their respective creators.</span>
         </div>
       </footer>
+
       <a className="admin-fab" href="/admin" aria-label="Open admin console">
         <ShieldCheck size={19} />
         <span>Admin</span>
       </a>
+
       {activeGame && (
         <div className="game-modal" role="dialog" aria-modal="true" aria-label={`${activeGame.title} game`}>
           <div className="modal-bar">
@@ -336,17 +773,48 @@ export default function Page() {
               <strong>{activeGame.title}</strong>
             </div>
             <div className="modal-actions">
-              <button onClick={() => document.querySelector<HTMLIFrameElement>('.game-frame')?.requestFullscreen()} aria-label="Fullscreen">
+              <a
+                className="modal-btn"
+                href={activeGame.path}
+                target="_blank"
+                rel="noreferrer"
+                title="Open in new window"
+                aria-label="Open in new window"
+              >
+                <ExternalLink size={17} />
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  const ifr = document.querySelector<HTMLIFrameElement>(".game-frame");
+                  if (ifr) ifr.src = activeGame.path;
+                }}
+                title="Reload game"
+                aria-label="Reload game"
+              >
+                <RotateCw size={17} />
+              </button>
+              <button
+                type="button"
+                onClick={() => document.querySelector<HTMLIFrameElement>(".game-frame")?.requestFullscreen()}
+                aria-label="Fullscreen"
+                title="Fullscreen"
+              >
                 <Maximize2 size={18} />
               </button>
-              <button onClick={() => setActiveGame(null)} aria-label="Close game">
+              <button type="button" onClick={() => setActiveGame(null)} aria-label="Close game" title="Close">
                 <X size={20} />
               </button>
             </div>
           </div>
-          <iframe className="game-frame" src={activeGame.path} title={activeGame.title} allow="fullscreen; autoplay; gamepad; keyboard-map" />
+          <iframe
+            className="game-frame"
+            src={activeGame.path}
+            title={activeGame.title}
+            allow="fullscreen; autoplay; gamepad; keyboard-map; clipboard-write; encrypted-media"
+          />
         </div>
       )}
     </main>
-  )
+  );
 }

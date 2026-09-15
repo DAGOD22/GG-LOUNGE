@@ -5,7 +5,12 @@ import { ArrowLeft, ArrowRight, Globe, Home, RotateCw, Search } from 'lucide-rea
 
 declare global {
   interface Window {
-    __uv$config?: { encodeUrl: (url: string) => string };
+    __uv$config?: {
+      encodeUrl: (url: string) => string;
+      decodeUrl?: (url: string) => string;
+      prefix?: string;
+      bare?: string;
+    };
   }
 }
 
@@ -99,7 +104,8 @@ export default function ProxyPage() {
     if (!/^https?:\/\//i.test(url)) {
       url = url.includes('.') && !url.includes(' ') ? 'https://' + url : 'https://duckduckgo.com/?q=' + encodeURIComponent(url);
     }
-    setCurrent(enc(url));
+    const prefix = window.__uv$config?.prefix || '/service/';
+    setCurrent(prefix + enc(url));
     setAddress(url);
   }
 
