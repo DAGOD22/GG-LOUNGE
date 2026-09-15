@@ -47,15 +47,57 @@
 
   var prefs = Object.assign({
     schoolMode: true,   // video bytes via /api/yt/media (same origin)
-    strictImg: false,   // thumbnails via /api/yt/img (same origin)
-    instance: "auto",   // "auto" (lounge proxy) or a direct Piped URL
-    region: "AU",
+    strictImg: true,    // thumbnails via /api/yt/img (same origin)
+    instance: "auto",   // "auto" (lounge proxy) or a direct mirror URL
+    provider: "auto",   // auto | innertube | piped | invidious
+    engine: "auto",     // auto | hls | mp4
+    region: "US",
     autoplay: false,
     skipSponsors: true,
-    quality: "auto"
+    captions: false,
+    volume: 1,
+    quality: "auto",
+    maxHeight: 0        // 0 = no cap (from the lounge Settings quality cap)
   }, lsGet("ggl_yt_prefs", {}));
 
   function savePrefs() { lsSet("ggl_yt_prefs", prefs); }
+
+  // The lounge's own /settings page owns the same profile: adopt it, and keep
+  // following it live (open two tabs, change theme/server, both update).
+  function applyGgProfile(ggSettings) {
+    if (!ggSettings || !ggSettings.video) return;
+    var v = ggSettings.video;
+    var cap = { "1080": 1080, "720": 720, "480": 480, "360": 360 }[v.quality] || 0;
+    prefs.schoolMode = v.schoolMode !== false;
+    prefs.strictImg = v.strictImg !== false;
+    prefs.provider = v.provider || "auto";
+    prefs.engine = v.engine || "auto";
+    prefs.region = v.region || prefs.region;
+    prefs.autoplay = !!v.autoplay;
+    prefs.skipSponsors = v.skipSponsors !== false;
+    prefs.captions = !!v.captions;
+    prefs.volume = typeof v.volume === "number" ? v.volume : 1;
+    prefs.quality = v.quality || "auto";
+    prefs.maxHeight = cap;
+    prefs.instance = v.instance ? String(v.instance).replace(/\/+$/, "") : "auto";
+    if (ggSettings.ui) prefs.reduceMotion = !!ggSettings.ui.reduceMotion;
+    savePrefs();
+  }
+
+  (function bindLoungeProfile() {
+    var gg = window.GG;
+    if (!gg) {
+      document.addEventListener("gg:ready", bindLoungeProfile, { once: true });
+      return;
+    }
+    try {
+      applyGgProfile(gg.get());
+      gg.subscribe(function (next) {
+        applyGgProfile(next);
+        if (document.getElementById("main")) render();
+      });
+    } catch (e) { /* profile is optional */ }
+  })();
   function getHistory() { return lsGet("ggl_yt_history", []); }
   function getLater() { return lsGet("ggl_yt_later", []); }
 
@@ -256,15 +298,27 @@
     });
   }
 
+  function withQuery(path) {
+    var add = [];
+    if (prefs.provider && prefs.provider !== "auto") add.push("provider=" + encodeURIComponent(prefs.provider));
+    var sep = path.indexOf("?") >= 0 ? "&" : "?";
+    return add.length ? path + sep + add.join("&") : path;
+  }
+
   function api(path) {
-    // Manual instance selected → go direct only.
+    // Manual mirror selected → go direct only.
     if (prefs.instance && prefs.instance !== "auto") {
-      return fetchJson(prefs.instance + path).then(function (data) {
+      return fetchJson(prefs.instance + withQuery(path)).then(function (data) {
         lastVia = prefs.instance;
         setNet("ok", "Server: custom");
         return data;
+      }).catch(function (err) {
+        // a dead custom mirror must not strand the room
+        setNet("bad", "Custom server failed — using auto");
+        return fetchJson(API_BASE + withQuery(path)).catch(function () { throw err; });
       });
     }
+    path = withQuery(path);
     // Proxy known-dead (e.g. sandbox preview): skip straight to direct.
     if (proxyAlive === false) {
       return tryDirect(path, new Error("lounge proxy unreachable"));
@@ -281,10 +335,22 @@
     });
   }
 
+  // Write back to the shared lounge profile so /settings and the room agree.
+  function pushToLounge(key, value) {
+    try {
+      var gg = window.GG;
+      if (!gg) return;
+      var patch = {};
+      patch[key] = value;
+      gg.patch("video", patch);
+    } catch (e) { /* lounge profile is optional */ }
+  }
+
   function cycleServer() {
     directCursor = (directCursor + 1) % DIRECT_INSTANCES.length;
     prefs.instance = DIRECT_INSTANCES[directCursor];
     savePrefs();
+    pushToLounge("instance", prefs.instance === "auto" ? "" : prefs.instance);
     toast("Trying server: " + prefs.instance.replace("https://", ""));
   }
 
@@ -535,9 +601,9 @@
       if (!next) return;
       var btn = document.getElementById("more-btn");
       btn.textContent = "Loading…";
-      var body = { nextpage: next, q: state.q, filter: state.filter };
-      // Piped nextpage/search is a GET with the page blob as a query param.
-      api("/nextpage/search?nextpage=" + encodeURIComponent(JSON.stringify(next)) +
+      // The proxy handles per-provider tokens (Piped blobs, InnerTube
+      // continuations, Invidious page numbers) — just hand the string back.
+      api("/nextpage/search?nextpage=" + encodeURIComponent(next) +
         "&q=" + encodeURIComponent(state.q) + "&filter=" + encodeURIComponent(state.filter))
         .then(function (page) {
           next = page.nextpage || null;
@@ -572,7 +638,12 @@
   function pickStreams(data) {
     var videos = (data.videoStreams || []).slice();
     var muxed = videos.filter(function (s) { return !s.videoOnly; });
+    void videos;
     // Prefer mp4 muxed for widest <video> support.
+    if (prefs.maxHeight > 0) {
+      var fits = muxed.filter(function (s) { return !(s.height || 0) || s.height <= prefs.maxHeight; });
+      if (fits.length) muxed = fits;
+    }
     muxed.sort(function (a, b) {
       var am = /mp4/i.test(a.mimeType || "") || /mp4/i.test(a.format || "") ? 0 : 1;
       var bm = /mp4/i.test(b.mimeType || "") || /mp4/i.test(b.format || "") ? 0 : 1;
@@ -593,6 +664,33 @@
     if (s.quality) return s.quality;
     if (s.height) return s.height + "p";
     return s.format || "SD";
+  }
+
+  function applyVolume(video) {
+    try {
+      var v = typeof prefs.volume === "number" ? prefs.volume : 1;
+      video.volume = Math.max(0, Math.min(1, v));
+      video.muted = v === 0;
+    } catch (e) { /* noop */ }
+  }
+
+  /** Lounge-level caption track, served same-origin as WebVTT. */
+  function attachCaptions(video, data) {
+    if (!prefs.captions) return;
+    try {
+      var list = (data && data.subtitles) || [];
+      if (!list.length) return;
+      var track = list.filter(function (t) { return !t.autoGenerated; })[0] || list[0];
+      var el = document.createElement("track");
+      el.kind = "subtitles";
+      el.label = (track.name || track.code || "Captions") + " (CC)";
+      el.srclang = track.code || "en";
+      el.src = API_BASE + "/captions/" + encodeURIComponent(state.id) + "?lang=" + encodeURIComponent(track.code || "en") + (track.autoGenerated ? "&auto=1" : "");
+      video.appendChild(el);
+      setTimeout(function () {
+        for (var i = 0; i < video.textTracks.length; i++) video.textTracks[i].mode = i === 0 ? "showing" : "hidden";
+      }, 0);
+    } catch (e) { /* captions are a bonus */ }
   }
 
   function ensureHls() {
@@ -696,15 +794,22 @@
         if (cu && cu !== defaultStream.url && candidates.indexOf(cu) < 0) candidates.push(cu);
       }
     }
+    // "HLS (HD)" prefers the adaptive stream; "MP4" never touches it.
+    var wantHls = !!data.hls && (prefs.engine === "hls" || (prefs.engine === "auto" && (!defaultStream || isLive)));
+    if (wantHls && !candidates.length) candidates.push(prefs.schoolMode ? mediaUrl(data.hls) : data.hls);
 
     if (isLive && data.hls) {
       attachHls(video, data.hls);
+    } else if (wantHls) {
+      attachHls(video, data.hls);
     } else if (defaultStream) {
       video.src = candidates[0];
+      applyVolume(video);
+      attachCaptions(video, data);
     } else if (data.hls) {
       attachHls(video, data.hls);
     } else {
-      holder.innerHTML = '<div class="player-fallback">No playable stream from this server.<br>Try another server in Settings, turn School mode off,<br><br><button class="btn" id="official-btn">Play with official YouTube player</button></div>';
+      holder.innerHTML = '<div class="player-fallback">No playable stream from this server.<br>Try Engine → “HLS (HD)”, another server, or School mode off.<br><br><button class="btn" id="official-btn">Play with official YouTube player</button></div>';
       document.getElementById("official-btn").onclick = function () { officialEmbed(id, holder); };
     }
 
@@ -868,7 +973,7 @@
   function loadComments(id, nextpage) {
     var box = document.getElementById("comments");
     var path = nextpage
-      ? "/nextpage/comments/" + encodeURIComponent(id) + "?nextpage=" + encodeURIComponent(JSON.stringify(nextpage))
+      ? "/nextpage/comments/" + encodeURIComponent(id) + "?nextpage=" + encodeURIComponent(typeof nextpage === "string" ? nextpage : JSON.stringify(nextpage))
       : "/comments/" + encodeURIComponent(id);
     api(path).then(function (page) {
       var list = page.comments || [];
@@ -999,6 +1104,15 @@
     DIRECT_INSTANCES.forEach(function (u) {
       instOptions += '<option value="' + esc(u) + '"' + (prefs.instance === u ? " selected" : "") + ">" + esc(u.replace("https://", "")) + "</option>";
     });
+    var PROVIDERS = [["auto", "Auto (recommended)"], ["innertube", "YouTube direct"], ["piped", "Piped mirrors"], ["invidious", "Invidious mirrors"]];
+    var provOptions = "";
+    PROVIDERS.forEach(function (pr) {
+      provOptions += '<option value="' + pr[0] + '"' + (prefs.provider === pr[0] ? " selected" : "") + ">" + esc(pr[1]) + "</option>";
+    });
+    var capOptions = '<option value="0"' + (!prefs.maxHeight ? " selected" : "") + ">No cap</option>";
+    [[1080, "1080p"], [720, "720p"], [480, "480p"], [360, "360p"]].forEach(function (q) {
+      capOptions += '<option value="' + q[0] + '"' + (prefs.maxHeight === q[0] ? " selected" : "") + ">" + q[1] + "</option>";
+    });
     var regionOpts = "";
     REGIONS.forEach(function (r) {
       regionOpts += '<option value="' + r[0] + '"' + (prefs.region === r[0] ? " selected" : "") + ">" + esc(r[1]) + "</option>";
@@ -1006,11 +1120,23 @@
     main.innerHTML =
       '<div class="view-head"><h1>Settings</h1></div>' +
       '<div class="settings">' +
-        '<div class="set-card"><h2>Unblock mode</h2><p>Route traffic through the lounge so school filters only see this site.</p>' +
+        '<div class="set-card"><h2>Unblock mode</h2><p>Route traffic through the lounge so school filters only see this site. Everything here mirrors the lounge <a href="/settings" style="color:var(--accent)">Settings → Video engine</a>.</p>' +
           '<div class="set-row"><label>School mode<small>Stream video through the lounge domain. Turn off if videos buffer.</small></label>' +
           '<span class="switch"><input type="checkbox" id="set-school"' + (prefs.schoolMode ? " checked" : "") + "><i></i></span></div>" +
           '<div class="set-row"><label>Strict image proxy<small>Also proxy thumbnails. Use if pictures don\'t load at school.</small></label>' +
           '<span class="switch"><input type="checkbox" id="set-img"' + (prefs.strictImg ? " checked" : "") + "><i></i></span></div>" +
+          '<div class="set-row"><label>Captions on<small>Loads the creator\'s own captions, same origin.</small></label>' +
+          '<span class="switch"><input type="checkbox" id="set-cc"' + (prefs.captions ? " checked" : "") + "><i></i></span></div>" +
+        "</div>" +
+        '<div class="set-card"><h2>Engine</h2><p>Which upstream the lounge asks first. Auto = YouTube, then Piped, then Invidious.</p>' +
+          '<div class="set-row"><label>Server priority</label><select class="set-select" id="set-prov">' + provOptions + "</select></div>" +
+          '<div class="set-row"><label>Player</label><select class="set-select" id="set-engine">' +
+            '<option value="auto"' + (prefs.engine === "auto" ? " selected" : "") + ">Auto (MP4 first)</option>" +
+            '<option value="hls"' + (prefs.engine === "hls" ? " selected" : "") + ">HLS (up to 1080p+)</option>" +
+            '<option value="mp4"' + (prefs.engine === "mp4" ? " selected" : "") + ">MP4 (most compatible)</option>" +
+          "</select></div>" +
+          '<div class="set-row"><label>Quality cap</label><select class="set-select" id="set-cap">' + capOptions + "</select></div>" +
+          '<div class="set-row"><label>Engine status<button class="pill" id="set-health">Run health check</button></label><span id="set-health-out" class="card-sub">Not tested yet.</span></div>' +
         "</div>" +
         '<div class="set-card"><h2>Playback</h2><p>How videos behave.</p>' +
           '<div class="set-row"><label>Skip sponsors<small>Auto-skip sponsor segments (SponsorBlock).</small></label>' +
@@ -1026,8 +1152,8 @@
         '<div class="set-card"><h2>Data</h2><p>History and saved videos live only in this browser.</p>' +
           '<div class="set-row"><label>Local data</label><button class="danger" id="set-wipe">Clear history &amp; saved</button></div>' +
         "</div>" +
-        '<div class="set-card"><h2>About</h2><p>GG Lounge video room v2. Powered by the open-source Piped API (' +
-        '<a href="https://github.com/TeamPiped/Piped" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">TeamPiped/Piped</a>). ' +
+        '<div class="set-card"><h2>About</h2><p>GG Lounge video room v3. Streams come from YouTube\'s own API first, then the open-source Piped (' +
+        '<a href="https://github.com/TeamPiped/Piped" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Piped</a> and Invidious mirrors, all relayed through this domain. ', +
         "No Google account, no ads, no tracking. Livestreams play from proxy URLs directly. " +
         (lastVia ? "Last served by: " + esc(lastVia) + "." : "") + "</p></div>" +
       "</div>";
@@ -1041,6 +1167,46 @@
     };
     document.getElementById("set-sb").onchange = function (e) {
       prefs.skipSponsors = e.target.checked; savePrefs();
+    };
+    document.getElementById("set-cc").onchange = function (e) {
+      prefs.captions = e.target.checked; savePrefs();
+      toast(prefs.captions ? "Captions on for the next video" : "Captions off");
+    };
+    document.getElementById("set-prov").onchange = function (e) {
+      prefs.provider = e.target.value; savePrefs();
+      pushToLounge("provider", prefs.provider);
+      toast("Engine: " + e.target.options[e.target.selectedIndex].text);
+      renderHome();
+    };
+    document.getElementById("set-engine").onchange = function (e) {
+      prefs.engine = e.target.value; savePrefs();
+      pushToLounge("engine", prefs.engine);
+      toast("Player: " + e.target.value.toUpperCase());
+    };
+    document.getElementById("set-cap").onchange = function (e) {
+      prefs.maxHeight = Number(e.target.value) || 0;
+      prefs.quality = prefs.maxHeight ? String(prefs.maxHeight) : "auto";
+      savePrefs();
+      pushToLounge("quality", prefs.quality);
+      toast(prefs.maxHeight ? "Capped at " + prefs.maxHeight + "p" : "Quality cap removed");
+    };
+    document.getElementById("set-health").onclick = function () {
+      var out = document.getElementById("set-health-out");
+      var btn = this;
+      btn.textContent = "Testing…";
+      out.textContent = "Asking the lounge server…";
+      fetchJson(API_BASE + "/health", 15000).then(function (h) {
+        btn.textContent = "Run health check";
+        var ps = h.providers || {};
+        var line = Object.keys(ps).map(function (k) {
+          return k + (ps[k] && ps[k].ok ? " ✓" : " ✕");
+        }).join("  ");
+        out.textContent = (h.usable ? "Ready — " : "No provider answered — ") + line;
+        setNet(h.usable ? "ok" : "bad", h.usable ? "Engines ready" : "Engines down");
+      }, function (err) {
+        btn.textContent = "Run health check";
+        out.textContent = "Health check failed: " + (err.message || "offline");
+      });
     };
     document.getElementById("set-auto").onchange = function (e) {
       prefs.autoplay = e.target.checked; savePrefs();
@@ -1126,7 +1292,7 @@
     clearTimeout(suggestTimer);
     if (q.length < 2) { closeSuggest(); return; }
     suggestTimer = setTimeout(function () {
-      api("/suggestions?query=" + encodeURIComponent(q)).then(function (items) {
+      api("/suggestions?q=" + encodeURIComponent(q)).then(function (items) {
         if (!items || !items.length || document.activeElement !== searchInput) { closeSuggest(); return; }
         suggestItems = items.slice(0, 8);
         suggestActive = -1;

@@ -45,5 +45,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/admin", "/request-game", "/games/:path*"],
+  matcher: ["/", "/admin", "/settings", "/proxy", "/request-game", "/games/:path*"],
 };

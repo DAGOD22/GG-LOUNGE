@@ -1,15 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<meta name="gg-bg" content="on">
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="referrer" content="no-referrer" />
 <meta http-equiv="Referrer-Policy" content="no-referrer" />
-<meta name="description" content="Unblocked YouTube lounge — search, trending and watch with no ads. Works on school networks." />
+<meta name="description" content="Unblocked YouTube — search, trending, watch, comments and captions with no ads. Streams are relayed through the lounge, so it works on school networks." />
 <meta name="theme-color" content="#0f0f0f" />
 <link rel="icon" type="image/svg+xml" href="./icon.svg" />
 <link rel="manifest" href="./manifest.json" />
 <title>YouTube Unblocked — GG Lounge</title>
+<link rel="manifest" href="/manifest.webmanifest" />
 <style>
 :root{
   --bg:#0f0f0f; --bg-soft:#171717; --bg-card:#1d1d1f; --bg-hover:#2a2a2c;
@@ -254,12 +256,25 @@ select.pill option{background:#212121;color:#f1f1f1}
       Watch Later
     </button>
     <div class="nav-sep"></div>
+    <a class="nav-item" href="/games/tiktok/index.html">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3v10.5a4 4 0 1 1-4-4"/><path d="M15 6.5A5.5 5.5 0 0 0 20.5 9V3.5A5.5 5.5 0 0 1 15 6.5z"/></svg>
+      TikTok room
+    </a>
+    <a class="nav-item" href="/settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18M3 12h18M3 19h18"/><circle cx="8" cy="5" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="6" cy="19" r="2"/></svg>
+      Lounge settings
+    </a>
+    <a class="nav-item" href="/">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11 12 4l8 7"/><path d="M6 10v10h12V10"/></svg>
+      Back to arcade
+    </a>
+    <div class="nav-sep"></div>
     <button class="nav-item" data-nav="settings">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>
       Settings
     </button>
     <div class="nav-sep"></div>
-    <p class="nav-note">No ads. No Google login. No youtube.com — everything loads through unblocked video servers.<br /><br />GG Lounge video room</p>
+    <p class="nav-note">No ads. No Google login. No youtube.com from your browser — the lounge server fetches YouTube (or a Piped/Invidious mirror) and relays every byte here.<br /><br />Theme, cloak and panic key come from <a href="/settings" style="color:var(--accent)">Lounge settings</a>.</p>
   </nav>
 
   <main class="main" id="main" tabindex="-1"></main>
@@ -289,6 +304,7 @@ select.pill option{background:#212121;color:#f1f1f1}
 </nav>
 
 <div id="toasts" aria-live="polite"></div>
+<script src="/gg/gg-boot.js"></script>
 <script src="./main.js"></script>
 </body>
 </html>

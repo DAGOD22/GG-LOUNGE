@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap } from 'lucide-react'
+import { ArrowUpRight, ExternalLink, Gamepad2, Heart, Maximize2, Play, Search, Settings2, ShieldCheck, Sparkles, Trophy, X, Zap } from 'lucide-react'
 
 type Game = { id: string; title: string; subtitle: string; description: string; genre: string; tone: string; mark: string; color: string; path: string; icon?: string; featured?: boolean }
 
@@ -12,6 +12,7 @@ const games: Game[] = [
   { id: 'level-devil', title: 'Level Devil', subtitle: 'Trust nothing.', description: 'A platformer where every level has a trick, and every trick has teeth.', genre: 'Platformer', tone: 'Tricky', mark: 'LD', color: 'devil', path: '/games/level-devil/index.html' },
   { id: 'stack', title: 'Stack', subtitle: 'Build the perfect tower.', description: 'Drop each block with precision and chase a tower that never stops climbing.', genre: 'Arcade', tone: 'Precision', mark: 'ST', color: 'stack', path: '/games/stack/index.html' },
   { id: 'youtube', title: 'YouTube', subtitle: 'Unblocked. No ads. Just play.', description: 'An unblocked video lounge with search, trending, watch, and comments — built to work on school networks.', genre: 'Video', tone: 'Explore', mark: 'YT', color: 'youtube', path: '/games/youtube/index.html' },
+  { id: 'tiktok', title: 'TikTok Unblocked', subtitle: 'Scroll without limits.', description: 'The real feed and hashtag search, played through the lounge — no tiktok.com, no ads, portrait swipe deck.', genre: 'Video', tone: 'Shorts', mark: 'TT', color: 'devil', path: '/games/tiktok/index.html' },
   { id: 'stickman-hook', title: 'Stickman Hook', subtitle: 'Swing into action.', description: 'Hook, swing, and launch through a kinetic obstacle course.', genre: 'Arcade', tone: 'Momentum', mark: 'SH', color: 'stack', path: '/games/stickman-hook/index.html' },
   { id: 'ragdoll-archers', title: 'Ragdoll Archers', subtitle: 'Aim. Fire. Bounce.', description: 'Take aim in a physics-packed archery arena full of ricochets.', genre: 'Arcade', tone: 'Physics', mark: 'RA', color: 'drive', path: '/games/ragdoll-archers/index.html' },
   { id: 'hextris', title: 'Hextris', subtitle: 'Spin. Match. Survive.', description: 'A hypnotic hexagonal puzzle where every move tightens the pressure.', genre: 'Puzzle', tone: 'Flow state', mark: 'HX', color: 'hextris', path: '/games/hextris/index.html' },
@@ -111,12 +112,30 @@ const pubColors = ['cookie', 'drive', 'mining', 'devil', 'stack', 'hextris', 'tw
 
 type PublishedListing = { id: string; title: string; icon: string | null }
 
+type GgUi = { showSettingsFab: boolean; compactCards: boolean; reduceMotion: boolean; hideHeaderLinks: boolean }
+type GgSettings = { ui: GgUi; cloak: { enabled: boolean; preset: string } }
+
+/** Read the lounge profile (gg-boot.js) so the arcade respects its toggles. */
+function useGgProfile() {
+  const [ui, setUi] = useState<GgUi>({ showSettingsFab: true, compactCards: false, reduceMotion: false, hideHeaderLinks: false })
+  useEffect(() => {
+    const gg = (window as unknown as { GG?: { get: () => GgSettings; subscribe: (fn: (s: GgSettings) => void) => () => void } }).GG
+    if (!gg) return
+    const apply = (s: GgSettings) => setUi({ ...s.ui })
+    apply(gg.get())
+    return gg.subscribe(apply)
+  }, [])
+  return ui
+}
+
+
 export default function Page() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('All games')
   const [favorites, setFavorites] = useState<string[]>([])
   const [activeGame, setActiveGame] = useState<Game | null>(null)
   const [published, setPublished] = useState<Game[]>([])
+  const ui = useGgProfile()
 
   useEffect(() => {
     fetch('/api/games')
@@ -172,10 +191,17 @@ export default function Page() {
           </span>
         </a>
         <nav className="header-nav" aria-label="Primary navigation">
-          <a href="#games">Library</a>
-          <a href="#about">Studio</a>
-          <a href="/request-game">Request a game</a>
-          <a href="/admin">Admin</a>
+          {ui.hideHeaderLinks ? (
+            <a href="#games">Library</a>
+          ) : (
+            <>
+              <a href="#games">Library</a>
+              <a href="#about">Studio</a>
+              <a href="/request-game">Request a game</a>
+              <a href="/settings">Settings</a>
+              <a href="/admin">Admin</a>
+            </>
+          )}
         </nav>
         <div className="header-status">
           <span className="live-dot" /> {allGames.length} titles / open all night
@@ -192,9 +218,20 @@ export default function Page() {
             <em>Play forever.</em>
           </h1>
           <p className="hero-text">A handpicked, no-filler collection of browser games for the minutes between everything.</p>
-          <a className="hero-link" href="#games">
-            Enter the lounge <ArrowUpRight size={15} />
-          </a>
+          <div className="hero-links">
+            <a className="hero-link" href="#games">
+              Enter the lounge <ArrowUpRight size={15} />
+            </a>
+            <a className="hero-link ghost" href="/games/youtube/index.html">
+              YouTube <ExternalLink size={13} />
+            </a>
+            <a className="hero-link ghost" href="/games/tiktok/index.html">
+              TikTok <ExternalLink size={13} />
+            </a>
+            <a className="hero-link ghost" href="/settings">
+              Settings <Settings2 size={13} />
+            </a>
+          </div>
           <div className="hero-stats">
             <span>
               <strong>{allGames.length}</strong> games
@@ -262,7 +299,7 @@ export default function Page() {
             ))}
           </div>
         </div>
-        <div className="game-grid">
+        <div className={`game-grid ${ui.compactCards ? "compact" : ""}`}>
           {visibleGames.map((game, index) => (
             <article className={`game-card ${game.color}`} key={game.id}>
               <button
@@ -324,10 +361,18 @@ export default function Page() {
           <span>Games remain property of their respective creators.</span>
         </div>
       </footer>
-      <a className="admin-fab" href="/admin" aria-label="Open admin console">
-        <ShieldCheck size={19} />
-        <span>Admin</span>
-      </a>
+      <div className="fab-stack">
+        {ui.showSettingsFab ? (
+          <a className="gg-fab" href="/settings" aria-label="Open lounge settings">
+            <Settings2 size={17} />
+            <span>Settings</span>
+          </a>
+        ) : null}
+        <a className="admin-fab" href="/admin" aria-label="Open admin console">
+          <ShieldCheck size={19} />
+          <span>Admin</span>
+        </a>
+      </div>
       {activeGame && (
         <div className="game-modal" role="dialog" aria-modal="true" aria-label={`${activeGame.title} game`}>
           <div className="modal-bar">
