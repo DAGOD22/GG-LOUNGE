@@ -1375,6 +1375,19 @@
     return (t && t.url) || 'https://classroom.google.com';
   }
 
+  /**
+   * True when an outer lounge document owns the panic action for this window.
+   * Games are iframed by the arcade, and both documents run gg-boot: without an
+   * owner rule "open in new tab" would fire once per frame.
+   */
+  function panicOwnedElsewhere() {
+    try {
+      return inFrame() && !!(window.top && window.top.GG && window.top.GG.ownsPanic);
+    } catch (e) {
+      return false; // cross-origin parent: bail ourselves out
+    }
+  }
+
   function panicNow(fromPeer) {
     var p = state.panic;
     if (!p.enabled) return;
@@ -1383,6 +1396,14 @@
     // tab/origin to bail out with us - otherwise the arcade shell stays put.
     if (!fromPeer) {
       try { if (gotChannel) gotChannel.postMessage('panic'); } catch (e) { /* noop */ }
+    }
+    if (panicOwnedElsewhere()) {
+      // "new tab" leaves the lounge visible, so only hide when the outer
+      // document is about to navigate or paint a decoy over everything.
+      if (p.mode !== 'newtab') {
+        try { document.documentElement.style.visibility = 'hidden'; } catch (e) { /* noop */ }
+      }
+      return;
     }
     if (p.mode === 'fake') { showFake(); return; }
     if (p.mode === 'newtab') {
@@ -1548,6 +1569,7 @@
     cloakValues: cloakValues,
     isStandalone: isStandalone,
     inFrame: inFrame,
+    ownsPanic: !(function () { try { return window.top !== window; } catch (e) { return false } })(),
     subscribe: function (fn) {
       listeners.push(fn);
       return function () { listeners = listeners.filter(function (f) { return f !== fn; }); };
