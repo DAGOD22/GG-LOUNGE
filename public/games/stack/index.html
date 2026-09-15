@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en" >
-<head>
+<head><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Lounge"><meta name="theme-color" content="#0d0f16"><link rel="icon" href="/brand/icon-32.png"><link rel="apple-touch-icon" href="/brand/icon-180.png">
   <meta charset="UTF-8">
   <title>Javascript Stack Game</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><link rel="stylesheet" href="./style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>
-  @import url("https://fonts.googleapis.com/css?family=Comfortaa");
+  
 html, body {
   margin: 0;
   overflow: hidden;
   height: 100vh;
   width: 100%;
   position: relative;
-  font-family: "Comfortaa", cursive;
+  font-family: "Comfortaa", "Trebuchet MS", Verdana, sans-serif;
 }
 
 #container {
@@ -128,8 +128,8 @@ html, body {
 			<div></div>
 		</div>
 	</div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r83/three.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/latest/TweenMax.min.js"></script>
+  <script src="./vendor/three.min.js"></script>
+  <script src="./vendor/TweenMax.min.js"></script>
   <script>"use strict";
 console.clear();
 class Stage {
@@ -426,5 +426,5 @@ class Game {
 }
 let game = new Game();
 </script>
-  </body>
+  <script src="/gg/gg-boot.js"></script></body>
 </html>

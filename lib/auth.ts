@@ -1,20 +1,28 @@
-import { betterAuth } from 'better-auth'
-import { pool } from '@/lib/db'
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { cookies } from "next/headers";
 
-const origin = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : (process.env.BETTER_AUTH_URL ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.V0_RUNTIME_URL))
+export const ADMIN_COOKIE = "gg_admin_session";
 
-export const auth = betterAuth({
-  database: pool,
-  baseURL: origin,
-  emailAndPassword: { enabled: true, autoSignIn: true },
-  trustedOrigins: [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'https://sb-9uxij242plud.vercel.run',
-    ...(process.env.V0_RUNTIME_URL ? [process.env.V0_RUNTIME_URL] : []),
-    ...(process.env.V0_DEV_APP_URL ? [process.env.V0_DEV_APP_URL] : []),
-    ...(process.env.V0_BUILD_URL ? [process.env.V0_BUILD_URL] : []),
-  ],
-  session: { expiresIn: 60 * 60 * 24 * 30, updateAge: 60 * 60 * 24 },
-  ...(process.env.NODE_ENV === 'development' ? { advanced: { defaultCookieAttributes: { sameSite: 'none' as const, secure: true } } } : {}),
-})
+/** Admin password: env override, default 220115. */
+export function adminPassword(): string {
+  return process.env.ADMIN_PASSWORD || "220115";
+}
+
+export function adminSignature(): string {
+  return createHmac("sha256", adminPassword()).update("gg-lounge-admin").digest("hex");
+}
+
+export async function isAdmin(): Promise<boolean> {
+  const value = (await cookies()).get(ADMIN_COOKIE)?.value;
+  const expected = adminSignature();
+  if (!value || value.length !== expected.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(value), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
+export function isDev(): boolean {
+  return process.env.NODE_ENV !== "production";
+}

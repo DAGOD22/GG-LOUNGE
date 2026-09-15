@@ -1,13 +1,29 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width">
-    <title>Loading...</title>
-    <link href="style.css" rel="stylesheet" type="text/css" />
-    <script>
-        window.location.href="game/importMod.html";
-    </script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <title>Idle Mining</title>
+    <link rel="icon" href="/brand/icon-32.png" />
+    <!-- The real entry point is game/game.html; the previous stub bounced to the
+         mod importer, which is why the card looked broken. -->
+    <style>
+      html, body { margin: 0; height: 100%; background: #0d0f16; color: #f2f4f8; font: 500 14px/1.5 system-ui, sans-serif; overflow: hidden; }
+      iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; background: #0d0f16; }
+      #boot { position: fixed; inset: 0; display: grid; place-items: center; letter-spacing: .18em; text-transform: uppercase; font-size: 11px; color: #9aa2b4; }
+    </style>
   </head>
-  <body>Loading...</body>
+  <body>
+    <div id="boot">digging…</div>
+    <iframe id="game" src="game/game.html" title="Idle Mining" allow="autoplay" loading="eager"></iframe>
+    <script>
+      var f = document.getElementById('game');
+      f.addEventListener('load', function () {
+        var b = document.getElementById('boot');
+        if (b) b.remove();
+        try { f.contentWindow.focus(); } catch (e) { /* cross-origin guard */ }
+      });
+    </script>
+    <script src="/gg/gg-boot.js"></script>
+  </body>
 </html>

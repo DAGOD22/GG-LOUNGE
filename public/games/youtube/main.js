@@ -1,173 +1,1369 @@
 "use strict";
+/* ============================================================
+   GG Lounge — YouTube Unblocked
+   A Piped-powered YouTube client. No Google API key, no ads,
+   no youtube.com requests. All data flows through the lounge's
+   own /api/yt proxy ("school mode") with direct Piped fallback.
+   ============================================================ */
 
-(async () => {
-// default error handler
-window.onerror = (message, src, lineno, colno, error) => {
-	alert(`Error at "${src}", line ${lineno}:${colno}: \n${error}`, "Error");
-};
+(function () {
+  // ---------- config ----------
+  var API_BASE = "/api/yt";
+  var DIRECT_INSTANCES = [
+    "https://pipedapi.kavin.rocks",
+    "https://pipedapi.leptons.xyz",
+    "https://pipedapi-libre.kavin.rocks",
+    "https://pipedapi.adminforge.de",
+    "https://api.piped.yt",
+    "https://pipedapi.drgns.space",
+    "https://pipedapi.ducks.party",
+    "https://piped-api.codespace.cz",
+    "https://pipedapi.reallyaweso.me",
+    "https://api.piped.private.coffee",
+    "https://pipedapi.darkness.services",
+    "https://pipedapi.orangenet.cc",
+    "https://pipedapi.owo.si",
+    "https://piped-api.privacy.com.de"
+  ];
+  var REGIONS = [
+    ["AU", "Australia"], ["US", "United States"], ["GB", "United Kingdom"],
+    ["CA", "Canada"], ["NZ", "New Zealand"], ["IN", "India"],
+    ["DE", "Germany"], ["FR", "France"], ["JP", "Japan"], ["BR", "Brazil"]
+  ];
+  var SEARCH_FILTERS = [
+    ["all", "All"], ["videos", "Videos"], ["channels", "Channels"], ["playlists", "Playlists"]
+  ];
 
-// html elements
-const searchBar = document.getElementById("search");
-const searchButton = document.getElementById("search-button");
-const maxResults = document.getElementById("max-results");
-const order = document.getElementById("order");
-const message = document.getElementById("message");
-const resultContainer = document.getElementById("results");
-const loadmore = document.getElementById("loadmore");
+  // ---------- tiny store ----------
+  function lsGet(key, fallback) {
+    try {
+      var raw = localStorage.getItem(key);
+      return raw == null ? fallback : JSON.parse(raw);
+    } catch (e) { return fallback; }
+  }
+  function lsSet(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* private mode */ }
+  }
 
-// load youtube gapi
-await new Promise(r => gapi.load("client", r));
-await new Promise(r => gapi.client.load("youtube", "v3", r));
-await gapi.client.init({
-	apiKey: "AIzaSyBTULa9eVc8Y_tky8hjo7u6R1IuT2eXrdw",
-	discoveryDocs: [
-		"https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest"
-	]
-});
+  var prefs = Object.assign({
+    schoolMode: true,   // video bytes via /api/yt/media (same origin)
+    strictImg: true,    // thumbnails via /api/yt/img (same origin)
+    instance: "auto",   // "auto" (lounge proxy) or a direct mirror URL
+    provider: "auto",   // auto | innertube | piped | invidious
+    engine: "auto",     // auto | hls | mp4
+    region: "US",
+    autoplay: false,
+    skipSponsors: true,
+    captions: false,
+    volume: 1,
+    quality: "auto",
+    maxHeight: 0        // 0 = no cap (from the lounge Settings quality cap)
+  }, lsGet("ggl_yt_prefs", {}));
 
-const youtube = gapi.client.youtube;
-if (youtube == null) {
-	message.textContent = "Failed to load YouTube GAPI: Internal Error. Please refresh this page.";
-	return;
-}
+  function savePrefs() { lsSet("ggl_yt_prefs", prefs); }
 
-let pageToken = null;
+  // The lounge's own /settings page owns the same profile: adopt it, and keep
+  // following it live (open two tabs, change theme/server, both update).
+  function applyGgProfile(ggSettings) {
+    if (!ggSettings || !ggSettings.video) return;
+    var v = ggSettings.video;
+    var cap = { "1080": 1080, "720": 720, "480": 480, "360": 360 }[v.quality] || 0;
+    prefs.schoolMode = v.schoolMode !== false;
+    prefs.strictImg = v.strictImg !== false;
+    prefs.provider = v.provider || "auto";
+    prefs.engine = v.engine || "auto";
+    prefs.region = v.region || prefs.region;
+    prefs.autoplay = !!v.autoplay;
+    prefs.skipSponsors = v.skipSponsors !== false;
+    prefs.captions = !!v.captions;
+    prefs.volume = typeof v.volume === "number" ? v.volume : 1;
+    prefs.quality = v.quality || "auto";
+    prefs.maxHeight = cap;
+    prefs.instance = v.instance ? String(v.instance).replace(/\/+$/, "") : "auto";
+    if (ggSettings.ui) prefs.reduceMotion = !!ggSettings.ui.reduceMotion;
+    savePrefs();
+  }
 
-searchButton.onclick = () => {
-	resultContainer.innerHTML = "";
-	pageToken = null;
-	run();
-};
-searchBar.onkeydown = (e) => {
-	if (e.key == "Enter") {
-		e.preventDefault();
-		searchButton.click();
-	}
-};
+  (function bindLoungeProfile() {
+    var gg = window.GG;
+    if (!gg) {
+      document.addEventListener("gg:ready", bindLoungeProfile, { once: true });
+      return;
+    }
+    try {
+      applyGgProfile(gg.get());
+      gg.subscribe(function (next) {
+        applyGgProfile(next);
+        if (document.getElementById("main")) render();
+      });
+    } catch (e) { /* profile is optional */ }
+  })();
+  function getHistory() { return lsGet("ggl_yt_history", []); }
+  function getLater() { return lsGet("ggl_yt_later", []); }
 
-/**
- * @param {HTMLInputElement} element 
- * @param {number} def 
- * @param {number} min 
- * @param {number} max 
- */
-function correctNumberRange(element, def, min, max) {
-	const val = element.value;
-	if (val == null || val.length == 0)
-		return element.value = def.toString();
+  function pushHistory(entry) {
+    var list = getHistory().filter(function (x) { return x.id !== entry.id; });
+    list.unshift(Object.assign({ ts: Date.now() }, entry));
+    lsSet("ggl_yt_history", list.slice(0, 100));
+  }
+  function toggleLater(entry) {
+    var list = getLater();
+    var i = -1;
+    for (var k = 0; k < list.length; k++) if (list[k].id === entry.id) i = k;
+    if (i >= 0) { list.splice(i, 1); lsSet("ggl_yt_later", list); return false; }
+    list.unshift(Object.assign({ ts: Date.now() }, entry));
+    lsSet("ggl_yt_later", list.slice(0, 200));
+    return true;
+  }
+  function isLater(id) {
+    return getLater().some(function (x) { return x.id === id; });
+  }
 
-	const nVal = parseInt(val);
-	if (nVal < min)
-		return element.value = min.toString();
-	else if (nVal > max)
-		return element.value = max.toString();
-	else return element.value;
-}
+  // ---------- dom ----------
+  var main = document.getElementById("main");
+  var netDot = document.getElementById("net-dot");
+  var netText = document.getElementById("net-text");
+  var searchInput = document.getElementById("search-input");
+  var searchBtn = document.getElementById("search-btn");
+  var suggestBox = document.getElementById("suggest");
+  var toasts = document.getElementById("toasts");
 
-function run() {
-	loadmore.style.display = "none"
-	message.innerHTML = "";
-	search(searchBar.value, correctNumberRange(maxResults, 10, 1, 50), order.value);
-}
+  function toast(msg) {
+    var el = document.createElement("div");
+    el.className = "toast";
+    el.textContent = msg;
+    toasts.appendChild(el);
+    setTimeout(function () { el.remove(); }, 2600);
+  }
 
-/**
- * @param {HTMLElement} container 
- * @param {string} videoId 
- */
-function createVideoFrame(container, videoId) {
-	const frame = document.createElement("embed");
-	frame.setAttribute("type", "text/plain");
-	frame.setAttribute("width", "800");
-	frame.setAttribute("height", "600");
-	frame.setAttribute("loading", "lazy");
-	frame.setAttribute("scrolling", "no");
-	frame.setAttribute("fetchpriority", "high");
-	frame.setAttribute("allowfullscreen", "true");
-	frame.setAttribute("referrerpolicy", "no-referrer");
-	frame.setAttribute("sandbox", "allow-scripts allow-same-origin");
+  function setNet(state, text) {
+    netDot.classList.remove("ok", "bad");
+    if (state === "ok") netDot.classList.add("ok");
+    if (state === "bad") netDot.classList.add("bad");
+    netText.textContent = text;
+  }
 
-	const url = new URL("https://www.youtube-nocookie.com/embed/" + videoId);
-	url.searchParams.set("autoplay", "1");
-	url.searchParams.set("controls", "1");
-	url.searchParams.set("rel", "0");
-	url.searchParams.set("color", "white");
-	frame.setAttribute("src", url.href);
+  // If a proxied thumbnail fails (proxy unreachable), retry it direct once.
+  document.addEventListener("error", function (ev) {
+    var t = ev.target;
+    if (t && t.tagName === "IMG" && !t.getAttribute("data-direct-retried") &&
+        (t.src.indexOf("/img?url=") >= 0 || t.src.indexOf("/api/yt/img?") >= 0)) {
+      t.setAttribute("data-direct-retried", "1");
+      try {
+        var u = new URL(t.src, location.href).searchParams.get("url");
+        if (u) t.src = u;
+      } catch (e) { /* noop */ }
+    }
+  }, true);
 
-	container.appendChild(frame);
-}
+  // ---------- helpers ----------
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+  function linkify(text) {
+    var safe = esc(text);
+    return safe.replace(/(https?:\/\/[^\s<]+)/g, function (m) {
+      return '<a href="' + m + '" target="_blank" rel="noopener noreferrer">' + m + "</a>";
+    }).replace(/\n/g, "<br>");
+  }
+  function fmtDur(sec) {
+    if (sec == null || sec < 0) return "";
+    sec = Math.floor(sec);
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    function p(n) { return (n < 10 ? "0" : "") + n; }
+    return h > 0 ? h + ":" + p(m) + ":" + p(s) : m + ":" + p(s);
+  }
+  function fmtNum(n) {
+    if (n == null || n < 0) return "";
+    if (n >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+    if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, "") + "K";
+    return String(n);
+  }
+  function timeAgo(ts) {
+    if (!ts || ts < 0) return "";
+    var d = Date.now() - (ts < 1e12 ? ts * 1000 : ts);
+    if (d < 0) return "";
+    var mins = Math.floor(d / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return mins + " min ago";
+    var h = Math.floor(mins / 60);
+    if (h < 24) return h + " hour" + (h > 1 ? "s" : "") + " ago";
+    var days = Math.floor(h / 24);
+    if (days < 30) return days + " day" + (days > 1 ? "s" : "") + " ago";
+    var months = Math.floor(days / 30);
+    if (months < 12) return months + " month" + (months > 1 ? "s" : "") + " ago";
+    var y = Math.floor(months / 12);
+    return y + " year" + (y > 1 ? "s" : "") + " ago";
+  }
+  function when(item) {
+    if (item.uploadedDate) return item.uploadedDate;
+    if (item.uploadDate) return item.uploadDate;
+    if (typeof item.uploaded === "number" && item.uploaded > 0) return timeAgo(item.uploaded);
+    return "";
+  }
+  function metaLine(item) {
+    var parts = [];
+    if (item.views != null && item.views >= 0) parts.push(fmtNum(item.views) + " views");
+    var w = when(item);
+    if (w) parts.push(w);
+    return parts.join(" • ");
+  }
+  function videoIdFromUrl(url) {
+    if (!url) return null;
+    var m = /[?&]v=([\w-]{11})/.exec(url) || /\/watch\/([\w-]{11})/.exec(url) ||
+            /^([\w-]{11})$/.exec(url) || /youtu\.be\/([\w-]{11})/.exec(url);
+    return m ? m[1] : null;
+  }
+  function channelPathFromUrl(url) {
+    if (!url) return null;
+    var m = /^\/(channel|c|user)\/([^/?#]+)/.exec(url);
+    return m ? m[1] + "/" + m[2] : null;
+  }
 
-/**
- * @param {string} q 
- * @param {string | number} maxResults 
- * @param {string} order 
- */
-async function search(q, maxResults, order) {
-	const params = {
-		part: "snippet",
-		type: "video",
-		order,
-		maxResults,
-		pageToken,
-		q
-	};
+  // The API already relays media/images through the lounge (see proxyMediaUrls
+  // in app/api/yt/[...path]/route.ts), so these helpers must be idempotent -
+  // wrapping an already-relay path would send a relative URL upstream.
+  function isRelayed(u) {
+    return typeof u === "string" && (u.indexOf("/api/yt/media?") === 0 || u.indexOf("/api/yt/img?") === 0 ||
+      u.indexOf(API_BASE + "/media?") === 0 || u.indexOf(API_BASE + "/img?") === 0);
+  }
+  function directUrl(s) {
+    return (s && (s.urlDirect || (isRelayed(s.url) ? "" : s.url))) || "";
+  }
+  function mediaUrl(u) {
+    if (!u) return "";
+    if (isRelayed(u)) return u;
+    if (prefs.schoolMode) return API_BASE + "/media?url=" + encodeURIComponent(u);
+    return u;
+  }
+  function imgUrl(u, fallback) {
+    if (!u) return fallback || "";
+    if (isRelayed(u)) return u;
+    // School mode proxies images same-origin too (auto-falls back to direct
+    // via the global IMG error handler below if the proxy is unreachable).
+    if (prefs.strictImg || prefs.schoolMode) return API_BASE + "/img?url=" + encodeURIComponent(u);
+    return u;
+  }
 
-	const response = await youtube.search.list(params);
-	if (response == null) {
-		message.innerHTML = "Internal error";
-		return;
-	}
+  // ---------- api client ----------
+  var lastVia = "";
+  var directCursor = 0;
+  var proxyAlive = null; // null = unknown, true/false after probe or first use
 
-	const result = response.result;
-	if (result == null) {
-		message.innerHTML = "Failed to fetch search results.";
-		return;
-	}
+  // One cheap boot probe so we don't waste seconds on a dead proxy (or a
+  // dead direct route) before trying the other path.
+  function probeProxy() {
+    if (proxyAlive !== null) return;
+    proxyAlive = undefined; // probing
+    fetchJson(API_BASE + "/trending?region=" + encodeURIComponent(prefs.region || "US"), 6000).then(function () {
+      proxyAlive = true;
+    }, function () { proxyAlive = false; });
+  }
 
-	const items = result.items;
-	if (items.length == 0) {
-		message.innerHTML = "No results match your search.";
-		return;
-	}
+  function fetchJson(url, timeoutMs) {
+    return new Promise(function (resolve, reject) {
+      var timer = setTimeout(function () { reject(new Error("timed out")); }, timeoutMs || 15000);
+      fetch(url, { headers: { Accept: "application/json" } })
+        .then(function (res) {
+          clearTimeout(timer);
+          res.text().then(function (text) {
+            var data = text;
+            try { data = JSON.parse(text); } catch (e) { /* keep text */ }
+            if (!res.ok) {
+              var msg = (data && data.message) || (data && data.error) || ("HTTP " + res.status);
+              var err = new Error(String(msg));
+              err.status = res.status;
+              reject(err);
+            } else resolve(data);
+          }, reject);
+        }, function (err) { clearTimeout(timer); reject(err); });
+    });
+  }
 
-	for (const item of items) {
-		const id = item.id.videoId;
-		const title = item.snippet.title;
-		const description = item.snippet.description;
-		const publishTime = item.snippet.publishTime;
-		const thumbnail = item.snippet.thumbnails.medium;
+  function directOrder() {
+    var list = DIRECT_INSTANCES.slice();
+    var out = [];
+    for (var i = 0; i < list.length; i++) out.push(list[(directCursor + i) % list.length]);
+    return out;
+  }
 
-		const container = document.createElement("div");
-		container.className = "result";
-		container.innerHTML = '<div class="result-item"><img class="result-preview" width="160" height="90" /><div class="result-details"><div class="result-title">Example</div><div class="result-description">An example video</div><div class="result-publish-time">A long time ago</div></div></div><div class="video-container"></div>';
-		container.getElementsByClassName("result-preview")[0].setAttribute("src", thumbnail.url);
-		container.getElementsByClassName("result-title")[0].textContent = title;
-		container.getElementsByClassName("result-description")[0].textContent = description;
-		container.getElementsByClassName("result-publish-time")[0].textContent = publishTime;
+  function tryDirect(path, proxyErr) {
+    var order = directOrder();
+    var chain = Promise.reject(proxyErr);
+    order.slice(0, 6).forEach(function (base) {
+      chain = chain.catch(function () {
+        return fetchJson(base + path, 10000).then(function (data) {
+          lastVia = base;
+          directCursor = DIRECT_INSTANCES.indexOf(base); // start here next time
+          setNet("ok", "Direct • connected");
+          return data;
+        });
+      });
+    });
+    return chain.catch(function (err) {
+      setNet("bad", "Offline");
+      throw err;
+    });
+  }
 
-		const videoContainer = container.getElementsByClassName("video-container")[0];
-		videoContainer.style.display = "none";
+  function withQuery(path) {
+    var add = [];
+    if (prefs.provider && prefs.provider !== "auto") add.push("provider=" + encodeURIComponent(prefs.provider));
+    var sep = path.indexOf("?") >= 0 ? "&" : "?";
+    return add.length ? path + sep + add.join("&") : path;
+  }
 
-		container.getElementsByClassName("result-item")[0].onclick = () => {
-			if (videoContainer.style.display == "none") {
-				videoContainer.style.display = "block";
-				createVideoFrame(videoContainer, id);
-			} else {
-				videoContainer.innerHTML = "";
-				videoContainer.style.display = "none";
-			}
-		};
+  function api(path) {
+    // Manual mirror selected → go direct only.
+    if (prefs.instance && prefs.instance !== "auto") {
+      return fetchJson(prefs.instance + withQuery(path)).then(function (data) {
+        lastVia = prefs.instance;
+        setNet("ok", "Server: custom");
+        return data;
+      }).catch(function (err) {
+        // a dead custom mirror must not strand the room
+        setNet("bad", "Custom server failed — using auto");
+        return fetchJson(API_BASE + withQuery(path)).catch(function () { throw err; });
+      });
+    }
+    path = withQuery(path);
+    // Proxy known-dead (e.g. sandbox preview): skip straight to direct.
+    if (proxyAlive === false) {
+      return tryDirect(path, new Error("lounge proxy unreachable"));
+    }
+    // Auto: lounge proxy first (same origin = unblockable), then direct Piped.
+    return fetchJson(API_BASE + path).then(function (data) {
+      lastVia = "lounge proxy";
+      proxyAlive = true;
+      setNet("ok", prefs.schoolMode ? "School mode • connected" : "Connected");
+      return data;
+    }).catch(function (proxyErr) {
+      proxyAlive = false;
+      return tryDirect(path, proxyErr);
+    });
+  }
 
-		resultContainer.appendChild(container);
-	}
+  // Write back to the shared lounge profile so /settings and the room agree.
+  function pushToLounge(key, value) {
+    try {
+      var gg = window.GG;
+      if (!gg) return;
+      var patch = {};
+      patch[key] = value;
+      gg.patch("video", patch);
+    } catch (e) { /* lounge profile is optional */ }
+  }
 
-	const nextPageToken = result.nextPageToken;
-	if (nextPageToken != null) {
-		loadmore.style.display = "block";
-		loadmore.onclick = () => {
-			pageToken = nextPageToken;
-			run();
-		};
-	}
-}
+  function cycleServer() {
+    directCursor = (directCursor + 1) % DIRECT_INSTANCES.length;
+    prefs.instance = DIRECT_INSTANCES[directCursor];
+    savePrefs();
+    pushToLounge("instance", prefs.instance === "auto" ? "" : prefs.instance);
+    toast("Trying server: " + prefs.instance.replace("https://", ""));
+  }
 
+  // ---------- navigation ----------
+  var state = { view: "home", q: "", filter: "all", id: "", chan: "", nextpage: null };
+  var currentVideo = null;   // HTMLVideoElement
+  var currentHls = null;     // hls.js instance
+  var upNext = [];
+  var sponsorsSkipped = 0;
+
+  function stopPlayer() {
+    try { if (currentHls) currentHls.destroy(); } catch (e) { /* noop */ }
+    currentHls = null;
+    if (currentVideo) { try { currentVideo.pause(); } catch (e) { /* noop */ } }
+    currentVideo = null;
+    upNext = [];
+    sponsorsSkipped = 0;
+  }
+
+  function setActiveNav(view) {
+    var btns = document.querySelectorAll("[data-nav]");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle("active", btns[i].getAttribute("data-nav") === view);
+    }
+  }
+
+  function go(view, params, push) {
+    stopPlayer();
+    state = Object.assign({ view: view }, params || {});
+    setActiveNav(view === "watch" || view === "search" || view === "channel" ? "" : view);
+    if (push !== false) {
+      var url = "./index.html" + toQuery(state);
+      try { history.pushState(Object.assign({}, state), "", url); } catch (e) { /* file:// */ }
+    }
+    window.scrollTo(0, 0);
+    render();
+  }
+
+  function toQuery(s) {
+    if (s.view === "watch" && s.id) return "?v=" + encodeURIComponent(s.id);
+    if (s.view === "search" && s.q) return "?q=" + encodeURIComponent(s.q);
+    if (s.view === "channel" && s.chan) return "?c=" + encodeURIComponent(s.chan);
+    if (s.view && s.view !== "home") return "?view=" + encodeURIComponent(s.view);
+    return "";
+  }
+
+  function bootFromUrl() {
+    var q = new URLSearchParams(window.location.search);
+    if (q.get("v")) return { view: "watch", id: q.get("v") };
+    if (q.get("q")) return { view: "search", q: q.get("q"), filter: "all" };
+    if (q.get("c")) return { view: "channel", chan: q.get("c") };
+    if (q.get("view")) return { view: q.get("view") };
+    return { view: "home" };
+  }
+
+  window.addEventListener("popstate", function (e) {
+    stopPlayer();
+    state = e.state || { view: "home" };
+    setActiveNav(state.view);
+    render();
+  });
+
+  // ---------- shared render bits ----------
+  function skeletonGrid(n) {
+    var html = '<div class="grid">';
+    for (var i = 0; i < (n || 12); i++) {
+      html += '<div class="skeleton"><div class="skel-thumb"></div><div class="skel-line" style="width:88%"></div><div class="skel-line" style="width:60%"></div></div>';
+    }
+    return html + "</div>";
+  }
+
+  function officialEmbed(id, holder) {
+    holder.innerHTML = '<iframe class="player official" src="https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1&rel=0" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="no-referrer"></iframe>';
+  }
+
+  function officialOnly(id) {
+    main.innerHTML =
+      '<div class="watch"><div class="player-col"><div class="player-holder">' +
+      '<iframe class="player official" src="https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1&rel=0" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="no-referrer"></iframe>' +
+      '</div><p class="official-note">Stream servers are unreachable, so this is playing through the official YouTube player.</p></div></div>';
+  }
+
+  function errorBox(title, message, retryFn) {
+    main.innerHTML =
+      '<div class="error-box"><h2>' + esc(title) + '</h2><p>' + esc(message) + '</p>' +
+      '<div class="btn-row"><button class="btn" id="err-retry">Try again</button>' +
+      '<button class="btn ghost" id="err-server">Try another server</button></div></div>';
+    document.getElementById("err-retry").onclick = retryFn;
+    document.getElementById("err-server").onclick = function () {
+      cycleServer();
+      retryFn();
+    };
+  }
+
+  function cardHtml(item) {
+    var id = videoIdFromUrl(item.url);
+    if (!id) return "";
+    var live = item.isShort === false && item.duration === -1;
+    var dur = item.duration != null && item.duration > 0 ? fmtDur(item.duration) : "";
+    var uploader = item.uploaderName || item.uploader || "";
+    var avatar = imgUrl(item.uploaderAvatar, "");
+    return (
+      '<div class="card" data-video="' + esc(id) + '" role="button" tabindex="0">' +
+        '<div class="thumb">' +
+          '<img loading="lazy" referrerpolicy="no-referrer" src="' + esc(imgUrl(item.thumbnail, "")) + '" alt="" onerror="this.classList.add(\'broken\')" />' +
+          (dur ? '<span class="badge-dur">' + esc(dur) + "</span>" : (live ? '<span class="badge-live">LIVE</span>' : "")) +
+        "</div>" +
+        '<div class="card-row">' +
+          (avatar ? '<img class="avatar" loading="lazy" referrerpolicy="no-referrer" src="' + esc(avatar) + '" alt="" onerror="this.style.visibility=\'hidden\'" />' : '<span class="avatar"></span>') +
+          '<div class="card-meta"><p class="card-title">' + esc(item.title) + "</p>" +
+          '<div class="card-sub">' + esc(uploader) +
+          (item.uploaderVerified ? ' <span class="verified">✓</span>' : "") + "<br>" + esc(metaLine(item)) + "</div></div>" +
+        "</div>" +
+      "</div>"
+    );
+  }
+
+  function bindCards(root) {
+    var cards = (root || main).querySelectorAll("[data-video]");
+    for (var i = 0; i < cards.length; i++) {
+      (function (el) {
+        function open() { go("watch", { id: el.getAttribute("data-video") }); }
+        el.addEventListener("click", open);
+        el.addEventListener("keydown", function (e) { if (e.key === "Enter") open(); });
+      })(cards[i]);
+    }
+  }
+
+  function regionSelectHtml() {
+    var html = '<select class="region-select" id="region-sel" aria-label="Trending region">';
+    for (var i = 0; i < REGIONS.length; i++) {
+      html += '<option value="' + REGIONS[i][0] + '"' +
+        (prefs.region === REGIONS[i][0] ? " selected" : "") + ">" + esc(REGIONS[i][1]) + "</option>";
+    }
+    return html + "</select>";
+  }
+
+  // ---------- home / trending ----------
+  function renderHome() {
+    var title = state.view === "trending" ? "Trending now" : "Recommended";
+    main.innerHTML =
+      '<div class="view-head"><h1>' + title + '</h1>' + regionSelectHtml() + "</div>" +
+      '<div id="feed">' + skeletonGrid(12) + "</div>";
+    document.getElementById("region-sel").onchange = function (e) {
+      prefs.region = e.target.value;
+      savePrefs();
+      renderHome();
+    };
+    api("/trending?region=" + encodeURIComponent(prefs.region)).then(function (items) {
+      if (!items || !items.length) {
+        main.querySelector("#feed").innerHTML = '<div class="empty">No trending videos right now. Try another region.</div>';
+        return;
+      }
+      var html = '<div class="grid">';
+      for (var i = 0; i < items.length; i++) html += cardHtml(items[i]);
+      main.querySelector("#feed").innerHTML = html + "</div>";
+      bindCards();
+    }, function (err) {
+      errorBox("Couldn't load videos", err.message || "Network error", renderHome);
+    });
+  }
+
+  // ---------- search ----------
+  function renderSearch() {
+    var tabs = '<div class="filter-tabs">';
+    for (var i = 0; i < SEARCH_FILTERS.length; i++) {
+      tabs += '<button data-filter="' + SEARCH_FILTERS[i][0] + '"' +
+        (state.filter === SEARCH_FILTERS[i][0] ? ' class="active"' : "") + ">" +
+        SEARCH_FILTERS[i][1] + "</button>";
+    }
+    main.innerHTML =
+      '<div class="view-head"><h1>Results for “' + esc(state.q) + "”</h1></div>" + tabs + "</div>" +
+      '<div class="rows" id="results"><div class="empty">Searching…</div></div>' +
+      '<button class="load-more" id="more-btn" style="display:none">Load more</button>';
+    searchInput.value = state.q;
+
+    var tabsBtns = main.querySelectorAll("[data-filter]");
+    for (var t = 0; t < tabsBtns.length; t++) {
+      tabsBtns[t].onclick = function () {
+        state.filter = this.getAttribute("data-filter");
+        state.nextpage = null;
+        renderSearch();
+      };
+    }
+
+    var next = null;
+    function paint(items, append) {
+      var box = document.getElementById("results");
+      var html = append ? "" : "";
+      if (!append && (!items || !items.length)) {
+        box.innerHTML = '<div class="empty">No results. Try different keywords.</div>';
+        return;
+      }
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i];
+        if (it.type === "stream") {
+          var id = videoIdFromUrl(it.url);
+          if (!id) continue;
+          html +=
+            '<div class="row" data-video="' + esc(id) + '">' +
+              '<div class="thumb"><img loading="lazy" referrerpolicy="no-referrer" src="' + esc(imgUrl(it.thumbnail, "")) + '" alt="" onerror="this.classList.add(\'broken\')" />' +
+              (it.duration > 0 ? '<span class="badge-dur">' + esc(fmtDur(it.duration)) + "</span>" : "") + "</div>" +
+              '<div class="row-body"><p class="row-title">' + esc(it.title) + "</p>" +
+              '<div class="row-sub">' + esc(metaLine(it)) + " • " + esc(it.uploaderName || "") +
+              (it.uploaderVerified ? " ✓" : "") + "</div>" +
+              '<div class="row-desc">' + esc(it.description || "") + "</div></div>" +
+            "</div>";
+        } else if (it.type === "channel") {
+          var cp = channelPathFromUrl(it.url);
+          html +=
+            '<div class="channel-row" data-channel="' + esc(cp || "") + '">' +
+              '<img loading="lazy" referrerpolicy="no-referrer" src="' + esc(imgUrl(it.thumbnail, "")) + '" alt="" />' +
+              "<div><div style='font-weight:700'>" + esc(it.name) + (it.verified ? " ✓" : "") + "</div>" +
+              '<div class="row-sub">' + esc(fmtNum(it.subscribers) + (it.subscribers >= 0 ? " subscribers • " : "") + (it.videoCount >= 0 ? it.videoCount + " videos" : "")) + "</div>" +
+              '<div class="row-desc">' + esc(it.description || "") + "</div></div>" +
+            "</div>";
+        } else if (it.type === "playlist") {
+          html +=
+            '<div class="row" data-playlist="' + esc(it.url || "") + '">' +
+              '<div class="thumb"><img loading="lazy" referrerpolicy="no-referrer" src="' + esc(imgUrl(it.thumbnail, "")) + '" alt="" onerror="this.classList.add(\'broken\')" /></div>' +
+              '<div class="row-body"><p class="row-title">▶ ' + esc(it.name) + "</p>" +
+              '<div class="row-sub">Playlist • ' + esc(it.uploaderName || "") + " • " + esc(String(it.videos >= 0 ? it.videos : "") + " videos") + "</div></div>" +
+            "</div>";
+        }
+      }
+      if (append) {
+        var tmp = document.createElement("div");
+        tmp.innerHTML = html;
+        while (tmp.firstChild) box.appendChild(tmp.firstChild);
+      } else box.innerHTML = html;
+      bindCards(box);
+      var chans = box.querySelectorAll("[data-channel]");
+      for (var c = 0; c < chans.length; c++) {
+        (function (el) {
+          el.onclick = function () {
+            var p = el.getAttribute("data-channel");
+            if (p) go("channel", { chan: p });
+          };
+        })(chans[c]);
+      }
+      var pls = box.querySelectorAll("[data-playlist]");
+      for (var p2 = 0; p2 < pls.length; p2++) {
+        pls[p2].onclick = function () { toast("Playlists open the first video — full playlist view coming soon."); };
+      }
+    }
+
+    function loadMore() {
+      if (!next) return;
+      var btn = document.getElementById("more-btn");
+      btn.textContent = "Loading…";
+      // The proxy handles per-provider tokens (Piped blobs, InnerTube
+      // continuations, Invidious page numbers) — just hand the string back.
+      api("/nextpage/search?nextpage=" + encodeURIComponent(next) +
+        "&q=" + encodeURIComponent(state.q) + "&filter=" + encodeURIComponent(state.filter))
+        .then(function (page) {
+          next = page.nextpage || null;
+          paint(page.items || [], true);
+          btn.style.display = next ? "block" : "none";
+          btn.textContent = "Load more";
+        }, function () { btn.textContent = "Load more"; });
+    }
+    document.getElementById("more-btn").onclick = loadMore;
+
+    api("/search?q=" + encodeURIComponent(state.q) + "&filter=" + encodeURIComponent(state.filter))
+      .then(function (page) {
+        next = page.nextpage || null;
+        if (page.suggestion) {
+          var s = document.createElement("div");
+          s.className = "row-sub";
+          s.style.marginBottom = "12px";
+          s.innerHTML = "Did you mean: <b></b>";
+          s.querySelector("b").textContent = page.suggestion;
+          s.style.cursor = "pointer";
+          s.onclick = function () { go("search", { q: page.suggestion, filter: state.filter }); };
+          document.getElementById("results").before(s);
+        }
+        paint(page.items || [], false);
+        document.getElementById("more-btn").style.display = next ? "block" : "none";
+      }, function (err) {
+        errorBox("Search failed", err.message || "Network error", renderSearch);
+      });
+  }
+
+  // ---------- watch ----------
+  function pickStreams(data) {
+    var videos = (data.videoStreams || []).slice();
+    var muxed = videos.filter(function (s) { return !s.videoOnly; });
+    void videos;
+    // Prefer mp4 muxed for widest <video> support.
+    if (prefs.maxHeight > 0) {
+      var fits = muxed.filter(function (s) { return !(s.height || 0) || s.height <= prefs.maxHeight; });
+      if (fits.length) muxed = fits;
+    }
+    muxed.sort(function (a, b) {
+      var am = /mp4/i.test(a.mimeType || "") || /mp4/i.test(a.format || "") ? 0 : 1;
+      var bm = /mp4/i.test(b.mimeType || "") || /mp4/i.test(b.format || "") ? 0 : 1;
+      if (am !== bm) return am - bm;
+      // In school mode, prefer non-googlevideo hosts (pipedproxy mirrors),
+      // since school filters usually block video CDNs but not these.
+      if (prefs.schoolMode) {
+        var ag = /googlevideo\.com/i.test(directUrl(a) || "") ? 1 : 0;
+        var bg = /googlevideo\.com/i.test(directUrl(b) || "") ? 1 : 0;
+        if (ag !== bg) return ag - bg;
+      }
+      return (b.height || 0) - (a.height || 0);
+    });
+    return { muxed: muxed, all: videos, audio: (data.audioStreams || []).slice() };
+  }
+
+  function qualityLabel(s) {
+    if (s.quality) return s.quality;
+    if (s.height) return s.height + "p";
+    return s.format || "SD";
+  }
+
+  function applyVolume(video) {
+    try {
+      var v = typeof prefs.volume === "number" ? prefs.volume : 1;
+      video.volume = Math.max(0, Math.min(1, v));
+      video.muted = v === 0;
+    } catch (e) { /* noop */ }
+  }
+
+  /** Lounge-level caption track, served same-origin as WebVTT. */
+  function attachCaptions(video, data) {
+    if (!prefs.captions) return;
+    try {
+      var list = (data && data.subtitles) || [];
+      if (!list.length) return;
+      var track = list.filter(function (t) { return !t.autoGenerated; })[0] || list[0];
+      var el = document.createElement("track");
+      el.kind = "subtitles";
+      el.label = (track.name || track.code || "Captions") + " (CC)";
+      el.srclang = track.code || "en";
+      el.src = API_BASE + "/captions/" + encodeURIComponent(state.id) + "?lang=" + encodeURIComponent(track.code || "en") + (track.autoGenerated ? "&auto=1" : "");
+      video.appendChild(el);
+      setTimeout(function () {
+        for (var i = 0; i < video.textTracks.length; i++) video.textTracks[i].mode = i === 0 ? "showing" : "hidden";
+      }, 0);
+    } catch (e) { /* captions are a bonus */ }
+  }
+
+  function ensureHls() {
+    return new Promise(function (resolve, reject) {
+      if (window.Hls) return resolve(window.Hls);
+      var s = document.createElement("script");
+      s.src = "./vendor/hls.min.js";
+      s.onload = function () { resolve(window.Hls); };
+      s.onerror = function () { reject(new Error("player engine failed to load")); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function attachHls(video, hlsUrl, fallbackUrl) {
+    function plain() {
+      // Safari (and any HLS-native webview) can take the manifest directly; our
+      // relay serves rewritten m3u8s, so this works on both paths.
+      video.src = hlsUrl;
+      video.play().catch(function () {});
+    }
+    if (video.canPlayType("application/vnd.apple.mpegurl")) { plain(); return; }
+    ensureHls().then(function (Hls) {
+      if (!Hls.isSupported()) { plain(); return; }
+      var hls = new Hls({ maxBufferLength: 30 });
+      if (prefs.schoolMode) {
+        hls.config.xhrSetup = function (xhr, url) {
+          // Anything not already same-origin goes through the lounge relay.
+          if (/^https?:/.test(url) && url.indexOf(location.host) < 0) {
+            xhr.open("GET", API_BASE + "/media?url=" + encodeURIComponent(url), true);
+          }
+        };
+      }
+      var triedDirect = false;
+      hls.on(Hls.Events.ERROR, function (_ev, err) {
+        if (!err || !err.fatal || triedDirect || !fallbackUrl) return;
+        triedDirect = true;
+        try { hls.destroy(); } catch (e) { /* noop */ }
+        if (currentHls === hls) currentHls = null;
+        video.src = fallbackUrl;
+        video.play().catch(function () {});
+        toast("Relay hiccuped - trying the CDN directly");
+      });
+      hls.loadSource(hlsUrl);
+      hls.attachMedia(video);
+      currentHls = hls;
+    }, function () { video.src = fallbackUrl || hlsUrl; });
+  }
+
+  function renderWatch() {
+    var id = state.id;
+    main.innerHTML =
+      '<div class="watch"><div class="player-col">' +
+        '<div class="player-holder"><div class="player-fallback" id="player-ph">Loading player…</div>' +
+        '<div class="skipper" id="skipper">Skipping sponsor…</div></div>' +
+        '<div id="watch-info"><div class="skel-line" style="width:70%;height:18px"></div><div class="skel-line" style="width:40%"></div></div>' +
+        '<div class="comments" id="comments"><h2>Comments</h2><div class="empty">Loading…</div></div>' +
+      '</div><div class="upnext"><h2>Up next</h2><div id="upnext-list">' + skeletonGrid(4) + "</div></div></div>";
+
+    api("/streams/" + encodeURIComponent(id)).then(function (data) {
+      paintWatch(id, data);
+    }, function (err) {
+      errorBox("Couldn't load this video", err.message || "Network error", renderWatch);
+      var row = main.querySelector(".btn-row");
+      if (row) {
+        var btn = document.createElement("button");
+        btn.className = "btn";
+        btn.id = "err-official";
+        btn.textContent = "Play with official YouTube player";
+        btn.onclick = function () { officialOnly(id); };
+        row.appendChild(btn);
+      }
+    });
+  }
+
+  function paintWatch(id, data) {
+    var picked = pickStreams(data);
+    var isLive = !!data.livestream;
+
+    pushHistory({
+      id: id, title: data.title,
+      thumbnail: data.thumbnailUrl || "",
+      uploader: data.uploader || "",
+      duration: data.duration || 0
+    });
+
+    // ---- player ----
+    var holder = main.querySelector(".player-holder");
+    holder.querySelector("#player-ph").remove();
+    var video = document.createElement("video");
+    video.className = "player";
+    video.controls = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+    video.poster = imgUrl(data.thumbnailUrl, "");
+    video.setAttribute("referrerpolicy", "no-referrer");
+    holder.insertBefore(video, holder.firstChild);
+    currentVideo = video;
+
+    var defaultStream = picked.muxed[0] || null;
+    if (prefs.quality !== "auto" && picked.muxed.length) {
+      for (var i = 0; i < picked.muxed.length; i++) {
+        if (qualityLabel(picked.muxed[i]) === prefs.quality) defaultStream = picked.muxed[i];
+      }
+    }
+
+    // Ordered playback candidates: proxied best stream (school mode, if the
+    // proxy is alive) → direct best stream → other direct renditions.
+    var candidates = [];
+    var candIdx = 0;
+    if (defaultStream) {
+      // The lounge relay first (works when video CDNs are blocked), then the
+      // CDN itself (works when the relay is the bottleneck), then alternatives.
+      if (prefs.schoolMode && proxyAlive !== false) candidates.push(mediaUrl(defaultStream.url));
+      var direct = directUrl(defaultStream);
+      if (direct) candidates.push(direct);
+      if (!prefs.schoolMode) candidates.push(mediaUrl(defaultStream.url));
+      for (var ci = 0; ci < picked.muxed.length && candidates.length < 8; ci++) {
+        var cm = picked.muxed[ci];
+        var cu = (prefs.schoolMode ? mediaUrl(cm.url) : directUrl(cm)) || cm.url;
+        if (cu && candidates.indexOf(cu) < 0) candidates.push(cu);
+      }
+    }
+    // "HLS (HD)" prefers the adaptive stream; "MP4" never touches it.
+    var wantHls = !!data.hls && (prefs.engine === "hls" || (prefs.engine === "auto" && (!defaultStream || isLive)));
+    if (wantHls && !candidates.length) candidates.push(prefs.schoolMode ? mediaUrl(data.hls) : data.hls);
+
+    if (isLive && data.hls) {
+      attachHls(video, data.hls, data.hlsDirect);
+    } else if (wantHls) {
+      attachHls(video, data.hls, data.hlsDirect);
+    } else if (defaultStream) {
+      video.src = candidates[0];
+      applyVolume(video);
+      attachCaptions(video, data);
+    } else if (data.hls) {
+      attachHls(video, data.hls, data.hlsDirect);
+    } else {
+      holder.innerHTML = '<div class="player-fallback">No playable stream from this server.<br>Try Engine → “HLS (HD)”, another server, or School mode off.<br><br><button class="btn" id="official-btn">Play with official YouTube player</button></div>';
+      document.getElementById("official-btn").onclick = function () { officialEmbed(id, holder); };
+    }
+
+    video.onerror = function () {
+      // Step through every candidate before giving up to the official player.
+      candIdx++;
+      if (candIdx < candidates.length) {
+        video.src = candidates[candIdx];
+        video.play().catch(function () {});
+      } else if (!document.getElementById("official-btn")) {
+        var wrap = document.createElement("div");
+        wrap.className = "player-fallback official-wrap";
+        wrap.innerHTML = 'This stream is blocked or broken on this network.<br><br><button class="btn" id="official-btn">Play with official YouTube player</button>';
+        holder.appendChild(wrap);
+        document.getElementById("official-btn").onclick = function () { officialEmbed(id, holder); };
+      }
+    };
+
+    // ---- info ----
+    var chanPath = channelPathFromUrl(data.uploaderUrl);
+    var saved = isLater(id);
+    var info = document.getElementById("watch-info");
+    var qOptions = '<option value="auto">Quality: Auto</option>';
+    var seen = {};
+    picked.muxed.forEach(function (s) {
+      var label = qualityLabel(s);
+      if (seen[label]) return;
+      seen[label] = true;
+      qOptions += '<option value="' + esc(label) + '"' +
+        (defaultStream && qualityLabel(defaultStream) === label ? " selected" : "") + ">" + esc(label) + "</option>";
+    });
+    if (picked.audio.length) qOptions += '<option value="__audio">Audio only</option>';
+
+    info.innerHTML =
+      '<h1 class="watch-title">' + esc(data.title) + "</h1>" +
+      '<div class="watch-row">' +
+        '<div class="channel-chip" id="w-chan">' +
+          (data.uploaderAvatar ? '<img referrerpolicy="no-referrer" src="' + esc(imgUrl(data.uploaderAvatar, "")) + '" alt="" />' : "") +
+          "<div><div class='name'>" + esc(data.uploader || "") +
+          (data.uploaderVerified ? " ✓" : "") + "</div>" +
+          '<div class="subs">' + esc(data.uploaderSubscriberCount != null ? fmtNum(data.uploaderSubscriberCount) + " subscribers" : "") + "</div></div>" +
+        "</div>" +
+        '<div class="watch-actions">' +
+          (isLive || picked.muxed.length === 0 ? "" : '<select class="pill" id="w-quality" aria-label="Quality">' + qOptions + "</select>") +
+          '<button class="pill' + (saved ? " on" : "") + '" id="w-save">' + (saved ? "★ Saved" : "☆ Save") + "</button>" +
+          '<button class="pill" id="w-share">⤴ Share</button>' +
+          '<button class="pill' + (prefs.autoplay ? " on" : "") + '" id="w-auto">Autoplay: ' + (prefs.autoplay ? "On" : "Off") + "</button>" +
+        "</div>" +
+      "</div>" +
+      '<div class="desc" id="w-desc"><div class="desc-meta">' +
+        esc((data.views >= 0 ? fmtNum(data.views) + " views • " : "") +
+          (data.uploadDate || "") +
+          (data.likes >= 0 ? " • 👍 " + fmtNum(data.likes) : "")) +
+      '</div><div class="desc-text">' + linkify(data.description || "No description.") + '</div>' +
+      '<button class="desc-toggle" id="w-desc-toggle">…more</button></div>';
+
+    document.getElementById("w-desc-toggle").onclick = function () {
+      var d = document.getElementById("w-desc");
+      d.classList.toggle("expanded");
+      this.textContent = d.classList.contains("expanded") ? "Show less" : "…more";
+    };
+    if (chanPath) {
+      document.getElementById("w-chan").onclick = function () { go("channel", { chan: chanPath }); };
+    }
+    var qSel = document.getElementById("w-quality");
+    if (qSel) {
+      qSel.onchange = function () {
+        var val = qSel.value;
+        prefs.quality = val;
+        savePrefs();
+        var t = video.currentTime || 0;
+        var wasPlaying = !video.paused;
+        if (val === "__audio") {
+          var best = picked.audio.slice().sort(function (a, b) { return (b.bitrate || 0) - (a.bitrate || 0); })[0];
+          if (best) { candidates = [mediaUrl(best.url)]; var bd = directUrl(best); if (bd) candidates.push(bd); video.src = candidates[0]; candIdx = 0; }
+        } else {
+          var target = picked.muxed[0];
+          for (var k = 0; k < picked.muxed.length; k++) {
+            if (qualityLabel(picked.muxed[k]) === val) target = picked.muxed[k];
+          }
+          if (val === "auto") target = picked.muxed[0];
+          if (target) { candidates = [mediaUrl(target.url)]; var td = directUrl(target); if (td) candidates.push(td); video.src = candidates[0]; candIdx = 0; }
+        }
+        video.currentTime = t;
+        if (wasPlaying) video.play().catch(function () {});
+      };
+    }
+    document.getElementById("w-save").onclick = function () {
+      var added = toggleLater({ id: id, title: data.title, thumbnail: data.thumbnailUrl || "", uploader: data.uploader || "", duration: data.duration || 0 });
+      this.classList.toggle("on", added);
+      this.textContent = added ? "★ Saved" : "☆ Save";
+      toast(added ? "Saved to Watch Later" : "Removed from Watch Later");
+    };
+    document.getElementById("w-share").onclick = function () {
+      var link = new URL("./index.html", window.location.href).toString().split("?")[0] + "?v=" + id;
+      function done() { toast("Link copied"); }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(link).then(done, function () { prompt("Copy this link:", link); });
+      } else prompt("Copy this link:", link);
+    };
+    document.getElementById("w-auto").onclick = function () {
+      prefs.autoplay = !prefs.autoplay;
+      savePrefs();
+      this.classList.toggle("on", prefs.autoplay);
+      this.textContent = "Autoplay: " + (prefs.autoplay ? "On" : "Off");
+    };
+
+    // ---- up next ----
+    var related = (data.relatedStreams || []).filter(function (r) { return videoIdFromUrl(r.url); });
+    upNext = related.map(function (r) { return videoIdFromUrl(r.url); });
+    var un = document.getElementById("upnext-list");
+    if (!related.length) {
+      un.innerHTML = '<div class="empty">Nothing else here.</div>';
+    } else {
+      var uh = "";
+      related.forEach(function (r) {
+        var rid = videoIdFromUrl(r.url);
+        uh +=
+          '<div class="mini" data-video="' + esc(rid) + '">' +
+            '<div class="thumb"><img loading="lazy" referrerpolicy="no-referrer" src="' + esc(imgUrl(r.thumbnail, "")) + '" alt="" />' +
+            (r.duration > 0 ? '<span class="badge-dur">' + esc(fmtDur(r.duration)) + "</span>" : "") + "</div>" +
+            "<div><p class='mini-title'>" + esc(r.title) + "</p>" +
+            '<div class="mini-sub">' + esc(r.uploaderName || "") + (r.uploaderVerified ? " ✓" : "") + "<br>" + esc(metaLine(r)) + "</div></div>" +
+          "</div>";
+      });
+      un.innerHTML = uh;
+      bindCards(un);
+    }
+
+    video.addEventListener("ended", function () {
+      if (prefs.autoplay && upNext.length) go("watch", { id: upNext[0] });
+    });
+
+    // ---- sponsor skip ----
+    if (prefs.skipSponsors && !isLive) {
+      api("/sponsors/" + encodeURIComponent(id) + "?category=sponsor").then(function (sb) {
+        var segs = (sb.segments || []).filter(function (s) { return s.segment && s.segment.length === 2; });
+        if (!segs.length) return;
+        var chip = document.getElementById("skipper");
+        video.addEventListener("timeupdate", function () {
+          var t = video.currentTime;
+          for (var s = 0; s < segs.length; s++) {
+            if (t >= segs[s].segment[0] && t < segs[s].segment[1] - 0.3) {
+              video.currentTime = segs[s].segment[1];
+              sponsorsSkipped++;
+              if (chip) {
+                chip.style.display = "block";
+                setTimeout(function () { chip.style.display = "none"; }, 1500);
+              }
+              break;
+            }
+          }
+        });
+      }, function () { /* sponsor data unavailable — ignore */ });
+    }
+
+    // ---- comments ----
+    loadComments(id, null);
+  }
+
+  function loadComments(id, nextpage) {
+    var box = document.getElementById("comments");
+    var path = nextpage
+      ? "/nextpage/comments/" + encodeURIComponent(id) + "?nextpage=" + encodeURIComponent(typeof nextpage === "string" ? nextpage : JSON.stringify(nextpage))
+      : "/comments/" + encodeURIComponent(id);
+    api(path).then(function (page) {
+      var list = page.comments || [];
+      var html = nextpage ? "" : "<h2>Comments" + (page.commentCount >= 0 ? " (" + fmtNum(page.commentCount) + ")" : "") + "</h2>";
+      if (!nextpage && !list.length) {
+        box.innerHTML = html + '<div class="empty">Comments are off or unavailable.</div>';
+        return;
+      }
+      list.forEach(function (c) {
+        html +=
+          '<div class="comment">' +
+            (c.thumbnail ? '<img loading="lazy" referrerpolicy="no-referrer" src="' + esc(imgUrl(c.thumbnail, "")) + '" alt="" />' : "") +
+            "<div><div class='comment-head'><b>" + esc(c.author || "Unknown") + "</b><span>" +
+            esc(c.commentedTime || c.commentTime || "") + "</span></div>" +
+            '<div class="comment-body">' + esc(c.commentText || "") + "</div>" +
+            (c.likeCount >= 0 ? '<div class="comment-likes">👍 ' + esc(fmtNum(c.likeCount)) + (c.replyCount > 0 ? " • " + c.replyCount + " replies" : "") + "</div>" : "") +
+            "</div>" +
+          "</div>";
+      });
+      if (nextpage) {
+        var btn = document.getElementById("c-more");
+        if (btn) btn.remove();
+        var tmp = document.createElement("div");
+        tmp.innerHTML = html;
+        while (tmp.firstChild) box.appendChild(tmp.firstChild);
+      } else box.innerHTML = html;
+      if (page.nextpage) {
+        var more = document.createElement("button");
+        more.className = "load-more";
+        more.id = "c-more";
+        more.textContent = "Load more comments";
+        more.onclick = function () { loadComments(id, page.nextpage); };
+        box.appendChild(more);
+      }
+    }, function () {
+      if (!nextpage) box.innerHTML = "<h2>Comments</h2><div class='empty'>Couldn't load comments.</div>";
+    });
+  }
+
+  // ---------- channel ----------
+  function renderChannel() {
+    main.innerHTML = '<div id="chan"><div class="skel-line" style="width:40%;height:24px"></div>' + skeletonGrid(8) + "</div>";
+    api("/" + state.chan).then(function (data) {
+      paintChannel(data, null);
+    }, function (err) {
+      errorBox("Couldn't load channel", err.message || "Network error", renderChannel);
+    });
+  }
+
+  function paintChannel(data, next) {
+    var box = document.getElementById("chan");
+    var chanId = null;
+    if (data.id) chanId = data.id;
+    var videos = data.relatedStreams || [];
+    var html =
+      (data.bannerUrl ? '<div class="chan-banner" style="background-image:url(\'' + esc(imgUrl(data.bannerUrl, "")).replace(/'/g, "%27") + '\')"></div>' : '<div class="chan-banner"></div>') +
+      '<div class="chan-head">' +
+        (data.avatarUrl ? '<img referrerpolicy="no-referrer" src="' + esc(imgUrl(data.avatarUrl, "")) + '" alt="" />' : "") +
+        "<div><h1>" + esc(data.name || "Channel") + (data.verified ? " ✓" : "") + "</h1>" +
+        '<div class="subs">' + esc((data.subscriberCount >= 0 ? fmtNum(data.subscriberCount) + " subscribers • " : "") + (data.videoCount >= 0 ? data.videoCount + " videos" : "")) + "</div></div>" +
+      "</div>" +
+      (data.description ? '<div class="desc"><div class="desc-text">' + linkify(data.description) + '</div></div>' : "") +
+      '<div style="height:18px"></div><div class="grid" id="chan-grid"></div>' +
+      '<button class="load-more" id="chan-more" style="display:none">Load more</button>';
+    box.innerHTML = html;
+    var grid = document.getElementById("chan-grid");
+    function append(list) {
+      var h = "";
+      for (var i = 0; i < list.length; i++) h += cardHtml(list[i]);
+      var tmp = document.createElement("div");
+      tmp.innerHTML = h;
+      while (tmp.firstChild) grid.appendChild(tmp.firstChild);
+      bindCards(grid);
+    }
+    append(videos);
+    var moreBtn = document.getElementById("chan-more");
+    var nextTok = next !== undefined ? next : data.nextpage;
+    if (nextTok && chanId) moreBtn.style.display = "block";
+    moreBtn.onclick = function () {
+      moreBtn.textContent = "Loading…";
+      api("/nextpage/channel/" + encodeURIComponent(chanId) + "?nextpage=" + encodeURIComponent(JSON.stringify(nextTok)))
+        .then(function (page) {
+          append(page.relatedStreams || []);
+          nextTok = page.nextpage || null;
+          moreBtn.style.display = nextTok ? "block" : "none";
+          moreBtn.textContent = "Load more";
+        }, function () { moreBtn.textContent = "Load more"; });
+    };
+  }
+
+  // ---------- history / later ----------
+  function renderLocal(kind) {
+    var list = kind === "history" ? getHistory() : getLater();
+    var title = kind === "history" ? "Watch history" : "Watch Later";
+    setActiveNav(kind === "history" ? "history" : "later");
+    var html = '<div class="view-head"><h1>' + title + "</h1>" +
+      (list.length ? '<button class="pill" id="clear-local">Clear all</button>' : "") + "</div>";
+    if (!list.length) {
+      main.innerHTML = html + '<div class="empty">' +
+        (kind === "history" ? "Videos you watch will show up here." : "Tap ☆ Save on any video to keep it here.") + "</div>";
+      return;
+    }
+    html += '<div class="rows">';
+    list.forEach(function (it) {
+      html +=
+        '<div class="row" data-video="' + esc(it.id) + '">' +
+          '<div class="thumb"><img loading="lazy" referrerpolicy="no-referrer" src="' + esc(imgUrl(it.thumbnail, "")) + '" alt="" />' +
+          (it.duration > 0 ? '<span class="badge-dur">' + esc(fmtDur(it.duration)) + "</span>" : "") + "</div>" +
+          '<div class="row-body"><p class="row-title">' + esc(it.title) + "</p>" +
+          '<div class="row-sub">' + esc(it.uploader || "") + (it.ts ? " • " + timeAgo(it.ts) : "") + "</div></div>" +
+        "</div>";
+    });
+    main.innerHTML = html + "</div>";
+    bindCards();
+    var clear = document.getElementById("clear-local");
+    if (clear) {
+      clear.onclick = function () {
+        lsSet(kind === "history" ? "ggl_yt_history" : "ggl_yt_later", []);
+        renderLocal(kind);
+      };
+    }
+  }
+
+  // ---------- settings ----------
+  function renderSettings() {
+    setActiveNav("settings");
+    var instOptions = '<option value="auto"' + (prefs.instance === "auto" ? " selected" : "") + ">Auto (lounge proxy + fallback)</option>";
+    DIRECT_INSTANCES.forEach(function (u) {
+      instOptions += '<option value="' + esc(u) + '"' + (prefs.instance === u ? " selected" : "") + ">" + esc(u.replace("https://", "")) + "</option>";
+    });
+    var PROVIDERS = [["auto", "Auto (recommended)"], ["innertube", "YouTube direct"], ["piped", "Piped mirrors"], ["invidious", "Invidious mirrors"]];
+    var provOptions = "";
+    PROVIDERS.forEach(function (pr) {
+      provOptions += '<option value="' + pr[0] + '"' + (prefs.provider === pr[0] ? " selected" : "") + ">" + esc(pr[1]) + "</option>";
+    });
+    var capOptions = '<option value="0"' + (!prefs.maxHeight ? " selected" : "") + ">No cap</option>";
+    [[1080, "1080p"], [720, "720p"], [480, "480p"], [360, "360p"]].forEach(function (q) {
+      capOptions += '<option value="' + q[0] + '"' + (prefs.maxHeight === q[0] ? " selected" : "") + ">" + q[1] + "</option>";
+    });
+    var regionOpts = "";
+    REGIONS.forEach(function (r) {
+      regionOpts += '<option value="' + r[0] + '"' + (prefs.region === r[0] ? " selected" : "") + ">" + esc(r[1]) + "</option>";
+    });
+    main.innerHTML =
+      '<div class="view-head"><h1>Settings</h1></div>' +
+      '<div class="settings">' +
+        '<div class="set-card"><h2>Unblock mode</h2><p>Route traffic through the lounge so school filters only see this site. Everything here mirrors the lounge <a href="/settings" style="color:var(--accent)">Settings → Video engine</a>.</p>' +
+          '<div class="set-row"><label>School mode<small>Stream video through the lounge domain. Turn off if videos buffer.</small></label>' +
+          '<span class="switch"><input type="checkbox" id="set-school"' + (prefs.schoolMode ? " checked" : "") + "><i></i></span></div>" +
+          '<div class="set-row"><label>Strict image proxy<small>Also proxy thumbnails. Use if pictures don\'t load at school.</small></label>' +
+          '<span class="switch"><input type="checkbox" id="set-img"' + (prefs.strictImg ? " checked" : "") + "><i></i></span></div>" +
+          '<div class="set-row"><label>Captions on<small>Loads the creator\'s own captions, same origin.</small></label>' +
+          '<span class="switch"><input type="checkbox" id="set-cc"' + (prefs.captions ? " checked" : "") + "><i></i></span></div>" +
+        "</div>" +
+        '<div class="set-card"><h2>Engine</h2><p>Which upstream the lounge asks first. Auto = YouTube, then Piped, then Invidious.</p>' +
+          '<div class="set-row"><label>Server priority</label><select class="set-select" id="set-prov">' + provOptions + "</select></div>" +
+          '<div class="set-row"><label>Player</label><select class="set-select" id="set-engine">' +
+            '<option value="auto"' + (prefs.engine === "auto" ? " selected" : "") + ">Auto (MP4 first)</option>" +
+            '<option value="hls"' + (prefs.engine === "hls" ? " selected" : "") + ">HLS (up to 1080p+)</option>" +
+            '<option value="mp4"' + (prefs.engine === "mp4" ? " selected" : "") + ">MP4 (most compatible)</option>" +
+          "</select></div>" +
+          '<div class="set-row"><label>Quality cap</label><select class="set-select" id="set-cap">' + capOptions + "</select></div>" +
+          '<div class="set-row"><label>Engine status<button class="pill" id="set-health">Run health check</button></label><span id="set-health-out" class="card-sub">Not tested yet.</span></div>' +
+        "</div>" +
+        '<div class="set-card"><h2>Playback</h2><p>How videos behave.</p>' +
+          '<div class="set-row"><label>Skip sponsors<small>Auto-skip sponsor segments (SponsorBlock).</small></label>' +
+          '<span class="switch"><input type="checkbox" id="set-sb"' + (prefs.skipSponsors ? " checked" : "") + "><i></i></span></div>" +
+          '<div class="set-row"><label>Autoplay<small>Automatically play the next video.</small></label>' +
+          '<span class="switch"><input type="checkbox" id="set-auto"' + (prefs.autoplay ? " checked" : "") + "><i></i></span></div>" +
+        "</div>" +
+        '<div class="set-card"><h2>Servers &amp; region</h2><p>Video data comes from community Piped servers. Switch if one is slow.</p>' +
+          '<div class="set-row"><label>Server</label><select class="set-select" id="set-inst">' + instOptions + "</select></div>" +
+          '<div class="set-row"><label>Trending region</label><select class="set-select" id="set-region">' + regionOpts + "</select></div>" +
+          '<div class="set-row"><label>Connection</label><button class="pill" id="set-test">Test connection</button></div>' +
+        "</div>" +
+        '<div class="set-card"><h2>Data</h2><p>History and saved videos live only in this browser.</p>' +
+          '<div class="set-row"><label>Local data</label><button class="danger" id="set-wipe">Clear history &amp; saved</button></div>' +
+        "</div>" +
+        '<div class="set-card"><h2>About</h2><p>GG Lounge video room v3. Streams come from YouTube\'s own API first, then the open-source Piped (' +
+        '<a href="https://github.com/TeamPiped/Piped" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Piped</a> and Invidious mirrors, all relayed through this domain. ', +
+        "No Google account, no ads, no tracking. Livestreams play from proxy URLs directly. " +
+        (lastVia ? "Last served by: " + esc(lastVia) + "." : "") + "</p></div>" +
+      "</div>";
+
+    document.getElementById("set-school").onchange = function (e) {
+      prefs.schoolMode = e.target.checked; savePrefs();
+      toast(prefs.schoolMode ? "School mode on" : "School mode off");
+    };
+    document.getElementById("set-img").onchange = function (e) {
+      prefs.strictImg = e.target.checked; savePrefs();
+    };
+    document.getElementById("set-sb").onchange = function (e) {
+      prefs.skipSponsors = e.target.checked; savePrefs();
+    };
+    document.getElementById("set-cc").onchange = function (e) {
+      prefs.captions = e.target.checked; savePrefs();
+      toast(prefs.captions ? "Captions on for the next video" : "Captions off");
+    };
+    document.getElementById("set-prov").onchange = function (e) {
+      prefs.provider = e.target.value; savePrefs();
+      pushToLounge("provider", prefs.provider);
+      toast("Engine: " + e.target.options[e.target.selectedIndex].text);
+      renderHome();
+    };
+    document.getElementById("set-engine").onchange = function (e) {
+      prefs.engine = e.target.value; savePrefs();
+      pushToLounge("engine", prefs.engine);
+      toast("Player: " + e.target.value.toUpperCase());
+    };
+    document.getElementById("set-cap").onchange = function (e) {
+      prefs.maxHeight = Number(e.target.value) || 0;
+      prefs.quality = prefs.maxHeight ? String(prefs.maxHeight) : "auto";
+      savePrefs();
+      pushToLounge("quality", prefs.quality);
+      toast(prefs.maxHeight ? "Capped at " + prefs.maxHeight + "p" : "Quality cap removed");
+    };
+    document.getElementById("set-health").onclick = function () {
+      var out = document.getElementById("set-health-out");
+      var btn = this;
+      btn.textContent = "Testing…";
+      out.textContent = "Asking the lounge server…";
+      fetchJson(API_BASE + "/health", 15000).then(function (h) {
+        btn.textContent = "Run health check";
+        var ps = h.providers || {};
+        var line = Object.keys(ps).map(function (k) {
+          return k + (ps[k] && ps[k].ok ? " ✓" : " ✕");
+        }).join("  ");
+        out.textContent = (h.usable ? "Ready — " : "No provider answered — ") + line;
+        setNet(h.usable ? "ok" : "bad", h.usable ? "Engines ready" : "Engines down");
+      }, function (err) {
+        btn.textContent = "Run health check";
+        out.textContent = "Health check failed: " + (err.message || "offline");
+      });
+    };
+    document.getElementById("set-auto").onchange = function (e) {
+      prefs.autoplay = e.target.checked; savePrefs();
+    };
+    document.getElementById("set-inst").onchange = function (e) {
+      prefs.instance = e.target.value; savePrefs();
+      toast("Server updated");
+    };
+    document.getElementById("set-region").onchange = function (e) {
+      prefs.region = e.target.value; savePrefs();
+    };
+    document.getElementById("set-test").onclick = function () {
+      var btn = this;
+      btn.textContent = "Testing…";
+      setNet("", "Testing…");
+      api("/trending?region=" + encodeURIComponent(prefs.region)).then(function (items) {
+        btn.textContent = "Test connection";
+        toast("Connected — " + (items ? items.length : 0) + " trending videos found");
+      }, function (err) {
+        btn.textContent = "Test connection";
+        toast("Connection failed: " + (err.message || "offline"));
+      });
+    };
+    document.getElementById("set-wipe").onclick = function () {
+      lsSet("ggl_yt_history", []);
+      lsSet("ggl_yt_later", []);
+      toast("History & saved cleared");
+    };
+  }
+
+  // ---------- router ----------
+  function render() {
+    if (state.view === "home" || state.view === "trending") renderHome();
+    else if (state.view === "search") renderSearch();
+    else if (state.view === "watch" && state.id) renderWatch();
+    else if (state.view === "channel" && state.chan) renderChannel();
+    else if (state.view === "history") renderLocal("history");
+    else if (state.view === "later") renderLocal("later");
+    else if (state.view === "settings") renderSettings();
+    else renderHome();
+  }
+
+  // ---------- search box + suggestions ----------
+  var suggestTimer = null;
+  var suggestItems = [];
+  var suggestActive = -1;
+
+  function closeSuggest() {
+    suggestBox.classList.remove("open");
+    suggestBox.innerHTML = "";
+    suggestItems = [];
+    suggestActive = -1;
+  }
+
+  function doSearch(q) {
+    q = (q || "").trim();
+    if (!q) return;
+    closeSuggest();
+    searchInput.blur();
+    go("search", { q: q, filter: "all" });
+  }
+
+  searchBtn.onclick = function () { doSearch(searchInput.value); };
+  searchInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      if (suggestActive >= 0 && suggestItems[suggestActive]) {
+        searchInput.value = suggestItems[suggestActive];
+      }
+      doSearch(searchInput.value);
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      if (!suggestItems.length) return;
+      e.preventDefault();
+      suggestActive += e.key === "ArrowDown" ? 1 : -1;
+      if (suggestActive < 0) suggestActive = suggestItems.length - 1;
+      if (suggestActive >= suggestItems.length) suggestActive = 0;
+      var btns = suggestBox.querySelectorAll("button");
+      for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("active", i === suggestActive);
+      searchInput.value = suggestItems[suggestActive];
+    } else if (e.key === "Escape") closeSuggest();
+  });
+  searchInput.addEventListener("input", function () {
+    var q = searchInput.value.trim();
+    clearTimeout(suggestTimer);
+    if (q.length < 2) { closeSuggest(); return; }
+    suggestTimer = setTimeout(function () {
+      api("/suggestions?q=" + encodeURIComponent(q)).then(function (items) {
+        if (!items || !items.length || document.activeElement !== searchInput) { closeSuggest(); return; }
+        suggestItems = items.slice(0, 8);
+        suggestActive = -1;
+        suggestBox.innerHTML = "";
+        suggestItems.forEach(function (s) {
+          var b = document.createElement("button");
+          b.textContent = s;
+          b.onmousedown = function (e) { e.preventDefault(); searchInput.value = s; doSearch(s); };
+          suggestBox.appendChild(b);
+        });
+        suggestBox.classList.add("open");
+      }, function () { /* suggestions are optional */ });
+    }, 250);
+  });
+  document.addEventListener("click", function (e) {
+    if (!suggestBox.contains(e.target) && e.target !== searchInput) closeSuggest();
+  });
+
+  // ---------- nav ----------
+  var navBtns = document.querySelectorAll("[data-nav]");
+  for (var n = 0; n < navBtns.length; n++) {
+    navBtns[n].addEventListener("click", function () {
+      var v = this.getAttribute("data-nav");
+      if (v === "home" || v === "trending") go(v);
+      else go(v);
+    });
+  }
+  document.getElementById("settings-btn").onclick = function () { go("settings"); };
+  document.getElementById("brand-home").onclick = function (e) {
+    e.preventDefault();
+    go("home");
+  };
+
+  window.onerror = function (message) {
+    toast("Something glitched: " + String(message).slice(0, 90));
+  };
+
+  // ---------- boot ----------
+  probeProxy();
+  state = bootFromUrl();
+  setActiveNav(state.view);
+  render();
 })();

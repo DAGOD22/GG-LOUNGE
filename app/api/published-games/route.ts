@@ -1,9 +1,19 @@
 import { NextResponse } from 'next/server'
-import { Pool } from 'pg'
+import { listGames } from '@/lib/db'
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
+/**
+ * main built this on a hand-made pg Pool, which meant community games vanished
+ * whenever the app ran in local JSON mode (and two pools pointed at one database).
+ * lib/db already understands both modes, so the listing comes from there.
+ */
 export async function GET() {
-  const result = await pool.query('SELECT "id", "title", "icon" FROM "published_game" ORDER BY "createdAt" DESC')
-  return NextResponse.json(result.rows)
+  try {
+    const games = await listGames()
+    return NextResponse.json(games.map((g) => ({ id: g.id, title: g.title, icon: g.icon ?? null })))
+  } catch (error) {
+    return NextResponse.json({ error: 'Game listing is unavailable.' }, { status: 502 })
+  }
 }

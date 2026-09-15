@@ -126,7 +126,15 @@
 	
     <!-- The runtime script.  You can rename it, but don't forget to rename the reference here as well.
     This file will have been minified and obfuscated if you enabled "Minify script" during export. -->
-	<script src="c7runtime.js"></script>
+<!-- The <base> above points at the mirror, which carries the renamed mod runtime
+     (c7runtime.js). This folder ships the vanilla c2runtime.js, so if the mirror is
+     blocked - or the mod ever drops the rename - the game still boots. -->
+	<script>
+	(function () {
+		function add(src, onerror) { var s = document.createElement('script'); s.src = src; s.onerror = onerror; document.head.appendChild(s); }
+		add('c7runtime.js', function () { add('/games/ovo/c2runtime.js'); });
+	})();
+	</script>
 
     <script>
 		// Start the Construct 2 project running on window load. 
@@ -192,5 +200,5 @@
         }());
     </script>
     <script src="https://cdn.jsdelivr.net/gh/Arjun99ab/ovo@main/src/modloaders/modloader.js" id="modloader" type="module" defer></script>
-</body> 
+<script src="/gg/gg-boot.js"></script></body> 
 </html> 
