@@ -75,14 +75,27 @@ DOM and asserts real state — that harness is what caught two boot-order crashe
 | `papasburgeria` | three empty `<script src="">` tags plus `prebid4.12.0.js` and a UUID script left over from the capture | removed |
 | `cookie-clicker` | “Try the beta!” linked to a `beta/` folder that is not shipped | hidden |
 
-## 5. Known cosmetic leftovers
+## 5. Merging main back in (September)
+
+main had removed `public/games/poki/index.html` while this branch had rewritten it. The
+branch version stays: it is a 2.6 KB page over 16 local files (`js/loader.js`,
+`js/app-new-gm.js`, `css/style3.css`, its own woff2 set and icons), so Paper.io 2 is a
+working offline game rather than a card pointing at nothing.
+
+`public/games/ovo/index.html` came from main and carries a `<base href>` at a jsdelivr
+mirror for the mod's renamed runtime (`c7runtime.js`). The folder ships the vanilla
+`c2runtime.js`, so the runtime tag is now a two-step loader: try the mirror, fall back to
+`/games/ovo/c2runtime.js`. Without that the game could not boot on a network that blocks
+jsdelivr, and never booted here at all, since `c7runtime.js` was a 404 in every case.
+
+## 6. Known cosmetic leftovers
 
 `TemplateData/style.css` in the Unity builds references progress-bar and logo PNGs that were
 never captured, and a few `@font-face` blocks still list `.eot`/`.svg` sources. Browsers ignore
 both: you get a plain black loading screen instead of a Unity logo, and system fonts instead of
 the bundled display face. Nothing gates gameplay, so they were deliberately left alone.
 
-## 6. Re-running the audit
+## 7. Re-running the audit
 
 ```bash
 # every local src/href in every game page, resolved inside its own folder

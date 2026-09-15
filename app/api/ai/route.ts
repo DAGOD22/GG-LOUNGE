@@ -1,8 +1,15 @@
 import { createGateway } from '@ai-sdk/gateway'
 import { generateText } from 'ai'
 
-const gateway = createGateway({ apiKey: process.env.ai_key })
+// v0 injected the key as `ai_key`; the documented name is AI_GATEWAY_API_KEY, and
+// a deployment that sets either one now works.
+const gateway = createGateway({ apiKey: process.env.AI_GATEWAY_API_KEY || process.env.ai_key })
 import { NextResponse } from 'next/server'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+// Generation outlives the 10s default; 60s is the ceiling on Hobby.
+export const maxDuration = 60
 
 export async function POST(request: Request) {
   const { prompt, model = 'alibaba/qwen3.5-flash' } = await request.json()
@@ -16,10 +23,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ text: result.text, model: candidate })
       } catch (error) { lastError = error }
     }
-    console.error('[v0] AI generation failed', lastError)
+    console.error('[gg] AI generation failed', lastError)
     return NextResponse.json({ error: 'AI Gateway is not connected to this preview yet. Publish with the project AI Gateway connection, then retry.' }, { status: 503 })
   } catch (error) {
-    console.error('[v0] AI request failed', error)
+    console.error('[gg] AI request failed', error)
     return NextResponse.json({ error: 'Invalid AI request.' }, { status: 400 })
   }
 }
