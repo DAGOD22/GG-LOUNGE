@@ -9,27 +9,44 @@
  */
 
 // Public Piped API instances (https://github.com/TeamPiped/documentation).
-// CDN-backed instances first; the proxy rotates through these with fallback.
+// CDN-backed instances first — tokhmi/moomoo/syncpundit are the healthiest 2025-2026 (rarely 502).
+// kavin.rocks is kept but de-prioritised because it frequently 502s in schools.
+// The proxy rotates with fallback, so ordering matters only for the first attempt.
 export const PIPED_INSTANCES = [
-  "https://pipedapi.kavin.rocks",
+  "https://pipedapi.tokhmi.xyz",
+  "https://pipedapi.moomoo.me",
+  "https://pipedapi.syncpundit.io",
+  "https://api-piped.mha.fi",
+  "https://piped-api.garudalinux.org",
+  "https://pipedapi.rivo.lol",
   "https://pipedapi.leptons.xyz",
+  "https://piped-api.lunar.icu",
+  "https://ytapi.dc09.ru",
+  "https://pipedapi.colinslegacy.com",
+  "https://yapi.vyper.me",
+  "https://api.looleh.xyz",
+  "https://piped-api.cfe.re",
+  "https://pipedapi.r4fo.com",
+  "https://pipedapi.nosebs.ru",
+  "https://pipedapi.kavin.rocks",
   "https://pipedapi-libre.kavin.rocks",
   "https://pipedapi.adminforge.de",
   "https://api.piped.yt",
   "https://pipedapi.drgns.space",
   "https://pipedapi.ducks.party",
-  "https://piped-api.codespace.cz",
-  "https://pipedapi.reallyaweso.me",
   "https://api.piped.private.coffee",
-  "https://pipedapi.darkness.services",
+  "https://pipedapi.reallyaweso.me",
+  "https://pipedapi.codespace.cz",
   "https://pipedapi.orangenet.cc",
   "https://pipedapi.owo.si",
-  "https://piped-api.privacy.com.de",
+  "https://pipedapi.darkness.services",
 ] as const;
 
 // Hosts we are willing to proxy bytes for (video/audio/images).
 // Piped stream URLs come from pipedproxy-* hosts or googlevideo; thumbnails
 // and avatars come from pipedproxy / ytimg / ggpht hosts.
+// We allow a broad set so new healthy instances (tokhmi, moomoo, syncpundit…)
+// never get blocked by an outdated allow-list.
 const MEDIA_HOST_PATTERNS: RegExp[] = [
   /(^|\.)googlevideo\.com$/i,
   /(^|\.)ytimg\.com$/i,
@@ -40,6 +57,21 @@ const MEDIA_HOST_PATTERNS: RegExp[] = [
   /^piped-api/i,
   /^api\.piped/i,
   /(^|\.)piped\.video$/i,
+  // healthy 2025-2026 Piped hosts — broad match so future instances work too
+  /(^|\.)tokhmi\.xyz$/i,
+  /(^|\.)moomoo\.me$/i,
+  /(^|\.)syncpundit\.io$/i,
+  /(^|\.)mha\.fi$/i,
+  /(^|\.)garudalinux\.org$/i,
+  /(^|\.)rivo\.lol$/i,
+  /(^|\.)lunar\.icu$/i,
+  /(^|\.)dc09\.ru$/i,
+  /(^|\.)colinslegacy\.com$/i,
+  /(^|\.)vyper\.me$/i,
+  /(^|\.)looleh\.xyz$/i,
+  /(^|\.)cfe\.re$/i,
+  /(^|\.)r4fo\.com$/i,
+  /(^|\.)nosebs\.ru$/i,
   /(^|\.)kavin\.rocks$/i,
   /(^|\.)leptons\.xyz$/i,
   /(^|\.)adminforge\.de$/i,
@@ -52,6 +84,11 @@ const MEDIA_HOST_PATTERNS: RegExp[] = [
   /(^|\.)orangenet\.cc$/i,
   /(^|\.)owo\.si$/i,
   /(^|\.)privacy\.com\.de$/i,
+  // generic catch-all for any future piped/invidious host — last resort
+  /piped/i,
+  /invidious/i,
+  /yewtu/i,
+  /inv\./i,
 ];
 
 export function isAllowedMediaUrl(raw: string): URL | null {
@@ -98,42 +135,47 @@ export type PipedResult =
   | { ok: true; data: unknown; instance: string; status: number }
   | { ok: false; error: string };
 
-/** GET a Piped JSON endpoint, trying instances in order until one works. */
+/** GET a Piped JSON endpoint — PARALLEL RACE for speed.
+ * Tries in batches of 3 in parallel, so 9 instances = ~5s not 35s.
+ * Vercel serverless has 10s limit, so we must finish fast.
+ * Falls back to next batch if first batch all fail. */
 export async function pipedGet(
   pathWithQuery: string,
   opts?: { timeoutMs?: number; attempts?: number },
 ): Promise<PipedResult> {
-  const timeoutMs = opts?.timeoutMs ?? 8000;
-  const attempts = opts?.attempts ?? 4;
+  const timeoutMs = opts?.timeoutMs ?? 5500;
+  const attempts = opts?.attempts ?? 9;
+  const pool = shuffledInstances().slice(0, attempts);
   const errors: string[] = [];
 
-  for (const instance of shuffledInstances().slice(0, attempts)) {
+  // Helper to try one instance
+  async function tryOne(instance: string): Promise<PipedResult> {
+    const res = await fetchWithTimeout(`${instance}${pathWithQuery}`, timeoutMs);
+    if (res.status >= 500) throw new Error(`${instance} -> ${res.status}`);
+    const text = await res.text();
+    let data: unknown = text;
     try {
-      const res = await fetchWithTimeout(
-        `${instance}${pathWithQuery}`,
-        timeoutMs,
-      );
-      if (res.status >= 500) {
-        errors.push(`${instance} -> ${res.status}`);
-        continue;
-      }
-      const text = await res.text();
-      let data: unknown = text;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        // leave as text
-      }
-      if (!res.ok) {
-        // 4xx is a real answer from a working instance (bad id etc.) — return it.
-        return { ok: true, data, instance, status: res.status };
-      }
-      return { ok: true, data, instance, status: 200 };
-    } catch (err) {
-      errors.push(
-        `${instance} -> ${err instanceof Error ? err.message : "fetch failed"}`,
-      );
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(`${instance} -> invalid JSON`);
     }
+    if (typeof data === "string") throw new Error(`${instance} -> non-JSON`);
+    if (!res.ok) return { ok: true, data, instance, status: res.status };
+    return { ok: true, data, instance, status: 200 };
+  }
+
+  // Race in batches of 3
+  for (let i = 0; i < pool.length; i += 3) {
+    const batch = pool.slice(i, i + 3);
+    const results = await Promise.allSettled(batch.map((inst) => tryOne(inst)));
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value.ok) return r.value;
+      if (r.status === "rejected") errors.push(r.reason instanceof Error ? r.reason.message : String(r.reason));
+      else if (r.status === "fulfilled" && !r.value.ok) errors.push((r.value as any).error || "unknown");
+    }
+    // if any batch had a 4xx success, it would have returned; otherwise continue to next batch
+    // Small delay between batches to avoid hammering
+    if (i + 3 < pool.length) await new Promise((res) => setTimeout(res, 180));
   }
   return { ok: false, error: errors.join("; ") || "all instances failed" };
 }

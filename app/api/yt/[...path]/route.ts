@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { pipedGet } from "../lib";
+import { rateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +40,16 @@ export async function GET(
   req: Request,
   context: { params: Promise<{ path: string[] }> },
 ) {
+  const ip = getClientIp(req as any);
+  const rl = rateLimit(`yt:${ip}`, 60, 60_000);
+  if (!rl.ok) {
+    const retryAfter = Math.ceil((rl.resetAt - Date.now()) / 1000);
+    const res = NextResponse.json({ error: "Rate limited — slow down", retryAfter }, { status: 429 });
+    const hdr = rateLimitResponse(60, 0, rl.resetAt);
+    Object.entries(hdr).forEach(([k, v]) => res.headers.set(k, v));
+    res.headers.set("Retry-After", String(retryAfter));
+    return res;
+  }
   const { path } = await context.params;
   const [root, ...rest] = path ?? [];
 

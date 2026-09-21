@@ -148,8 +148,8 @@ svg:not(:root) {
 }
 @font-face {
     font-family: Minecraft;
-    src: url("/projects/minecraft-classic/assets/fonts/minecraftfont.eot");
-    src: url("/projects/minecraft-classic/assets/fonts/minecraftfont.woff") format("woff"), url("/projects/minecraft-classic/assets/fonts/minecraftfont.ttf") format("truetype");
+    src: url("/games/minecraft-classic/assets/fonts/minecraftfont.eot");
+    src: url("/games/minecraft-classic/assets/fonts/minecraftfont.woff") format("woff"), url("/games/minecraft-classic/assets/fonts/minecraftfont.ttf") format("truetype");
 }
 #progress {
     position: absolute;
@@ -181,7 +181,7 @@ svg:not(:root) {
     height: 100%;
     text-align: center;
     z-index: 8;
-    background-image: url("/projects/minecraft-classic/assets/textures/background.jpg");
+    background-image: url("/games/minecraft-classic/assets/textures/background.jpg");
     background-size: cover;
     background-position: center;
 }
@@ -217,7 +217,7 @@ svg:not(:root) {
     height: 100%;
     text-align: center;
     z-index: 8;
-    background-image: url("/projects/minecraft-classic/assets/textures/background.jpg");
+    background-image: url("/games/minecraft-classic/assets/textures/background.jpg");
     background-size: cover;
     background-position: center;
 }

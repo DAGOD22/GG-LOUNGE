@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
   <head>
+<script src="/customization-game.js"></script>
+
     <meta charset="utf-8" />
     <style>
       html,
@@ -35,7 +37,7 @@
         font-weight: bold;
       }
     </style>
-    <title>Classic Minecraft Hacks</title>
+    <title>ClassiCube</title>
     <link rel="icon" href="bg_main.png">
   </head>
   <body>
@@ -64,7 +66,7 @@
         ],
         locateFile(path, prefix) {
           if (path === "/static/default.zip") {
-            return new URL("default.zip", location);
+            return new URL("default.zip", location.href).href;
           }
 
           return prefix + path;

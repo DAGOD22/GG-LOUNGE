@@ -1,395 +1,492 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import {
-  ArrowUpRight,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  ExternalLink,
-  Flame,
-  Gamepad2,
-  Heart,
-  Layers,
-  LayoutGrid,
-  Maximize2,
-  Play,
-  RotateCw,
-  Search,
-  ShieldCheck,
-  Sparkles,
-  Trophy,
-  X,
-  Zap,
-} from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCustomization } from '@/components/customization/CustomizationProvider'
+import { THEMES } from '@/lib/customization/settings'
+import { dedupeGames } from '@/lib/game-identity'
+import { unavailableGames, getGameAssetIssues } from '@/lib/games'
+import Fuse from 'fuse.js'
+import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap, LayoutGrid, Rows3, Shuffle, ExternalLink, Copy, AlertCircle, Loader2, ChevronLeft, ChevronRight, Sun, Moon, Download, Flag, Flame, Crown, Gift, Monitor, Keyboard, Bug, ThumbsUp, Globe, MessageSquare, Star, Timer, WifiOff, Wifi, Filter, ArrowUpDown, Eye, EyeOff, ShieldAlert, ListFilter, Users, LogIn, LogOut, User, Cloud, CloudOff, Save, Menu } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, CONTROLS_LEGEND, hashDay, gameOfDayIndex, PROXY_TILES, isNearDuplicate, normalizeTitle } from '@/lib/games'
+import type { Game } from '@/lib/games'
+import { GameCard, ShelfCard } from '@/components/GameCard'
+import { LibraryToolbar } from '@/components/LibraryToolbar'
+import { CatalogGrid } from '@/components/CatalogGrid'
+import { RequestPanel } from '@/components/RequestPanel'
+const HomeDashboard = dynamic(() => import('@/components/HomeDashboard').then(m => m.HomeDashboard), { ssr: false, loading: () => null })
+import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { AuthDialog } from '@/components/AuthDialog'
+const GameModal = dynamic(() => import('@/components/GameModal').then(m => m.GameModal), { ssr: false, loading: () => null })
+const AchievementsHub = dynamic(() => import('@/components/AchievementsHub').then(m => m.AchievementsHub), { ssr: false, loading: () => null })
 
-type Game = { id: string; title: string; subtitle: string; description: string; genre: string; tone: string; mark: string; color: string; path: string; icon?: string; featured?: boolean }
-
-const games: Game[] = [
-  { id: 'cookie-clicker', title: 'Cookie Clicker', subtitle: 'Bake a bigger future.', description: 'Start with one tiny click and build an unstoppable cookie empire.', genre: 'Idle', tone: 'Cozy chaos', mark: 'CC', color: 'cookie', path: '/games/cookie-clicker/index.html', featured: true },
-  { id: 'drive-mad', title: 'Drive Mad', subtitle: 'Keep it together.', description: 'Flip, fly, and find your line through a physics playground that hates straight roads.', genre: 'Racing', tone: 'Physics', mark: 'DM', color: 'drive', path: '/games/drive-mad/index.html' },
-  { id: 'idle-mining', title: 'Idle Mining', subtitle: 'Dig deeper. Get richer.', description: 'Turn a quiet patch of earth into a sparkling underground operation.', genre: 'Idle', tone: 'Tycoon', mark: 'IM', color: 'mining', path: '/games/idle-mining/index.html' },
-  { id: 'level-devil', title: 'Level Devil', subtitle: 'Trust nothing.', description: 'A platformer where every level has a trick, and every trick has teeth.', genre: 'Platformer', tone: 'Tricky', mark: 'LD', color: 'devil', path: '/games/level-devil/index.html' },
-  { id: 'stack', title: 'Stack', subtitle: 'Build the perfect tower.', description: 'Drop each block with precision and chase a tower that never stops climbing.', genre: 'Arcade', tone: 'Precision', mark: 'ST', color: 'stack', path: '/games/stack/index.html' },
-  { id: 'youtube', title: 'YouTube', subtitle: 'Unblocked. No ads. Just play.', description: 'An unblocked video lounge with search, trending, watch, and comments — built to work on school networks.', genre: 'Video', tone: 'Explore', mark: 'YT', color: 'youtube', path: '/games/youtube/index.html' },
-  { id: 'stickman-hook', title: 'Stickman Hook', subtitle: 'Swing into action.', description: 'Hook, swing, and launch through a kinetic obstacle course.', genre: 'Arcade', tone: 'Momentum', mark: 'SH', color: 'stack', path: '/games/stickman-hook/index.html' },
-  { id: 'ragdoll-archers', title: 'Ragdoll Archers', subtitle: 'Aim. Fire. Bounce.', description: 'Take aim in a physics-packed archery arena full of ricochets.', genre: 'Arcade', tone: 'Physics', mark: 'RA', color: 'drive', path: '/games/ragdoll-archers/index.html' },
-  { id: 'hextris', title: 'Hextris', subtitle: 'Spin. Match. Survive.', description: 'A hypnotic hexagonal puzzle where every move tightens the pressure.', genre: 'Puzzle', tone: 'Flow state', mark: 'HX', color: 'hextris', path: '/games/hextris/index.html' },
-  { id: '2048', title: '2048', subtitle: 'Join the numbers.', description: 'Slide, merge, and think ahead in the classic number puzzle.', genre: 'Puzzle', tone: 'Strategy', mark: '20', color: 'twenty', path: '/games/2048/index.html' },
-  { id: 'solar-smash', title: 'Solar Smash', subtitle: 'Break the impossible.', description: 'Unleash cosmic-scale destruction in a spectacular planetary sandbox.', genre: 'Simulation', tone: 'Cosmic', mark: 'SS', color: 'devil', path: '/games/solar-smash/index.html' },
-  { id: 'drift-boss', title: 'Drift Boss', subtitle: 'One road. No brakes.', description: 'Hold the perfect line through an endless neon road and chase your best run.', genre: 'Racing', tone: 'Reflex', mark: 'DB', color: 'drive', path: '/games/drift-boss/index.html' },
-  { id: 'moto-x3m', title: 'Moto X3M', subtitle: 'Ride the impossible.', description: 'Launch, flip, and land your way through explosive motorcycle stunt courses.', genre: 'Racing', tone: 'Stunts', mark: 'MX', color: 'drive', path: '/games/moto-x3m/index.html' },
-  { id: 'subway-surfers', title: 'Subway Surfers', subtitle: 'Run without limits.', description: 'Dash through the city, dodge the tracks, and chase a higher score.', genre: 'Arcade', tone: 'Reflex', mark: 'SS', color: 'youtube', path: '/games/subway-surfers/index.html' },
-  { id: 'survival-race', title: 'Survival Race', subtitle: 'Race the danger.', description: 'Keep your wheels steady and survive a relentless run of hazards.', genre: 'Racing', tone: 'Reflex', mark: 'SR', color: 'drive', path: '/games/survival-race/index.html' },
-  { id: 'geometry-dash', title: 'Geometry Dash', subtitle: 'Jump the rhythm.', description: 'Sync your timing to the beat and clear a precision platforming gauntlet.', genre: 'Platformer', tone: 'Rhythm', mark: 'GD', color: 'hextris', path: '/games/geometry-dash/index.html' },
-  { id: 'poki', title: 'Paper.io 2', subtitle: 'Claim it all.', description: 'The real Paper.io 2 — loop out, capture territory, cut rival tails.', genre: 'Arcade', tone: 'Battle', mark: 'P2', color: 'youtube', path: '/games/poki/index.html' },
-  { id: 'vex-8', title: 'Vex 8', subtitle: 'Run the gauntlet.', description: 'Wall-jump, slide, and sprint through a sharp new platforming challenge.', genre: 'Platformer', tone: 'Precision', mark: 'V8', color: 'devil', path: '/games/vex-8/index.html' },
-  { id: 'eaglercraftx', title: 'EaglercraftX', subtitle: 'Minecraft in a tab.', description: 'The real EaglercraftX 1.8 client — singleplayer and multiplayer Minecraft, right in the browser.', genre: 'Sandbox', tone: 'Blocky', mark: 'EX', color: 'mining', path: '/games/eaglercraftx/index.html' },
-  { id: 'backrooms', title: 'Backrooms', subtitle: 'You noclipped.', description: 'The real Unity backrooms explorer — wander the humming halls of Level 0.', genre: 'Sandbox', tone: 'Horror', mark: 'BR', color: 'twenty', path: '/games/backrooms/index.html' },
-  { id: 'slope', title: 'Slope', subtitle: 'Roll at full speed.', description: 'Steer a glowing ball down a deadly neon slope — how far can you ride?', genre: 'Arcade', tone: 'Reflex', mark: 'SL', color: 'hextris', path: '/games/slope/index.html' },
-  { id: 'retro-bowl', title: 'Retro Bowl', subtitle: 'Sunday, simplified.', description: 'The beloved retro football sim — call plays, win bowls.', genre: 'Arcade', tone: 'Retro', mark: 'RB', color: 'drive', path: '/games/retro-bowl/index.html' },
-  { id: 'ovo', title: 'OvO', subtitle: 'Move like water.', description: 'A slick parkour platformer — slide, dive and flow through precision levels.', genre: 'Platformer', tone: 'Precision', mark: 'OO', color: 'stack', path: '/games/ovo/index.html' },
-  { id: 'temple-run-2', title: 'Temple Run 2', subtitle: 'Run for your life.', description: 'The classic endless runner — escape the temple with the gold.', genre: 'Arcade', tone: 'Reflex', mark: 'TR', color: 'cookie', path: '/games/temple-run-2/index.html' },
-  { id: 'tunnel-rush', title: 'Tunnel Rush', subtitle: 'Dodge at light speed.', description: 'Blast through a spinning 3D tunnel of obstacles.', genre: 'Arcade', tone: 'Reflex', mark: 'TU', color: 'devil', path: '/games/tunnel-rush/index.html' },
-  { id: 'doodle-jump', title: 'Doodle Jump', subtitle: 'Bounce forever.', description: 'Hop up an endless page of platforms in the one-thumb classic.', genre: 'Arcade', tone: 'Retro', mark: 'DJ', color: 'mining', path: '/games/doodle-jump/index.html' },
-  { id: 'cluster-rush', title: 'Cluster Rush', subtitle: 'Jump truck to truck.', description: 'First-person parkour across speeding trucks — don’t fall.', genre: 'Platformer', tone: 'Precision', mark: 'CR', color: 'drive', path: '/games/cluster-rush/index.html' },
-  { id: 'jetpack-joyride', title: 'Jetpack Joyride', subtitle: 'Fly. Dodge. Profit.', description: 'Blast through the lab with a machine-gun jetpack.', genre: 'Arcade', tone: 'Reflex', mark: 'JJ', color: 'youtube', path: '/games/jetpack-joyride/index.html' },
-  { id: 'drift-hunters', title: 'Drift Hunters', subtitle: 'Slide everything.', description: 'Tune your ride and chain drifts across huge 3D tracks.', genre: 'Racing', tone: 'Drift', mark: 'DH', color: 'drive', path: '/games/drift-hunters/index.html' },
-  { id: 'rooftop-snipers', title: 'Rooftop Snipers', subtitle: 'Two idiots. One roof.', description: 'Knock your opponent off the roof in this chaotic 2-player duel.', genre: 'Arcade', tone: 'Chaos', mark: 'RS', color: 'cookie', path: '/games/rooftop-snipers/index.html' },
-  { id: 'worlds-hardest-game', title: 'World’s Hardest Game', subtitle: 'It means it.', description: 'Dodge the blue dots and beat the most rage-inducing maze ever.', genre: 'Puzzle', tone: 'Rage', mark: 'WH', color: 'devil', path: '/games/worlds-hardest-game/index.html' },
-  { id: 'fireboywatergirlforesttemple', title: 'Fireboy & Watergirl', subtitle: 'Two players, one temple.', description: 'Solve puzzles together in the Forest Temple — the co-op classic.', genre: 'Puzzle', tone: 'Co-op', mark: 'FW', color: 'stack', path: '/games/fireboywatergirlforesttemple/index.html' },
-  { id: 'impossiblequiz', title: 'The Impossible Quiz', subtitle: 'Think outside the box.', description: 'Trick questions, bombs and pure chaos — answer carefully.', genre: 'Puzzle', tone: 'Chaos', mark: 'IQ', color: 'twenty', path: '/games/impossiblequiz/index.html' },
-  { id: 'ducklife2', title: 'Duck Life 2', subtitle: 'Train your duck.', description: 'Race, swim and fly your duck to championship glory.', genre: 'Simulation', tone: 'Cute', mark: 'DL', color: 'mining', path: '/games/ducklife2/index.html' },
-  { id: 'escapingtheprison', title: 'Escaping the Prison', subtitle: 'Choose wisely.', description: 'The Henry Stickmin classic — pick your escape route.', genre: 'Puzzle', tone: 'Story', mark: 'EP', color: 'stack', path: '/games/escapingtheprison/index.html' },
-  { id: 'stealingthediamond', title: 'Stealing the Diamond', subtitle: 'Go big.', description: 'Henry Stickmin returns — steal the Tunisian Diamond your way.', genre: 'Puzzle', tone: 'Story', mark: 'SD', color: 'twenty', path: '/games/stealingthediamond/index.html' },
-  { id: 'fancypantsadventures', title: 'Fancy Pants', subtitle: 'Run fancy.', description: 'The legendary stick-figure platformer with the smoothest moves.', genre: 'Platformer', tone: 'Retro', mark: 'FP', color: 'youtube', path: '/games/fancypantsadventures/index.html' },
-  { id: 'papaspizzaria', title: 'Papa’s Pizzeria', subtitle: 'Top. Bake. Serve.', description: 'Run the pizzeria — take orders, bake pizzas, keep customers happy.', genre: 'Simulation', tone: 'Cute', mark: 'PP', color: 'cookie', path: '/games/papaspizzaria/index.html' },
-  { id: 'papasburgeria', title: 'Papa’s Burgeria', subtitle: 'Flip and stack.', description: 'Grill, stack and serve the perfect burgers.', genre: 'Simulation', tone: 'Cute', mark: 'PB', color: 'cookie', path: '/games/papasburgeria/index.html' },
-  { id: 'riddleschool', title: 'Riddle School', subtitle: 'Escape class.', description: 'Point, click and puzzle your way out of school.', genre: 'Puzzle', tone: 'Story', mark: 'RD', color: 'stack', path: '/games/riddleschool/index.html' },
-  { id: 'bloxors', title: 'Bloxors', subtitle: 'Roll the block.', description: 'Tip the block onto the goal without falling off the edge.', genre: 'Puzzle', tone: 'Strategy', mark: 'BX', color: 'stack', path: '/games/bloxors/index.html' },
-  { id: 'basket-random', title: 'Basket Random', subtitle: 'Chaos basketball.', description: 'Floppy 2-player hoops — first to 5 wins.', genre: 'Arcade', tone: 'Chaos', mark: 'BK', color: 'drive', path: '/games/basket-random/index.html' },
-  { id: 'boxing-random', title: 'Boxing Random', subtitle: 'Floppy fists.', description: 'Wobbly 2-player boxing — knock them out.', genre: 'Arcade', tone: 'Chaos', mark: 'BO', color: 'devil', path: '/games/boxing-random/index.html' },
-  { id: 'alienhominid', title: 'Alien Hominid', subtitle: 'Run-and-gun classic.', description: 'Blast through the FBI as the little yellow alien.', genre: 'Arcade', tone: 'Retro', mark: 'AH', color: 'mining', path: '/games/alienhominid/index.html' },
-  { id: 'awesometanks2', title: 'Awesome Tanks 2', subtitle: 'Upgrade and destroy.', description: 'Blast through enemy tanks and upgrade your ride.', genre: 'Arcade', tone: 'Battle', mark: 'AT', color: 'drive', path: '/games/awesometanks2/index.html' },
-  { id: 'baldis-basics', title: 'Baldi’s Basics', subtitle: 'Math. Horror. Run.', description: 'Collect notebooks and escape Baldi in the cult horror hit.', genre: 'Arcade', tone: 'Horror', mark: 'BB', color: 'twenty', path: '/games/baldis-basics/index.html' },
-  { id: 'bad-ice-cream', title: 'Bad Ice Cream', subtitle: 'Chill out.', description: 'Maze-munching arcade fun — grab fruit, dodge enemies.', genre: 'Arcade', tone: 'Retro', mark: 'BI', color: 'hextris', path: '/games/bad-ice-cream/index.html' },
-  { id: 'crossyroad', title: 'Crossy Road', subtitle: 'Why did it cross?', description: 'Hop across roads and rivers — don’t get flattened.', genre: 'Arcade', tone: 'Reflex', mark: 'XO', color: 'mining', path: '/games/crossyroad/index.html' },
-  { id: 'cubefield', title: 'Cubefield', subtitle: 'Dodge the cubes.', description: 'Fly through an endless field of cubes at breakneck speed.', genre: 'Arcade', tone: 'Reflex', mark: 'CB', color: 'stack', path: '/games/cubefield/index.html' },
-  { id: 'edge-surf', title: 'Edge Surf', subtitle: 'Ride the waves.', description: 'The endless surfer — dodge obstacles and grab coins.', genre: 'Arcade', tone: 'Reflex', mark: 'ES', color: 'hextris', path: '/games/edge-surf/index.html' },
-  { id: 'flappy-bird', title: 'Flappy Bird', subtitle: 'Just one more tap.', description: 'The original rage-tap classic — thread the pipes.', genre: 'Arcade', tone: 'Reflex', mark: 'FB', color: 'youtube', path: '/games/flappy-bird/index.html' },
-  { id: 'fruitninja', title: 'Fruit Ninja', subtitle: 'Slice everything.', description: 'Swipe-slice fruit combos and dodge the bombs.', genre: 'Arcade', tone: 'Reflex', mark: 'FN', color: 'devil', path: '/games/fruitninja/index.html' },
-  { id: 'getaway-shootout', title: 'Getaway Shootout', subtitle: 'Race to escape.', description: 'Chaotic 2-player showdowns — grab the getaway first.', genre: 'Arcade', tone: 'Chaos', mark: 'GS', color: 'twenty', path: '/games/getaway-shootout/index.html' },
-  { id: 'google-feud', title: 'Google Feud', subtitle: 'Guess the autocomplete.', description: 'Quiz party game — guess how the internet finishes the sentence.', genre: 'Puzzle', tone: 'Party', mark: 'GF', color: 'stack', path: '/games/google-feud/index.html' },
-  { id: 'hackertype', title: 'Hacker Type', subtitle: 'Look like a hacker.', description: 'Mash keys, hack the mainframe, look awesome.', genre: 'Arcade', tone: 'Fun', mark: 'HT', color: 'mining', path: '/games/hackertype/index.html' },
-  { id: 'knife-master', title: 'Knife Master', subtitle: 'Hit the target.', description: 'Time your throws and stick every knife.', genre: 'Arcade', tone: 'Reflex', mark: 'KM', color: 'devil', path: '/games/knife-master/index.html' },
-  { id: 'thisistheonlylevel', title: 'This Is The Only Level', subtitle: 'One level. Many lies.', description: 'Same stage, new twist every time — think fast.', genre: 'Platformer', tone: 'Puzzle', mark: 'TO', color: 'stack', path: '/games/thisistheonlylevel/index.html' },
-  { id: 'tiny-fishing', title: 'Tiny Fishing', subtitle: 'Cast and relax.', description: 'Hook fish, upgrade your rod, dive deeper.', genre: 'Idle', tone: 'Chill', mark: 'TF', color: 'hextris', path: '/games/tiny-fishing/index.html' },
-  { id: 'wordle', title: 'Wordle', subtitle: 'Six tries.', description: 'Guess the 5-letter word in six tries — the daily classic.', genre: 'Puzzle', tone: 'Strategy', mark: 'WO', color: 'mining', path: '/games/wordle/index.html' },
-  { id: 'fnaw', title: 'FNaW', subtitle: 'Nights at Winston’s.', description: 'A Five Nights fan game — survive the night shift as the janitor.', genre: 'Arcade', tone: 'Horror', mark: 'NW', color: 'twenty', path: '/games/fnaw/index.html' },
-  { id: 'stack-bump-3d', title: 'Stack Bump 3D', subtitle: 'Smash the stack.', description: 'Bounce through spinning helix stacks.', genre: 'Arcade', tone: 'Reflex', mark: 'SB', color: 'twenty', path: '/games/stack-bump-3d/index.html' },
-  { id: 'death-run-3d', title: 'Death Run 3D', subtitle: 'Outrun death.', description: 'Sprint through a neon tunnel of moving walls.', genre: 'Arcade', tone: 'Reflex', mark: 'DR', color: 'devil', path: '/games/death-run-3d/index.html' },
-  { id: 'a-dance-of-fire-and-ice', title: 'A Dance of Fire and Ice', subtitle: 'One-button rhythm.', description: 'Guide two orbiting planets down a strict rhythm path.', genre: 'Platformer', tone: 'Rhythm', mark: 'DF', color: 'youtube', path: '/games/a-dance-of-fire-and-ice/index.html' },
-  { id: 'n-gon', title: 'n-gon', subtitle: 'Physics playground.', description: 'A deep physics sandbox shooter — bend gravity, build, destroy.', genre: 'Sandbox', tone: 'Chaos', mark: 'NG', color: 'stack', path: '/games/n-gon/index.html' },
-  { id: 'achievementunlocked', title: 'Achievement Unlocked', subtitle: 'Unlock everything.', description: 'The meta game about unlocking achievements — including this one.', genre: 'Platformer', tone: 'Meta', mark: 'AU', color: 'twenty', path: '/games/achievementunlocked/index.html' },
-  { id: 'cell-machine', title: 'Cell Machine', subtitle: 'Program cells.', description: 'Build self-replicating machines from logic cells.', genre: 'Puzzle', tone: 'Strategy', mark: 'CM', color: 'mining', path: '/games/cell-machine/index.html' },
-  { id: 'mario', title: 'Mario', subtitle: 'Wahoo.', description: 'The classic platforming adventure — stomp, jump, save the day.', genre: 'Platformer', tone: 'Retro', mark: 'M!', color: 'devil', path: '/games/mario/index.html' },
-  { id: 'bobtherobber2', title: 'Bob the Robber 2', subtitle: 'Steal quietly.', description: 'Sneak past guards and grab the loot.', genre: 'Puzzle', tone: 'Stealth', mark: 'B2', color: 'stack', path: '/games/bobtherobber2/index.html' },
-  { id: 'learntofly', title: 'Learn to Fly', subtitle: 'Penguins can fly.', description: 'Launch the penguin, upgrade, fly farther.', genre: 'Arcade', tone: 'Retro', mark: 'LF', color: 'hextris', path: '/games/learntofly/index.html' },
-  { id: 'learntofly2', title: 'Learn to Fly 2', subtitle: 'Fly farther.', description: 'Bigger launches, better gear, dumber penguin.', genre: 'Arcade', tone: 'Retro', mark: 'L2', color: 'youtube', path: '/games/learntofly2/index.html' },
-  { id: 'breakingthebank', title: 'Breaking the Bank', subtitle: 'Get rich quick.', description: 'Henry Stickmin’s first heist — pick your tool.', genre: 'Puzzle', tone: 'Story', mark: 'BT', color: 'stack', path: '/games/breakingthebank/index.html' },
-  { id: 'among-us', title: 'Among Us', subtitle: 'Find the impostor.', description: 'The social deduction hit — finish tasks, eject the impostor.', genre: 'Arcade', tone: 'Party', mark: 'AM', color: 'devil', path: '/games/among-us/index.html' },
-  { id: 'elasticman', title: 'Elastic Man', subtitle: 'Stretch his face.', description: 'The viral silly toy — pull, stretch and giggle.', genre: 'Arcade', tone: 'Fun', mark: 'EM', color: 'cookie', path: '/games/elasticman/index.html' },
-  { id: 'chrome-dino', title: 'Chrome Dino', subtitle: 'No internet? No problem.', description: 'The offline runner — jump cacti, dodge pterodactyls.', genre: 'Arcade', tone: 'Retro', mark: 'CD', color: 'stack', path: '/games/chrome-dino/index.html' },
-  { id: 'core-ball', title: 'Core Ball', subtitle: 'Thread the core.', description: 'Time your shots into the spinning core — don’t touch.', genre: 'Arcade', tone: 'Reflex', mark: 'CO', color: 'hextris', path: '/games/core-ball/index.html' },
-  { id: 'monkey-mart', title: 'Monkey Mart', subtitle: 'Monkey business.', description: 'Run a grocery store with monkey staff — stock shelves, serve customers.', genre: 'Simulation', tone: 'Cute', mark: 'MM', color: 'mining', path: '/games/monkey-mart/index.html' },
-  { id: 'proxy', title: 'Proxy', subtitle: 'Browse unblocked.', description: 'The lounge\'s built-in unblocked browser — Poki, Google, anything.', genre: 'Proxy', tone: 'Tool', mark: 'PX', color: 'twenty', path: '/proxy' },
-  { id: 'minecraft-classic', title: 'Minecraft Classic', subtitle: 'The original, in a tab.', description: 'Mojang’s official Classic build — place and break blocks with friends.', genre: 'Sandbox', tone: 'Blocky', mark: 'MC', color: 'mining', path: '/games/minecraft-classic/index.html' },
-  { id: 'minecraftbeta', title: 'Minecraft Beta', subtitle: 'Survive the night.', description: 'A playable beta-style Minecraft — mine, build, survive.', genre: 'Sandbox', tone: 'Blocky', mark: 'MB', color: 'mining', path: '/games/minecraftbeta/index.html' },
-  { id: 'riddleschool2', title: 'Riddle School 2', subtitle: 'Escape again.', description: 'Point, click and puzzle your way out — the sequel.', genre: 'Puzzle', tone: 'Story', mark: 'R2', color: 'stack', path: '/games/riddleschool2/index.html' },
-  { id: 'riddleschool3', title: 'Riddle School 3', subtitle: 'No skipping class.', description: 'The third escape — trickier puzzles, funnier endings.', genre: 'Puzzle', tone: 'Story', mark: 'R3', color: 'stack', path: '/games/riddleschool3/index.html' },
-  { id: 'bad-ice-cream-2', title: 'Bad Ice Cream 2', subtitle: 'Double chill.', description: 'More mazes, more fruit, more chaos — solo or co-op.', genre: 'Arcade', tone: 'Retro', mark: 'I2', color: 'hextris', path: '/games/bad-ice-cream-2/index.html' },
-  { id: 'bad-ice-cream-3', title: 'Bad Ice Cream 3', subtitle: 'Triple chill.', description: 'The iciest one yet — 40 levels of fruity mayhem.', genre: 'Arcade', tone: 'Retro', mark: 'I3', color: 'hextris', path: '/games/bad-ice-cream-3/index.html' },
-  { id: 'slope-2', title: 'Slope 2', subtitle: 'Faster. Steeper.', description: 'The sequel to the endless neon slope — even less mercy.', genre: 'Arcade', tone: 'Reflex', mark: 'S2', color: 'hextris', path: '/games/slope-2/index.html' },
-  { id: 'slope-ball', title: 'Slope Ball', subtitle: 'Roll the slope.', description: 'A slope-style ball roller with fresh tracks and traps.', genre: 'Arcade', tone: 'Reflex', mark: 'BL', color: 'stack', path: '/games/slope-ball/index.html' },
-  { id: 'flashtetris', title: 'Tetris Flash', subtitle: 'Stack ’em, classic style.', description: 'The timeless Flash block-stacker — clear lines, chase the score.', genre: 'Puzzle', tone: 'Retro', mark: 'TF', color: 'twenty', path: '/games/flashtetris/index.html' },
-  { id: 'twitch-tetris', title: 'Tetris', subtitle: 'Pure blocks.', description: 'A clean modern Tetris — spin, drop, clear.', genre: 'Puzzle', tone: 'Retro', mark: 'TE', color: 'twenty', path: '/games/twitch-tetris/index.html' },
-  { id: 'ducklife1', title: 'Duck Life', subtitle: 'Train your duck.', description: 'The original — run, swim and fly to racing glory.', genre: 'Simulation', tone: 'Cute', mark: 'D1', color: 'mining', path: '/games/ducklife1/index.html' },
-  { id: 'ducklife3', title: 'Duck Life 3', subtitle: 'Evolve your duck.', description: 'Bigger races, tougher training, champion ducks.', genre: 'Simulation', tone: 'Cute', mark: 'D3', color: 'mining', path: '/games/ducklife3/index.html' },
-  { id: 'basketball-stars', title: 'Basketball Stars', subtitle: 'Ball is life.', description: 'Fast 1v1 hoops — shoot, steal and dunk on your rival.', genre: 'Arcade', tone: 'Chaos', mark: 'BS', color: 'drive', path: '/games/basketball-stars/index.html' },
-  { id: 'stickman-golf', title: 'Stickman Golf', subtitle: 'Fore!', description: 'Fling the stickman through crazy golf courses.', genre: 'Arcade', tone: 'Fun', mark: 'SG', color: 'mining', path: '/games/stickman-golf/index.html' },
-  { id: 'stickman-boost', title: 'Stickman Boost', subtitle: 'Hold on tight.', description: 'High-speed stickman runner — jump, slide, survive.', genre: 'Arcade', tone: 'Reflex', mark: 'ST', color: 'stack', path: '/games/stickman-boost/index.html' },
-  { id: 'fnaf', title: 'Five Nights at Freddy’s', subtitle: 'Survive five nights.', description: 'The original FNAF — watch the cameras, save power, keep them out.', genre: 'Arcade', tone: 'Horror', mark: 'F1', color: 'twenty', path: '/games/fnaf/index.html' },
-  { id: 'happy-wheels', title: 'Happy Wheels', subtitle: 'Brutal ragdoll racing.', description: 'The legendary obstacle racer — finish in one piece. Probably not.', genre: 'Platformer', tone: 'Chaos', mark: 'HW', color: 'devil', path: '/games/happy-wheels/index.html' },
-  { id: 'run-3', title: 'Run 3', subtitle: 'Don’t fall off.', description: 'Run, skate and float through the tunnels of space.', genre: 'Platformer', tone: 'Reflex', mark: 'RN', color: 'stack', path: '/games/run-3/index.html' },
-  { id: 'red-ball-4', title: 'Red Ball 4', subtitle: 'Roll to the rescue.', description: 'All three volumes — bounce, squash and outsmart the squares.', genre: 'Platformer', tone: 'Retro', mark: 'R4', color: 'devil', path: '/games/red-ball-4/index.html' },
-  { id: 'plants-vs-zombies', title: 'Plants vs Zombies', subtitle: 'Hold the lawn.', description: 'The classic lawn defense — pea-shooters vs the horde.', genre: 'Arcade', tone: 'Strategy', mark: 'PV', color: 'mining', path: '/games/plants-vs-zombies/index.html' },
-  { id: 'snow-rider-3d', title: 'Snow Rider 3D', subtitle: 'Shred the mountain.', description: 'Dodge trees and grab gifts on an endless snowy ride.', genre: 'Arcade', tone: 'Reflex', mark: 'SN', color: 'hextris', path: '/games/snow-rider-3d/index.html' },
-  { id: 'granny', title: 'Granny', subtitle: 'Don’t make a sound.', description: 'Escape Granny’s house in 5 days — quietly.', genre: 'Arcade', tone: 'Horror', mark: 'GR', color: 'twenty', path: '/games/granny/index.html' },
-]
-const filters = [
-  "All games",
-  "Idle",
-  "Arcade",
-  "Puzzle",
-  "Racing",
-  "Platformer",
-  "Simulation",
-  "Sandbox",
-  "Video",
-  "Community",
-  "Proxy",
-  "Favorites"
-];
-const pubColors = ["cookie", "drive", "mining", "devil", "stack", "hextris", "twenty", "youtube"];
-
-type PublishedListing = { id: string; title: string; icon: string | null };
-type ViewMode = "shelves" | "grid" | "cards";
-
+type PublishedListing = { id: string; title: string; icon: string | null }
+type RequestItem = { id: string; title: string; votes: number; status: string }
 export default function Page() {
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("All games");
-  const [favorites, setFavorites] = useState<string[]>([]);
-  const [recent, setRecent] = useState<string[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>("shelves");
-  const [activeGame, setActiveGame] = useState<Game | null>(null);
-  const [published, setPublished] = useState<Game[]>([]);
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState('All games')
+  const [favorites, setFavorites] = useState<string[]>([])
+  const [activeGame, setActiveGame] = useState<Game | null>(null)
+  const [published, setPublished] = useState<Game[]>([])
+  const [spotIdx, setSpotIdx] = useState(0)
+  const [view, setView] = useState<'shelves'|'grid'>('shelves')
+  const [recentlyPlayed, setRecentlyPlayed] = useState<string[]>([])
+  // 10 features state
+  const customization = useCustomization()
+  const theme = customization.settings.theme.mode
+  const [online, setOnline] = useState(true)
+  const [installPrompt, setInstallPrompt] = useState<any>(null)
+  const [installable, setInstallable] = useState(false)
+  const [playCounts, setPlayCounts] = useState<Record<string,number>>({})
+  const [requests, setRequests] = useState<RequestItem[]>([])
+  const [requestVotes, setRequestVotes] = useState<string[]>([])
+  const [newReqTitle, setNewReqTitle] = useState('')
+  const [leaderTab, setLeaderTab] = useState<'today'|'week'>('today')
+  const [authUser, setAuthUser] = useState<{id:string; username:string}|null>(null)
+  const [showAuth, setShowAuth] = useState<null|'login'|'register'|'reset'>(null)
+  const [authForm, setAuthForm] = useState({ username:'', password:'', favoriteFood:'', newPassword:'' })
+  const [authError, setAuthError] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [sortBy, setSortBy] = useState<'featured'|'popular'|'newest'|'az'>('featured')
+  const [visibleCount, setVisibleCount] = useState(36)
+  const [hideLow, setHideLow] = useState(true)
+  const [showStaffOnly, setShowStaffOnly] = useState(false)
+  const [showAchievementsHub, setShowAchievementsHub] = useState(false)
+  const [achSummary, setAchSummary] = useState<{total:number, unlocked:number, points:number} | null>(null)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [dbMode, setDbMode] = useState<'postgres'|'local'|null>(null)
+  const [streak, setStreak] = useState(1)
+  const [showDashboard, setShowDashboard] = useState(false)
+
+  const featuredGames = useMemo(()=> games.filter(g=> FEATURED_IDS.includes(g.id)), [])
 
   useEffect(() => {
-    try {
-      const savedFavs = localStorage.getItem("gg_favorites");
-      if (savedFavs) setFavorites(JSON.parse(savedFavs));
-      const savedRecent = localStorage.getItem("gg_recent_games");
-      if (savedRecent) setRecent(JSON.parse(savedRecent));
-      const savedView = localStorage.getItem("gg_view_mode") as ViewMode | null;
-      if (savedView === "shelves" || savedView === "grid" || savedView === "cards") setViewMode(savedView);
-    } catch {}
+    const id = setInterval(()=> setSpotIdx(i=> (i+1)%featuredGames.length), 5000)
+    return ()=> clearInterval(id)
+  }, [featuredGames.length])
 
-    fetch("/api/games")
+  useEffect(() => {
+    fetch('/api/games')
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { games?: PublishedListing[] } | null) => {
-        if (!d?.games) return;
+        if (!d?.games) return
         setPublished(
           d.games.map((g, i) => ({
-            id: "pub-" + g.id,
+            id: 'pub-' + g.id,
             title: g.title,
-            subtitle: "Community upload.",
-            description: "Published by the lounge community.",
-            genre: "Community",
-            tone: "Fresh",
-            mark: g.title.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "GG",
+            subtitle: 'Community upload.',
+            description: 'Published by the lounge community.',
+            genre: 'Community',
+            tone: 'Fresh',
+            mark: g.title.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'GG',
             color: pubColors[i % pubColors.length],
-            path: "/games/" + g.id,
+            path: '/games/' + g.id,
             icon: g.icon || undefined,
-          }))
-        );
+          })),
+        )
       })
-      .catch(() => {});
-  }, []);
+      .catch(() => {})
+  }, [])
 
-  const allGames = useMemo(() => [...games, ...published], [published]);
+  // Load favorites from localStorage + theme + playCounts + requests votes
+  useEffect(()=>{
+    try{
+      const f = JSON.parse(localStorage.getItem('ggl_fav')||'[]')
+      if(Array.isArray(f)) setFavorites(f)
+      const r = JSON.parse(localStorage.getItem('ggl_recent')||'[]')
+      if(Array.isArray(r)) setRecentlyPlayed(r)
 
+      const pc = JSON.parse(localStorage.getItem('ggl_playcounts')||'{}')
+      if(pc && typeof pc==='object') setPlayCounts(pc)
+      const rv = JSON.parse(localStorage.getItem('ggl_req_votes')||'[]')
+      if(Array.isArray(rv)) setRequestVotes(rv)
+    }catch{}
+    setOnline(typeof navigator!=='undefined' ? navigator.onLine : true)
+    const onOnline=()=> setOnline(true)
+    const onOffline=()=> setOnline(false)
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    const onInstallable = ()=> setInstallable(true)
+    window.addEventListener('ggl:installable', onInstallable as any)
+    const dp = (window as any).__gglDeferredPrompt
+    if(dp) { setInstallPrompt(dp); setInstallable(true) }
+    const handler = (e:any)=>{ e.preventDefault(); setInstallPrompt(e); setInstallable(true) }
+    window.addEventListener('beforeinstallprompt', handler as any)
+    return ()=> { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); window.removeEventListener('ggl:installable', onInstallable as any); window.removeEventListener('beforeinstallprompt', handler as any) }
+  },[])
+  // streak: consecutive days visited (retention)
+  useEffect(()=>{
+    try{
+      const today = new Date().toISOString().slice(0,10)
+      const last = localStorage.getItem('ggl_last_visit')
+      let s = parseInt(localStorage.getItem('ggl_streak')||'0',10)
+      if(last !== today){
+        const yest = new Date(Date.now()-86400000).toISOString().slice(0,10)
+        s = last===yest ? (s||1)+1 : (s||0)+1
+        if(s>1 || !last) s = Math.max(1,s)
+        localStorage.setItem('ggl_streak', String(s))
+        localStorage.setItem('ggl_last_visit', today)
+      }
+      setStreak(s||1)
+    }catch{}
+  },[])
+  useEffect(()=>{ try{localStorage.setItem('ggl_fav', JSON.stringify(favorites))}catch{} },[favorites])
+  useEffect(()=>{ try{localStorage.setItem('ggl_recent', JSON.stringify(recentlyPlayed.slice(0,12)))}catch{} },[recentlyPlayed])
+  useEffect(()=>{ try{ localStorage.setItem('ggl_playcounts', JSON.stringify(playCounts))}catch{}},[playCounts])
+  useEffect(()=>{ try{ localStorage.setItem('ggl_req_votes', JSON.stringify(requestVotes))}catch{}},[requestVotes])
+  // auth: fetch me
+  useEffect(()=>{
+    fetch('/api/auth/me').then(r=> r.ok? r.json():null).then((d:any)=> { if(d?.user) setAuthUser(d.user) }).catch(()=>{})
+  },[])
+  // achievements summary (CrazyGames-style)
+  useEffect(()=>{
+    if(!authUser){ setAchSummary(null); return }
+    fetch('/api/achievements/stats').then(r=> r.ok? r.json():null).then((d:any)=>{
+      if(d?.signedIn) setAchSummary({ total: d.total||0, unlocked: d.totalUnlocked||0, points: d.totalPoints||0 })
+    }).catch(()=>{})
+  }, [authUser])
+  useEffect(()=>{
+    const h=()=> setShowAuth('login')
+    window.addEventListener('ggl:open-auth' as any, h as any)
+    return ()=> window.removeEventListener('ggl:open-auth' as any, h as any)
+  }, [])
+  // detect DB mode for warning (if local JSON, guest data is ephemeral)
+  useEffect(()=>{
+    fetch('/api/achievements').then(r=> {
+      const mode = r.headers.get('x-db-mode') as any
+      if(mode) setDbMode(mode)
+      return r.json()
+    }).catch(()=>{})
+    fetch('/api/gate').then(r=> {
+      const m = r.headers.get('x-db-mode')
+      if(m) setDbMode(m as any)
+    }).catch(()=>{})
+  },[])
+
+  // anonymous id for cloud sync + username-linked cloud (favorites sync across devices)
+  const anonIdRef = useRef<string>('')
+  useEffect(()=>{
+    try{
+      let id = localStorage.getItem('ggl_anon_id')
+      if(!id){ id='anon_'+Math.random().toString(36).slice(2,9)+Date.now().toString(36); localStorage.setItem('ggl_anon_id', id) }
+      anonIdRef.current=id
+      // load cloud state and merge (cloud wins if newer) — anon
+      fetch('/api/user-state?id='+encodeURIComponent(id)).then(r=> r.ok? r.json():null).then((d:any)=>{
+        if(d?.state){
+          const s=d.state
+          if(Array.isArray(s.favorites) && s.favorites.length> favorites.length) setFavorites(s.favorites)
+          if(s.playCounts && Object.keys(s.playCounts).length> Object.keys(playCounts).length) setPlayCounts(s.playCounts)
+          if(Array.isArray(s.recentlyPlayed) && s.recentlyPlayed.length> recentlyPlayed.length) setRecentlyPlayed(s.recentlyPlayed.slice(0,12))
+        }
+      }).catch(()=>{})
+    }catch{}
+  },[])
+  // when signed in, also load/merge username cloud state (this is what saves progress across devices with username)
+  useEffect(()=>{
+    if(!authUser?.id) return
+    fetch('/api/user-state?id='+encodeURIComponent(authUser.id)).then(r=> r.ok? r.json():null).then((d:any)=>{
+      if(d?.state){
+        const s=d.state
+        // merge: union favorites, max playCounts, union recentlyPlayed
+        if(Array.isArray(s.favorites) && s.favorites.length){
+          setFavorites(prev=> Array.from(new Set([...prev, ...s.favorites])))
+        }
+        if(s.playCounts && Object.keys(s.playCounts).length){
+          setPlayCounts(prev=> { const m={...prev}; for(const k of Object.keys(s.playCounts)){ m[k]=Math.max(m[k]||0, s.playCounts[k]||0) }; return m })
+        }
+        if(Array.isArray(s.recentlyPlayed) && s.recentlyPlayed.length){
+          setRecentlyPlayed(prev=> Array.from(new Set([...s.recentlyPlayed, ...prev])).slice(0,12))
+        }
+      }
+    }).catch(()=>{})
+  },[authUser?.id])
+  // sync to cloud debounced — anon + signed-in user (progress saves across devices via username)
+  useEffect(()=>{
+    const anon = anonIdRef.current || (typeof localStorage!=='undefined' ? localStorage.getItem('ggl_anon_id') : '')
+    const ids = [anon, authUser?.id].filter(Boolean) as string[]
+    if(ids.length===0) return
+    const h = setTimeout(()=>{
+      for(const id of ids) fetch('/api/user-state', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ id, favorites, playCounts, recentlyPlayed })}).catch(()=>{})
+    }, 1200)
+    return ()=> clearTimeout(h)
+  },[favorites, playCounts, recentlyPlayed, authUser])
+
+  // keyboard shortcut: '/' focuses search, Esc closes modal (a11y)
+  useEffect(()=>{
+    const onKey = (e: KeyboardEvent)=>{
+      const tag = (e.target as HTMLElement)?.tagName
+      if(tag==='INPUT' || tag==='TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+      if(e.key==='/' && !e.ctrlKey && !e.metaKey){ e.preventDefault(); const el=document.getElementById('main-search'); el?.focus() }
+      if(e.key==='Escape'){ setActiveGame(null); setShowAuth(null); setShowAchievementsHub(false); setMobileNavOpen(false) }
+    }
+    window.addEventListener('keydown', onKey)
+    return ()=> window.removeEventListener('keydown', onKey)
+  },[])
+
+    // instant search — debounce removed for immediate feedback, keep tiny 80ms to avoid jank but visible is instant
+  useEffect(()=>{
+    const id=setTimeout(()=> setDebouncedQuery(query), 120)
+    return ()=> clearTimeout(id)
+  },[query])
+  useEffect(()=>{ setVisibleCount(36) },[query, filter, sortBy, hideLow, showStaffOnly])
+  // fetch requests for upvote list
+  useEffect(()=>{
+    fetch('/api/game-requests').then(r=> r.ok? r.json(): null).then((d:any)=>{
+      if(d?.requests) setRequests(d.requests.map((x:any)=> ({ id:String(x.id), title:x.title||x.game||x.name||'Unknown', votes: Number(x.votes||x.upvotes||0), status: x.status||'pending'})))
+    }).catch(()=>{})
+  },[])
+
+  const allGames = useMemo(() => dedupeGames([...games, ...published]), [published])
+  // PROD: handle ?play= id from /g/[id] SEO landing (auto-open modal)
+  useEffect(()=>{
+    try{
+      const sp = new URLSearchParams(window.location.search)
+      const pid = sp.get('play')
+      if(pid){
+        const g = allGames.find(x=> x.id===pid)
+        if (g) {
+          launch(g)
+          const url = new URL(window.location.href); url.searchParams.delete('play'); history.replaceState(null,'', url.toString())
+        } // Keep the ID until asynchronously loaded community games are available.
+      }
+    }catch{}
+  }, [allGames])
+  // Fix 1: precomputed search index to avoid re-concatting strings on every keystroke
+  const searchIndex = useMemo(() => new Map(allGames.map((g) => [g.id, `${g.title} ${g.genre} ${g.tone} ${g.description}`.toLowerCase()] as const)), [allGames])
+  const fuse = useMemo(() => new Fuse(allGames, { keys: [{ name: 'title', weight: 0.5 }, { name: 'genre', weight: 0.2 }, { name: 'tone', weight: 0.15 }, { name: 'description', weight: 0.15 }], threshold: 0.3, distance: 100, ignoreLocation: true, minMatchCharLength: 2, includeScore: true }), [allGames])
   const visibleGames = useMemo(
-    () =>
-      allGames.filter(
-        (game) =>
-          `${game.title} ${game.genre} ${game.tone} ${game.subtitle}`.toLowerCase().includes(query.toLowerCase()) &&
-          (filter === "All games" || game.genre === filter || (filter === "Favorites" && favorites.includes(game.id)))
-      ),
-    [allGames, favorites, filter, query]
-  );
-
-  const shelfDefinitions = useMemo(() => {
-    const byId = (idList: string[]) =>
-      idList.map((id) => allGames.find((g) => g.id === id)).filter((g): g is Game => Boolean(g));
-
-    const list: { id: string; title: string; subtitle: string; icon: typeof Trophy; games: Game[] }[] = [];
-
-    if (recent.length > 0) {
-      const recentGames = recent.map((id) => allGames.find((g) => g.id === id)).filter((g): g is Game => Boolean(g));
-      if (recentGames.length > 0) {
-        list.push({ id: "shelf-recent", title: "Jump Back In", subtitle: "Recently played by you", icon: Clock, games: recentGames });
+    () => {
+      const q = query.trim().toLowerCase()
+      let base: Game[] = []
+      if(q){
+        // PROD honest: always use Fuse ranking (typo tolerant), not just fallback — users feel search is smart
+        const results = fuse.search(query.trim(), { limit: 80 })
+        const ranked = results.map(r=> r.item)
+        // also include exact substring matches that Fuse might miss (boost them to top)
+        const exact = allGames.filter(g=> (searchIndex.get(g.id)||'').includes(q))
+        const seen = new Set(ranked.map(g=> g.id))
+        base = [...exact.filter(g=> !seen.has(g.id)), ...ranked]
+        base = base.filter(g=>{
+          if(filter === 'All games') return true
+          if(filter === 'Favorites') return favorites.includes(g.id)
+          return g.genre === filter
+        })
+      } else {
+        base = allGames.filter((game) => {
+          if(filter === 'All games') return true
+          if(filter === 'Favorites') return favorites.includes(game.id)
+          return game.genre === filter
+        })
       }
-    }
-
-    if (favorites.length > 0) {
-      const favGames = allGames.filter((g) => favorites.includes(g.id));
-      if (favGames.length > 0) {
-        list.push({ id: "shelf-favs", title: "Your Favorites", subtitle: "Starred arcade favorites", icon: Heart, games: favGames });
+      if (hideLow) {
+        base = base.filter(g=> !LOW_QUALITY_HINTS.has(g.id))
+        // PROD dedupe: exact + Levenshtein near-duplicate (honest: catches "Slope" vs "Slope Ball", "Paper.io 2" vs "Paper io 2")
+        const kept: Game[] = []
+        for(const g of base){
+          const dup = kept.some(k=> isNearDuplicate(k.title, g.title))
+          if(!dup) kept.push(g)
+        }
+        base = kept
       }
+      if (showStaffOnly) base = base.filter(g=> STAFF_PICKS.includes(g.id))
+      // sorting
+      if (sortBy==='popular') base = [...base].sort((a,b)=> (playCounts[b.id]||0) - (playCounts[a.id]||0))
+      else if (sortBy==='az') base = [...base].sort((a,b)=> a.title.localeCompare(b.title))
+      else if (sortBy==='newest') base = [...base].reverse()
+      // featured first when default
+      else base = [...base].sort((a,b)=> (b.featured?1:0) - (a.featured?1:0))
+      return base
+    },
+    [allGames, favorites, filter, query, playCounts, sortBy, hideLow, showStaffOnly, searchIndex, fuse],
+  )
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+  const paginatedGames = useMemo(()=> visibleGames.slice(0, visibleCount), [visibleGames, visibleCount])
+  useEffect(()=>{
+    if (!loadMoreRef.current) return
+    const el = loadMoreRef.current
+    const obs = new IntersectionObserver((entries)=>{
+      if (entries[0]?.isIntersecting && paginatedGames.length < visibleGames.length) setVisibleCount(c=> Math.min(c+36, visibleGames.length))
+    }, { rootMargin:'600px' })
+    obs.observe(el)
+    return ()=> obs.disconnect()
+  }, [paginatedGames.length, visibleGames.length])
+
+  // Fix 6: shelves grouping only when actually showing shelves (avoid wasted 192 scan in grid/search)
+  const grouped = useMemo(()=>{
+    if (view !== 'shelves' || filter !== 'All games' || query.trim()) return [] as [string, Game[]][]
+    const map: Record<string, Game[]> = {}
+    for(const g of visibleGames){
+      const k = g.genre
+      if(!map[k]) map[k]=[]
+      map[k].push(g)
     }
+    return Object.entries(map).sort((a,b)=> b[1].length - a[1].length)
+  }, [visibleGames, view, filter, query])
+  const staffGames = useMemo(()=> allGames.filter(g=> STAFF_PICKS.includes(g.id)), [allGames])
 
-    list.push({
-      id: "shelf-trending",
-      title: "Top Lounge Picks",
-      subtitle: "Most played right now",
-      icon: Flame,
-      games: byId([
-        "cookie-clicker",
-        "eaglercraftx",
-        "drift-boss",
-        "fnaf",
-        "granny",
-        "happy-wheels",
-        "run-3",
-        "poki",
-        "retro-bowl",
-        "level-devil",
-        "drive-mad",
-        "snow-rider-3d",
-        "plants-vs-zombies",
-        "slope",
-      ]),
-    });
+  const spotlight = featuredGames[spotIdx] || games[0]
+  const gameOfDay = useMemo(()=> {
+    const idx = gameOfDayIndex(allGames.length)
+    return allGames[idx] || games[0]
+  }, [allGames])
+  const filterCounts = useMemo(()=>{
+    const q = query.toLowerCase()
+    const m: Record<string,number>={}
+    for(const f of filters){
+      if(f==='All games') m[f]= allGames.filter(g=> (searchIndex.get(g.id)||'').includes(q)).length
+      else if(f==='Favorites') m[f]= allGames.filter(g=> favorites.includes(g.id) && (searchIndex.get(g.id)||'').includes(q)).length
+      else m[f]= allGames.filter(g=> g.genre===f && (searchIndex.get(g.id)||'').includes(q)).length
+    }
+    return m
+  }, [allGames, favorites, query, searchIndex])
+  // Leaderboard: server-side, only signed-in users count (per user request)
+  const [serverLeaderboard, setServerLeaderboard] = useState<{gameId:string,count:number}[]>([])
+  useEffect(()=>{
+    let alive=true
+    const fetchLB=()=> fetch('/api/leaderboard?limit=5').then(r=> r.ok? r.json(): null).then((d:any)=>{ if(!alive) return; if(d?.leaderboard && Array.isArray(d.leaderboard)) setServerLeaderboard(d.leaderboard) }).catch(()=>{})
+    fetchLB()
+    const id=setInterval(()=>{ if(document.visibilityState!=='hidden') fetchLB() }, 30000)
+    return ()=> { alive=false; clearInterval(id)}
+  }, [playCounts]) // PROD: guests + signed-in both poll, no authUser dep
+  const leaderboard = useMemo(()=>{
+    if(serverLeaderboard.length>0){
+      const map = new Map(allGames.map(g=> [g.id, g] as const))
+      const rows = serverLeaderboard.map(r=> {
+        const g = map.get(r.gameId)
+        return g ? { game:g, count:r.count } : null
+      }).filter(Boolean) as {game:typeof allGames[number], count:number}[]
+      if(rows.length>0) return rows.slice(0,5)
+    }
+    // PROD honest global: never fake with local playCounts
+    if(serverLeaderboard.length===0) return featuredGames.slice(0,5).map((g,i)=> ({ game:g, count: 0}))
+    return featuredGames.slice(0,5).map((g,i)=> ({ game:g, count: 0}))
+  }, [allGames, playCounts, serverLeaderboard, authUser, featuredGames])
+  // JSON-LD for SEO - top games as ItemList
+  function highlight(text:string, q:string){
+    if(!q) return text
+    const idx = text.toLowerCase().indexOf(q.toLowerCase())
+    if(idx===-1) return text
+    const before = text.slice(0, idx)
+    const match = text.slice(idx, idx+q.length)
+    const after = text.slice(idx+q.length)
+    // return JSX fragments via split render in caller — this helper returns parts
+    return ({ before, match, after } as any)
+  }
+  function Highlighted({ text, query }: { text:string; query:string }){
+    if(!query) return <>{text}</>
+    const lower=text.toLowerCase(), q=query.toLowerCase()
+    const i=lower.indexOf(q)
+    if(i===-1) return <>{text}</>
+    return <>{text.slice(0,i)}<mark className="hl">{text.slice(i,i+q.length)}</mark>{text.slice(i+q.length)}</>
+  }
 
-    list.push({
-      id: "shelf-classics",
-      title: "Retro & Flash Legends",
-      subtitle: "The immortal web game hall of fame",
-      icon: Trophy,
-      games: byId([
-        "happy-wheels",
-        "run-3",
-        "red-ball-4",
-        "fancypantsadventures",
-        "ducklife1",
-        "ducklife2",
-        "ducklife3",
-        "riddleschool",
-        "riddleschool2",
-        "riddleschool3",
-        "papaspizzaria",
-        "papasburgeria",
-        "escapingtheprison",
-        "stealingthediamond",
-        "breakingthebank",
-        "impossiblequiz",
-        "bloxors",
-        "learntofly",
-        "learntofly2",
-        "thisistheonlylevel",
-      ]),
-    });
-
-    list.push({
-      id: "shelf-action",
-      title: "Action & Precision",
-      subtitle: "Test your reflexes, timing, and momentum",
-      icon: Zap,
-      games: byId([
-        "level-devil",
-        "vex-8",
-        "ovo",
-        "drive-mad",
-        "geometry-dash",
-        "tunnel-rush",
-        "cluster-rush",
-        "jetpack-joyride",
-        "stickman-hook",
-        "ragdoll-archers",
-        "stickman-boost",
-        "slope-2",
-        "slope-ball",
-        "alienhominid",
-      ]),
-    });
-
-    list.push({
-      id: "shelf-puzzle",
-      title: "Puzzles & Strategy",
-      subtitle: "Strategy, logic, and pure flow state",
-      icon: Sparkles,
-      games: byId([
-        "2048",
-        "hextris",
-        "flashtetris",
-        "twitch-tetris",
-        "bad-ice-cream-2",
-        "bad-ice-cream-3",
-        "plants-vs-zombies",
-        "worlds-hardest-game",
-        "fireboywatergirlforesttemple",
-        "wordle",
-        "stack",
-      ]),
-    });
-
-    list.push({
-      id: "shelf-sandbox",
-      title: "Sandbox, 3D & Survival",
-      subtitle: "Open worlds, horror, and endless exploration",
-      icon: Layers,
-      games: byId([
-        "eaglercraftx",
-        "backrooms",
-        "fnaf",
-        "granny",
-        "snow-rider-3d",
-        "minecraft-classic",
-        "minecraftbeta",
-        "solar-smash",
-        "idle-mining",
-      ]),
-    });
-
-    list.push({
-      id: "shelf-sports",
-      title: "Sports & Racing",
-      subtitle: "High speed and competitive head-to-head duels",
-      icon: Gamepad2,
-      games: byId([
-        "drift-boss",
-        "drift-hunters",
-        "moto-x3m",
-        "basketball-stars",
-        "basket-random",
-        "rooftop-snipers",
-        "retro-bowl",
-        "stickman-golf",
-        "survival-race",
-      ]),
-    });
-
-    return list;
-  }, [allGames, favorites, recent]);
+  const jsonLd = useMemo(()=> ({
+    '@context':'https://schema.org',
+    '@type':'ItemList',
+    name:'GG-Lounge Games',
+    numberOfItems: allGames.length,
+    itemListElement: allGames.slice(0,24).map((g,i)=> ({
+      '@type':'ListItem',
+      position:i+1,
+      item: {
+        '@type':'VideoGame',
+        name:g.title,
+        description:g.description,
+        url: (process.env.NEXT_PUBLIC_SITE_URL || 'https://gg-lounge.vercel.app') + g.path,
+        image: (process.env.NEXT_PUBLIC_SITE_URL || 'https://gg-lounge.vercel.app') + (g.icon || ''),
+        genre: g.genre,
+        applicationCategory: 'Game',
+        operatingSystem: 'Web Browser',
+        offers: { '@type':'Offer', price:'0', priceCurrency:'USD', availability:'https://schema.org/InStock' },
+        author: { '@type':'Organization', name:'GG-Lounge Studios' }
+      }
+    }))
+  }), [allGames])
 
   function launch(game: Game) {
-    setActiveGame(game);
-    setRecent((prev) => {
-      const next = [game.id, ...prev.filter((id) => id !== game.id)].slice(0, 16);
-      try {
-        localStorage.setItem("gg_recent_games", JSON.stringify(next));
-      } catch {}
-      return next;
-    });
+    setActiveGame(game)
+    setRecentlyPlayed(prev=> [game.id, ...prev.filter(x=> x!==game.id)].slice(0,12))
+    setPlayCounts(prev=> ({ ...prev, [game.id]: (prev[game.id]||0)+1 }))
+    try{ fetch('/api/visit', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ gameId: game.id }) }).catch(()=>{}) }catch{}
   }
-
-  function toggleFavorite(id: string, e?: React.MouseEvent) {
-    e?.stopPropagation();
-    setFavorites((current) => {
-      const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
-      try {
-        localStorage.setItem("gg_favorites", JSON.stringify(next));
-      } catch {}
-      return next;
-    });
+        function toggleFavorite(id: string) {
+    setFavorites((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
   }
-
-  function changeViewMode(mode: ViewMode) {
-    setViewMode(mode);
+  function shufflePick(){
+    const pool = visibleGames.length? visibleGames: allGames
+    const pick = pool[Math.floor(Math.random()*pool.length)]
+    if(pick) launch(pick)
+  }
+  function toggleTheme(){ const id=theme==='dark'?'arctic':'lounge'; const preset=THEMES[id]; customization.update(s=>({...s,theme:{preset:id,mode:preset.mode,colors:{...preset.colors}}})) }
+  const [installHint, setInstallHint] = useState<string|null>(null)
+  async function doInstall(){
+    const dp:any = installPrompt || (window as any).__gglDeferredPrompt
+    if(dp && dp.prompt){ try{ dp.prompt(); const r= await dp.userChoice; if(r) { setInstallable(false); setInstallPrompt(null); (window as any).__gglDeferredPrompt=null } }catch{} return }
+    // honest iOS: show inline hint, not alert
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    if(isIOS) setInstallHint('On iPhone: tap Share → Add to Home Screen')
+    else setInstallHint('In browser menu: Install app / Add to Home Screen')
+    setTimeout(()=> setInstallHint(null), 4000)
+  }
+  async function refreshRequests() {
+    const response = await fetch('/api/game-requests', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Could not load requests.');
+    const data = await response.json();
+    if (Array.isArray(data.requests)) setRequests(data.requests);
+  }
+  async function submitRequest() {
+    const title = newReqTitle.trim();
+    if (!title) return;
     try {
-      localStorage.setItem("gg_view_mode", mode);
-    } catch {}
+      const response = await fetch('/api/game-requests', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Request failed.');
+      setNewReqTitle('');
+      await refreshRequests();
+    } catch (error) { window.alert(error instanceof Error ? error.message : 'Request failed. Try again.'); }
+  }
+  async function upvoteRequest(id: string) {
+    if (requestVotes.includes(id)) return;
+    try {
+      const response = await fetch('/api/game-requests/' + encodeURIComponent(id) + '/upvote', { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Vote failed.');
+      setRequestVotes(previous => [...previous, id]);
+      await refreshRequests();
+    } catch (error) { window.alert(error instanceof Error ? error.message : 'Vote failed. Try again.'); }
+  }
+  function openProxyTile(url:string){ window.location.href = '/proxy?url='+encodeURIComponent(url) }
+  function copyGameLink(path:string){ try{ navigator.clipboard.writeText(location.origin+path); }catch{} }
+  // autosave now handled inside GameModal (Fix 3+5)
+  async function doAuth(mode:'login'|'register'|'reset'){
+    setAuthError(''); setAuthLoading(true)
+    try{
+      let url='', body:any={}
+      if(mode==='login'){ url='/api/auth/login'; body={ username: authForm.username, password: authForm.password } }
+      else if(mode==='register'){ url='/api/auth/register'; body={ username: authForm.username, password: authForm.password, favoriteFood: authForm.favoriteFood } }
+      else { url='/api/auth/reset'; body={ username: authForm.username, favoriteFood: authForm.favoriteFood, newPassword: authForm.newPassword } }
+      const r = await fetch(url, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body) })
+      const d = await r.json().catch(()=> ({}))
+      if(!r.ok) throw new Error(d.error || 'Failed')
+      if(mode==='reset'){ setShowAuth('login'); setAuthError('Password reset — now log in.'); return }
+      // fetch me
+      const me = await fetch('/api/auth/me').then(x=> x.json()).catch(()=>null)
+      if(me?.user) setAuthUser(me.user)
+      setShowAuth(null); setAuthForm({ username:'', password:'', favoriteFood:'', newPassword:'' })
+    }catch(e:any){ setAuthError(e.message || 'Error') } finally{ setAuthLoading(false) }
+  }
+  async function doLogout(){
+    await fetch('/api/auth/logout', { method:'POST' }).catch(()=>{})
+    setAuthUser(null)
   }
 
-  function scrollShelf(id: string, delta: number) {
-    const el = document.getElementById(id);
-    if (el) el.scrollBy({ left: delta, behavior: "smooth" });
-  }
-
-  const isFiltering = filter !== "All games" || query.trim().length > 0;
 
   return (
     <main className="lounge-shell">
+      <ErrorBoundary>
+      <a href="#games" className="sr-only focus:not-sr-only" style={{position:'absolute',left:12,top:12,zIndex:50,padding:'8px 12px',background:'var(--lime)',color:'#0b0d12',borderRadius:999,fontWeight:900}}>Skip to games</a>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{__html: JSON.stringify(jsonLd)}} />
       <div className="noise" aria-hidden="true" />
       <header className="site-header">
         <a href="#top" className="brand" aria-label="GG-Lounge home">
@@ -400,71 +497,120 @@ export default function Page() {
             GG-LOUNGE<span className="tm">™</span>
           </span>
         </a>
-        <nav className="header-nav" aria-label="Primary navigation">
-          <a href="#games">Library</a>
-          <a href="/proxy">Proxy</a>
-          <a href="/request-game">Request game</a>
-          <a href="/admin">Admin</a>
+        <button className="mobile-toggle" aria-label="Open menu" aria-expanded={mobileNavOpen} onClick={()=> setMobileNavOpen(v=>!v)}>{mobileNavOpen ? <X size={16}/> : <Menu size={16}/>}</button>
+        <nav className={`header-nav ${mobileNavOpen?'mobile-open':''}`} aria-label="Primary navigation">
+          <a href="#games" onClick={()=> setMobileNavOpen(false)}>Library</a>
+          <a href="/apps" onClick={()=> setMobileNavOpen(false)}>Apps</a>
+          <a href="/proxy" onClick={()=> setMobileNavOpen(false)}>Proxy</a>
+          <button onClick={()=> { setShowAchievementsHub(true); setMobileNavOpen(false) }} style={{background:'none',border:0,cursor:'pointer',font: 'inherit',color:'inherit',display:'flex',alignItems:'center',gap:6,fontWeight:800}}><Trophy size={12}/> Achievements</button>
+          <a href="#about" onClick={()=> setMobileNavOpen(false)}>Studio</a>
+          <a href="/request-game" onClick={()=> setMobileNavOpen(false)}>Request a game</a>
+          <a href="/admin" onClick={()=> setMobileNavOpen(false)}>Admin</a>
         </nav>
-        <div className="header-status">
-          <span className="live-dot" />
-          <span>{allGames.length} GAMES ONLINE</span>
+        <div className="header-actions" style={{display:'flex',alignItems:'center',gap:10}}>
+          <button onClick={()=> setShowAchievementsHub(true)} aria-label="Achievements" title={authUser ? `${achSummary?.unlocked||0}/${achSummary?.total||"--"} unlocked` : "View achievements — sign in to save"} style={{width:36,height:36,borderRadius:999,border:"1px solid var(--line)",background: authUser?"var(--lime)":"rgba(255,255,255,.06)",color: authUser?"#0b0d12":"var(--foreground)",display:"grid",placeItems:"center",cursor:"pointer",position:"relative"}}><Trophy size={16}/>{authUser && achSummary && achSummary.unlocked>0 ? <span style={{position:"absolute",top:-6,right:-6,background:"#0b0d12",color:"var(--lime)",border:"1px solid var(--lime)",fontSize:9,fontWeight:900,padding:"2px 5px",borderRadius:999,lineHeight:1}}>{achSummary.unlocked}</span> : null}</button>
+          <div className="header-status" style={{display:'flex',alignItems:'center',gap:6}}>
+            {online ? <Wifi size={12}/> : <WifiOff size={12} color="var(--coral)"/>}
+            <span className="live-dot" style={{background: online?'var(--lime)':'var(--coral)'}} /> {allGames.length} titles
+          </div>
+          {authUser ? (
+            <span style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',fontSize:12,fontWeight:800}}>
+              <User size={14}/> {authUser.username}
+              <span style={{display:'flex',alignItems:'center',gap:4,padding:'2px 6px',borderRadius:999,background:'rgba(34,197,94,.14)',border:'1px solid var(--line)',fontSize:10}}><Cloud size={10}/> Synced</span>
+              <button onClick={doLogout} aria-label="Log out" title="Log out" style={{width:24,height:24,display:'grid',placeItems:'center',borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',cursor:'pointer'}}><LogOut size={12}/></button>
+            </span>
+          ) : (
+            <button onClick={()=> setShowAuth('login')} style={{padding:'7px 12px',borderRadius:999,border:'1px solid var(--lime)',background:'var(--lime)',color:'#0b0d12',fontWeight:900,fontSize:12,display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}><LogIn size={14}/> Sign in</button>
+          )}
+          <button onClick={toggleTheme} aria-label="Toggle theme" title={theme==='dark'?'Switch to light mode':'Switch to dark mode'} style={{width:36,height:36,borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',display:'grid',placeItems:'center',cursor:'pointer'}}>
+            {theme==='dark' ? <Sun size={16}/> : <Moon size={16}/>}
+          </button>
+          {installable && <button onClick={doInstall} style={{padding:'7px 10px',borderRadius:999,border:'1px solid var(--lime)',background:'var(--lime)',color:'#0b0d12',fontWeight:900,fontSize:12,display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}><Download size={14}/> Install</button>}
         </div>
       </header>
-
-      <section className="hero" id="top">
-        <div className="hero-content">
+      {showAuth && (
+        <AuthDialog
+          mode={showAuth}
+          form={authForm}
+          setForm={setAuthForm}
+          error={authError}
+          loading={authLoading}
+          onAction={() => doAuth(showAuth === 'register' ? 'register' : showAuth === 'reset' ? 'reset' : 'login')}
+          onClose={() => setShowAuth(null)}
+          onSwitch={setShowAuth}
+        />
+      )}
+      {!online && <div role="status" aria-live="polite" style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(255,92,92,.12)',border:'1px solid rgba(255,92,92,.3)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:13}}><WifiOff size={16}/> You’re offline — browsing is limited. A few cached games may still work, but most need internet.</div>}
+      {dbMode==='local' && !authUser && <div role="note" style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(255,190,70,.14)',border:'1px solid rgba(255,190,70,.3)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:12}}><AlertCircle size={14}/> Guest mode: progress saves locally. <button onClick={()=> setShowAuth('register')} style={{marginLeft:4, textDecoration:'underline', background:'none', border:0, color:'var(--foreground)', fontWeight:800, cursor:'pointer'}}>Sign in to keep it forever</button> — survives deploys.</div>}
+      {installable && <div style={{margin:'12px 18px 0',padding:'12px 14px',borderRadius:14,background:'linear-gradient(135deg, rgba(204,255,0,.18), rgba(0,242,234,.14))',border:'1px solid rgba(204,255,0,.35)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+        <span style={{display:'flex',alignItems:'center',gap:10,fontWeight:800,fontSize:13}}><span style={{width:32,height:32,borderRadius:999,background:'var(--lime)',display:'grid',placeItems:'center',color:'#0b0d12'}}><Download size={16}/></span> Install GG Lounge — play offline & launch like an app</span>
+        <span style={{display:'flex',gap:8}}><button onClick={doInstall} style={{padding:'8px 14px',borderRadius:999,background:'#0b0d12',color:'#fff',border:'1px solid rgba(255,255,255,.15)',fontWeight:800,cursor:'pointer'}}>Install</button><button onClick={()=> setInstallable(false)} style={{padding:'8px 10px',borderRadius:999,background:'transparent',border:'1px solid var(--line)',color:'var(--foreground)',cursor:'pointer'}}>Dismiss</button></span>
+      </div>}
+      {installHint && <div role="status" style={{margin:'10px 18px 0', padding:'10px 14px', borderRadius:12, background:'rgba(255,255,255,.06)', border:'1px solid var(--line)', fontSize:13, textAlign:'center'}}>{installHint}</div>}
+      <section className="hero" id="top" style={{position:"relative", overflow:"hidden", background:"radial-gradient(600px 400px at 15% 10%, rgba(125,107,255,.14), transparent 60%), radial-gradient(700px 500px at 85% 15%, rgba(215,243,74,.12), transparent 60%), radial-gradient(500px 400px at 50% 90%, rgba(255,108,131,.08), transparent 60%), var(--background)"}}>
+        <div className="hero-copy">
           <p className="eyebrow">
-            <Sparkles size={14} /> CURATED ARCADE LOUNGE
+            <Sparkles size={14} /> THE INDEPENDENT ARCADE
           </p>
           <h1>
-            Play <em>unblocked</em> anywhere.
+            Stay a while.
+            <br />
+            <em>Play forever.</em>
           </h1>
-          <p className="hero-text">
-            Hand-crafted, zero-lag browser games, school-unblocked video, and an integrated proxy — all running directly from clean local files.
-          </p>
-          <a className="hero-link" href="#games">
-            Browse all {allGames.length} games <ArrowUpRight size={16} />
-          </a>
-          <div className="hero-stats">
-            <div>
-              <strong>{allGames.length}</strong>
-              <span>Installed games</span>
-            </div>
-            <div>
-              <strong>0</strong>
-              <span>External embeds</span>
-            </div>
-            <div>
-              <strong>100%</strong>
-              <span>School safe</span>
-            </div>
+          <p className="hero-text">A handpicked, no-filler collection of browser games for the minutes between everything. <span style={{opacity:.8}}><Keyboard size={12} style={{display:'inline',verticalAlign:'-2px'}}/> {CONTROLS_LEGEND.default} — hover any card to see its controls.</span></p>
+          <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:14}}>
+            <a className="hero-link" href="#games">
+              Enter the lounge <ArrowUpRight size={15} />
+            </a>
+            <button onClick={shufflePick} className="btn-ghost" style={{padding:'8px 14px',fontSize:13}}>
+              <Shuffle size={14}/> Surprise me
+            </button>
+            <button onClick={()=> launch(gameOfDay)} style={{padding:'8px 12px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',fontWeight:800,fontSize:12,display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}>
+              <Gift size={14}/> Game of the Day: {gameOfDay.title}
+            </button>
+          </div>
+          <div className="hero-stats" style={{gap:18, padding:'12px 16px', borderRadius:999, background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.06)', backdropFilter:'blur(8px)', display:'inline-flex', width:'fit-content', marginTop:22}}>
+            <span>
+              <strong>{allGames.length}</strong> games
+            </span>
+            <span>
+              <strong>∞</strong> replay value
+            </span>
+            <span style={{display:'flex',alignItems:'center',gap:6}}><Flame size={12} color={streak>2?'var(--lime)':'inherit'}/> <strong>{streak}</strong> day streak</span>
+            <span>
+              <strong>01</strong> lounge
+            </span>
           </div>
         </div>
         <div className="spotlight">
           <div className="spotlight-top">
-            <span>SPOTLIGHT / 001</span>
+            <span>SPOTLIGHT / {(String(spotIdx+1).padStart(2,'0'))}</span>
             <span className="spotlight-tag">FEATURED</span>
           </div>
-          <div className="spotlight-art">
-            <div className="orbit orbit-a" />
-            <div className="orbit orbit-b" />
-            <span className="spotlight-mark">CC</span>
-            <span className="spotlight-caption">
-              SWEET
-              <br />
-              DESTRUCTION
+          <div className="spotlight-art" onClick={()=> launch(spotlight)} role="button" tabIndex={0} onKeyDown={e=> e.key==='Enter'&&launch(spotlight)} style={{cursor:'pointer', overflow:'hidden', borderRadius:16, position:'relative'}}>
+            {spotlight.icon ? (
+              <img src={spotlight.icon} alt={spotlight.title} style={{position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', opacity:.9}} onError={(e)=> (e.currentTarget.style.display='none')} />
+            ) : null}
+            <div style={{position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 30%, rgba(0,0,0,.55) 100%)'}}/>
+            <div className="orbit orbit-a" style={{opacity:.5}} />
+            <div className="orbit orbit-b" style={{opacity:.4}} />
+            <span className="spotlight-mark" style={{position:'relative', zIndex:1, textShadow:'0 4px 20px rgba(0,0,0,.45)'}}>{spotlight.mark}</span>
+            <span className="spotlight-caption" style={{zIndex:1, background:'rgba(0,0,0,.32)', padding:'6px 10px', borderRadius:999, border:'1px solid rgba(255,255,255,.14)', backdropFilter:'blur(6px)'}}>
+              {spotlight.tone.toUpperCase()}<br/>{spotlight.genre.toUpperCase()}
             </span>
           </div>
           <div className="spotlight-bottom">
             <div>
-              <p className="card-kicker">IDLE · COZY CHAOS</p>
-              <h2>Cookie Clicker</h2>
-              <p>One click away from a very sweet problem.</p>
+              <p className="card-kicker">{spotlight.genre} · {spotlight.tone}</p>
+              <h2>{spotlight.title}</h2>
+              <p>{spotlight.subtitle}</p>
             </div>
-            <button className="circle-play" onClick={() => launch(games[0])} aria-label="Play Cookie Clicker">
+            <button className="circle-play" onClick={() => launch(spotlight)} aria-label={`Play ${spotlight.title}`}>
               <Play size={18} fill="currentColor" />
             </button>
+          </div>
+          <div style={{display:'flex',gap:6,justifyContent:'center',marginTop:10}}>
+            {featuredGames.map((_,i)=> <span key={i} style={{width: i===spotIdx?22:8,height:6,borderRadius:99,background: i===spotIdx?'var(--lime)':'rgba(255,255,255,.22)',transition:'all .3s',display:'block'}}/>)}
           </div>
         </div>
       </section>
@@ -473,348 +619,80 @@ export default function Page() {
         <div className="section-heading">
           <div>
             <p className="eyebrow">THE ARCADE FLOOR</p>
-            <h2>
-              Pick your poison<span>.</span>
-            </h2>
+            <h2>Pick your poison<span>.</span></h2>
           </div>
           <div className="collection-note">
             <Trophy size={16} />
-            <span>
-              <strong>{visibleGames.length.toString().padStart(2, "0")}</strong> games ready
-            </span>
+            <span><strong>{visibleGames.length.toString().padStart(2, '0')}</strong> available now</span>
           </div>
         </div>
-
-        <div className="toolbar-controls">
-          <div className="search-wrap">
-            <Search size={17} />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search 99+ titles, genres, moods…"
-              aria-label="Search games"
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={() => setQuery("")}
-                style={{ background: "transparent", border: 0, color: "var(--muted)", cursor: "pointer", display: "grid" }}
-                aria-label="Clear search"
-              >
-                <X size={15} />
-              </button>
-            )}
+                <LibraryToolbar query={query} setQuery={setQuery} allGames={allGames} sortBy={sortBy} setSortBy={setSortBy} view={view} setView={setView} hideLow={hideLow} setHideLow={setHideLow} showStaffOnly={showStaffOnly} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} />
+        {favorites.length>0 && filter!=='Favorites' && (
+          <div style={{marginBottom:12, padding:'10px 14px', borderRadius:12, background:'linear-gradient(135deg, rgba(215,243,74,.14), rgba(125,107,255,.08))', border:'1px solid rgba(215,243,74,.28)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
+            <span style={{fontSize:13, fontWeight:800, display:'flex', alignItems:'center', gap:8}}><Heart size={14} fill="var(--coral)" color="var(--coral)"/> You have {favorites.length} favorite{favorites.length>1?'s':''}</span>
+            <button onClick={()=> setFilter('Favorites')} style={{padding:'7px 12px', borderRadius:999, background:'var(--lime)', color:'#0b0d12', border:0, fontWeight:900, fontSize:12, cursor:'pointer'}}>View favorites →</button>
           </div>
-
-          <div className="view-switcher" role="group" aria-label="Catalog view mode">
-            <button
-              type="button"
-              className={`view-btn ${viewMode === "shelves" && !isFiltering ? "active" : ""}`}
-              onClick={() => {
-                changeViewMode("shelves");
-                setFilter("All games");
-                setQuery("");
-              }}
-              title="Shelf View (curated categories)"
-            >
-              <Layers size={14} /> Shelves
+        )}
+        <div className="filter-tabs" role="tablist" aria-label="Filter games">
+          {filters.filter(f=> f==='All games' || f==='Favorites' || (filterCounts[f]??0)>0).map((item) => (
+            <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)} role="tab" aria-selected={filter === item}>
+              {item} <span style={{opacity:.7,fontWeight:700,marginLeft:4,fontSize:11}}>({filterCounts[item]??0})</span>
             </button>
-            <button
-              type="button"
-              className={`view-btn ${viewMode === "grid" || (viewMode === "shelves" && isFiltering) ? "active" : ""}`}
-              onClick={() => changeViewMode("grid")}
-              title="Compact Grid (dense arcade tiles)"
-            >
-              <LayoutGrid size={14} /> Compact Grid
-            </button>
-            <button
-              type="button"
-              className={`view-btn ${viewMode === "cards" ? "active" : ""}`}
-              onClick={() => changeViewMode("cards")}
-              title="Detailed Cards"
-            >
-              <Trophy size={14} /> Detailed Cards
-            </button>
-          </div>
+          ))}
         </div>
 
-        <div className="toolbar">
-          <div className="filter-tabs" role="tablist" aria-label="Filter games">
-            {filters.map((item) => (
-              <button
-                key={item}
-                className={filter === item ? "active" : ""}
-                onClick={() => setFilter(item)}
-                role="tab"
-                aria-selected={filter === item}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-        </div>
+        {unavailableGames.length > 0 && <details style={{ margin: '16px 0', padding: 14, border: '1px solid var(--line)', borderRadius: 12 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13 }}>{unavailableGames.length} titles need local files — not listed as playable</summary>
+          <p style={{ fontSize: 12, color: 'var(--muted)' }}>A loader, external embed or missing directory is not a working local game. These entries remain recorded until their authorized browser files are installed.</p>
+          <ul style={{ maxHeight: 220, overflowY: 'auto', fontSize: 12 }}>{unavailableGames.map(game => <li key={game.id}><strong>{game.title}</strong> — {getGameAssetIssues(game.id).join('; ')}</li>)}</ul>
+          <a href="/request-game" style={{ fontSize: 12, color: 'var(--lime)' }}>View game requests</a>
+        </details>}
+        <CatalogGrid view={view} filter={filter} query={query} visibleGames={visibleGames} paginatedGames={paginatedGames} grouped={grouped} staffGames={staffGames} allGames={allGames} favorites={favorites} toggleFavorite={toggleFavorite} launch={launch} loadMoreRef={loadMoreRef} visibleCount={visibleCount} setVisibleCount={setVisibleCount} setQuery={setQuery} setFilter={setFilter} setHideLow={setHideLow} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} />
+            <HomeDashboard
+        gameOfDay={gameOfDay} allGames={allGames} leaderboard={leaderboard}
+        favorites={favorites} recentlyPlayed={recentlyPlayed}
+        authUser={authUser} achSummary={achSummary}
+        showDashboard={showDashboard} setShowDashboard={setShowDashboard}
+        leaderTab={leaderTab} setLeaderTab={setLeaderTab}
+        launch={launch} openProxyTile={openProxyTile}
+        setShowAchievementsHub={setShowAchievementsHub} setRecentlyPlayed={setRecentlyPlayed}
+      />
 
-        {/* VIEW 1: CURATED CATEGORIZED SHELVES */}
-        {viewMode === "shelves" && !isFiltering && (
-          <div className="arcade-shelves">
-            {shelfDefinitions.map((shelf) => {
-              const ShelfIcon = shelf.icon;
-              return (
-                <section className="arcade-shelf" key={shelf.id}>
-                  <div className="shelf-header">
-                    <div className="shelf-title-wrap">
-                      <h3>
-                        <ShelfIcon size={18} />
-                        {shelf.title}
-                      </h3>
-                      <span className="shelf-badge">{shelf.games.length}</span>
-                    </div>
-                    <div className="shelf-nav">
-                      <button
-                        type="button"
-                        onClick={() => scrollShelf(shelf.id, -450)}
-                        aria-label={`Scroll ${shelf.title} left`}
-                      >
-                        <ChevronLeft size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => scrollShelf(shelf.id, 450)}
-                        aria-label={`Scroll ${shelf.title} right`}
-                      >
-                        <ChevronRight size={16} />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="shelf-track" id={shelf.id}>
-                    {shelf.games.map((game) => (
-                      <div
-                        className="shelf-card"
-                        key={shelf.id + "-" + game.id}
-                        onClick={() => launch(game)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            launch(game);
-                          }
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className={`shelf-fav-btn ${favorites.includes(game.id) ? "active" : ""}`}
-                          onClick={(e) => toggleFavorite(game.id, e)}
-                          aria-label="Favorite"
-                        >
-                          <Heart size={14} fill={favorites.includes(game.id) ? "currentColor" : "none"} />
-                        </button>
-                        <div className={`shelf-card-art ${game.color}`}>
-                          {game.icon ? (
-                            <img className="game-icon" src={game.icon} alt="" />
-                          ) : (
-                            <span className="shelf-card-mark">{game.mark}</span>
-                          )}
-                        </div>
-                        <div className="shelf-card-body">
-                          <div>
-                            <h4>{game.title}</h4>
-                            <span className="shelf-kicker">{game.genre}</span>
-                          </div>
-                          <div className="shelf-card-meta">
-                            <span style={{ fontSize: "11px", color: "var(--muted)" }}>{game.tone}</span>
-                            <span className="shelf-play-btn">
-                              <Play size={12} fill="currentColor" />
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
-        )}
-
-        {/* VIEW 2: COMPACT ARCADE GRID */}
-        {(viewMode === "grid" || (viewMode === "shelves" && isFiltering)) && (
-          <div className="compact-grid">
-            {visibleGames.map((game) => (
-              <div
-                className="compact-card"
-                key={game.id}
-                onClick={() => launch(game)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    launch(game);
-                  }
-                }}
-              >
-                <button
-                  type="button"
-                  className={`shelf-fav-btn ${favorites.includes(game.id) ? "active" : ""}`}
-                  onClick={(e) => toggleFavorite(game.id, e)}
-                  aria-label="Favorite"
-                >
-                  <Heart size={13} fill={favorites.includes(game.id) ? "currentColor" : "none"} />
-                </button>
-                <div className={`compact-card-art ${game.color}`}>
-                  {game.icon ? (
-                    <img className="game-icon" src={game.icon} alt="" />
-                  ) : (
-                    <span className="compact-card-mark">{game.mark}</span>
-                  )}
-                </div>
-                <div className="compact-card-body">
-                  <h4>{game.title}</h4>
-                  <span className="compact-kicker">
-                    {game.genre} · {game.tone}
-                  </span>
-                  <div className="compact-actions">
-                    <button
-                      type="button"
-                      className="compact-play-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        launch(game);
-                      }}
-                    >
-                      <Play size={11} fill="currentColor" /> Play
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* VIEW 3: DETAILED CARDS */}
-        {viewMode === "cards" && (
-          <div className="game-grid">
-            {visibleGames.map((game, index) => (
-              <article className={`game-card ${game.color}`} key={game.id}>
-                <button
-                  className="favorite-button"
-                  onClick={() => toggleFavorite(game.id)}
-                  aria-label={`${favorites.includes(game.id) ? "Remove" : "Add"} ${game.title} ${favorites.includes(game.id) ? "from" : "to"} favorites`}
-                >
-                  <Heart size={17} fill={favorites.includes(game.id) ? "currentColor" : "none"} />
-                </button>
-                <div className="game-art">
-                  {game.icon ? (
-                    <img className="game-icon" src={game.icon} alt="" />
-                  ) : (
-                    <span className="game-mark">{game.mark}</span>
-                  )}
-                  <small>{String(index + 1).padStart(2, "0")}</small>
-                </div>
-                <div className="game-info">
-                  <div>
-                    <p className="card-kicker">
-                      {game.genre} · {game.tone}
-                    </p>
-                    <h3>{game.title}</h3>
-                    <p>{game.description}</p>
-                  </div>
-                  <button className="play-button" onClick={() => launch(game)}>
-                    <Play size={13} fill="currentColor" /> Launch
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-
-        {visibleGames.length === 0 && (
-          <div className="empty-state">
-            <Zap size={22} />
-            <h3>No games found</h3>
-            <p>Try a different search or clear the filter.</p>
-          </div>
-        )}
+      {/* Requests + Upvotes */}
+                <RequestPanel requests={requests} requestVotes={requestVotes} newReqTitle={newReqTitle} setNewReqTitle={setNewReqTitle} submitRequest={submitRequest} upvoteRequest={upvoteRequest} />
       </section>
-
       <footer id="about">
         <div className="footer-top">
           <div className="footer-brand">
             <span className="brand-mark">
               <Gamepad2 size={17} />
             </span>
-            <strong>
-              GG-LOUNGE<span className="tm">™</span>
-            </strong>
+            <strong>GG-LOUNGE<span className="tm">™</span></strong>
           </div>
           <span className="footer-rule" />
-          <p>
-            Made by <strong>Kai Chauhan</strong>
-          </p>
+          <p>Made by <strong>Kai Chauhan</strong></p>
         </div>
         <div className="footer-bottom">
           <span>© 2026 GG-LOUNGE STUDIOS™. All rights reserved.</span>
-          <span>A Production of GG-LOUNGE STUDIOS™</span>
+          <span style={{ display: 'flex', gap: 12, alignItems: 'center' }}><a href="/privacy" style={{ textDecoration: 'underline', color: 'inherit' }}>Privacy</a> <a href="/terms" style={{ textDecoration: 'underline', color: 'inherit' }}>Terms</a> <a href="/api/health" style={{ textDecoration: 'underline', color: 'inherit' }}>Health</a></span>
           <span>Games remain property of their respective creators.</span>
         </div>
       </footer>
-
       <a className="admin-fab" href="/admin" aria-label="Open admin console">
         <ShieldCheck size={19} />
         <span>Admin</span>
       </a>
-
+      {showAchievementsHub && <AchievementsHub open={showAchievementsHub} onClose={()=> setShowAchievementsHub(false)} authUser={authUser} onPlayGame={(id)=> { const g=allGames.find(x=> x.id===id); if(g){ setShowAchievementsHub(false); launch(g) } }} />}
       {activeGame && (
-        <div className="game-modal" role="dialog" aria-modal="true" aria-label={`${activeGame.title} game`}>
-          <div className="modal-bar">
-            <div>
-              <span className="modal-kicker">NOW PLAYING</span>
-              <strong>{activeGame.title}</strong>
-            </div>
-            <div className="modal-actions">
-              <a
-                className="modal-btn"
-                href={activeGame.path}
-                target="_blank"
-                rel="noreferrer"
-                title="Open in new window"
-                aria-label="Open in new window"
-              >
-                <ExternalLink size={17} />
-              </a>
-              <button
-                type="button"
-                onClick={() => {
-                  const ifr = document.querySelector<HTMLIFrameElement>(".game-frame");
-                  if (ifr) ifr.src = activeGame.path;
-                }}
-                title="Reload game"
-                aria-label="Reload game"
-              >
-                <RotateCw size={17} />
-              </button>
-              <button
-                type="button"
-                onClick={() => document.querySelector<HTMLIFrameElement>(".game-frame")?.requestFullscreen()}
-                aria-label="Fullscreen"
-                title="Fullscreen"
-              >
-                <Maximize2 size={18} />
-              </button>
-              <button type="button" onClick={() => setActiveGame(null)} aria-label="Close game" title="Close">
-                <X size={20} />
-              </button>
-            </div>
-          </div>
-          <iframe
-            className="game-frame"
-            src={activeGame.path}
-            title={activeGame.title}
-            allow="fullscreen; autoplay; gamepad; keyboard-map; clipboard-write; encrypted-media"
-          />
-        </div>
+        <GameModal
+          game={activeGame}
+          isFavorite={favorites.includes(activeGame.id)}
+          onToggleFavorite={toggleFavorite}
+          onClose={() => { setActiveGame(null); if(authUser) fetch('/api/achievements/stats').then(r=> r.ok? r.json():null).then((d:any)=>{ if(d?.signedIn) setAchSummary({ total:d.total||0, unlocked:d.totalUnlocked||0, points:d.totalPoints||0 }) }).catch(()=>{}) }}
+          authUser={authUser}
+        />
       )}
-    </main>
-  );
+          </ErrorBoundary>
+</main>
+  )
 }

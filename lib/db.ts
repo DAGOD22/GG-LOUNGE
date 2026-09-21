@@ -5,10 +5,41 @@
  * - Falls back to a local JSON file store when it isn't (local dev / preview).
  * - Auto-creates tables on first use, so there is no manual migration step.
  */
-import { randomUUID } from "node:crypto";
+import { randomUUID, scryptSync, randomBytes, timingSafeEqual } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { Pool } from "pg";
+import { canonicalGameTitle, mergeDuplicateRequests } from "./game-identity";
+
+// ---- Fix 1: queued writes to avoid local JSON races ----
+let writeQueue: Promise<void> = Promise.resolve();
+
+// ---- Fix 2: auth hardening helpers ----
+const COMMON_PASSWORDS = new Set(['password','123456','qwerty','letmein','admin','aaaa','abcd','1234','password1','qwerty123','12345678','111111','123123','abc123','password123','letmein123','welcome','monkey','dragon','master','football','iloveyou','admin123','gg-lounge','gg lounge'])
+function isStrongPassword(pw: string): string | null {
+  if (pw.length < 8 || pw.length > 64) return 'Password must be 8-64 characters'
+  if (pw.length < 12 && !/(?=.*[a-z])(?=.*[A-Z])|(?=.*\d)(?=.*[a-zA-Z])/.test(pw)) return 'Use 8+ chars with mix of cases or letters+numbers'
+  if (COMMON_PASSWORDS.has(pw.toLowerCase())) return 'Password too common — choose another'
+  if (/^([a-zA-Z0-9])\1{3,}$/.test(pw)) return 'Password too simple'
+  if (/(.)\1{4,}/.test(pw)) return 'Too many repeated characters'
+  // block username-like passwords will be checked in createAuthUser
+  return null
+}
+const rateMap = new Map<string, { count:number, reset:number }>()
+export function checkRateLimit(key:string, max=5, windowMs=15*60*1000): boolean {
+  const now = Date.now()
+  const e = rateMap.get(key)
+  if (!e || now > e.reset) { rateMap.set(key, { count: 1, reset: now + windowMs }); return true }
+  if (e.count >= max) return false
+  e.count++
+  return true
+}
+export function getRateLimitRemaining(key:string, max=5): number {
+  const e = rateMap.get(key)
+  if (!e) return max
+  if (Date.now() > e.reset) return max
+  return Math.max(0, max - e.count)
+}
 
 export type DbMode = "postgres" | "local";
 
@@ -25,6 +56,7 @@ export interface Visit {
   ua: string;
   path: string;
   createdAt: string;
+  userId?: string | null;
 }
 export interface GameRequest {
   id: string;
@@ -32,6 +64,13 @@ export interface GameRequest {
   icon: string | null;
   html?: string;
   status: string;
+  createdAt: string;
+  votes?: number;
+}
+export interface Report {
+  id: string;
+  gameId: string;
+  title: string;
   createdAt: string;
 }
 export interface PublishedGame {
@@ -84,7 +123,8 @@ export function migrate(): Promise<void> {
           "ip" TEXT NOT NULL,
           "ua" TEXT NOT NULL DEFAULT '',
           "path" TEXT NOT NULL DEFAULT '/',
-          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "userId" TEXT REFERENCES "auth_user"("id") ON DELETE SET NULL
         );
         CREATE INDEX IF NOT EXISTS "visits_createdAt_idx" ON "visits" ("createdAt" DESC);
         CREATE TABLE IF NOT EXISTS "game_request" (
@@ -109,10 +149,78 @@ export function migrate(): Promise<void> {
           "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           PRIMARY KEY ("upload_id", "idx")
         );
+        CREATE TABLE IF NOT EXISTS "reports" (
+          "id" TEXT PRIMARY KEY,
+          "gameId" TEXT NOT NULL,
+          "title" TEXT NOT NULL,
+          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS "auth_user" (
+          "id" TEXT PRIMARY KEY,
+          "username" TEXT NOT NULL,
+          "username_lower" TEXT UNIQUE NOT NULL,
+          "password_hash" TEXT NOT NULL,
+          "favorite_food_hash" TEXT NOT NULL,
+          "favorite_food_norm" TEXT NOT NULL,
+          "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS "auth_session" (
+          "token" TEXT PRIMARY KEY,
+          "user_id" TEXT NOT NULL REFERENCES "auth_user"("id") ON DELETE CASCADE,
+          "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "expires_at" TIMESTAMPTZ NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS "game_save" (
+          "user_id" TEXT NOT NULL REFERENCES "auth_user"("id") ON DELETE CASCADE,
+          "game_id" TEXT NOT NULL,
+          "data" TEXT NOT NULL,
+          "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY ("user_id", "game_id")
+        );
+        CREATE INDEX IF NOT EXISTS "game_save_user_idx" ON "game_save" ("user_id");
+        CREATE TABLE IF NOT EXISTS "user_achievement" (
+          "user_id" TEXT NOT NULL REFERENCES "auth_user"("id") ON DELETE CASCADE,
+          "game_id" TEXT NOT NULL,
+          "achievement_id" TEXT NOT NULL,
+          "progress" INTEGER NOT NULL DEFAULT 0,
+          "unlocked" BOOLEAN NOT NULL DEFAULT FALSE,
+          "unlocked_at" TIMESTAMPTZ,
+          "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY ("user_id", "achievement_id")
+        );
+        CREATE INDEX IF NOT EXISTS "user_achievement_user_idx" ON "user_achievement" ("user_id");
+        CREATE INDEX IF NOT EXISTS "user_achievement_game_idx" ON "user_achievement" ("game_id");
+        CREATE TABLE IF NOT EXISTS "user_game_stats" (
+          "user_id" TEXT NOT NULL REFERENCES "auth_user"("id") ON DELETE CASCADE,
+          "game_id" TEXT NOT NULL,
+          "plays" INTEGER NOT NULL DEFAULT 0,
+          "time_seconds" INTEGER NOT NULL DEFAULT 0,
+          "last_played_at" TIMESTAMPTZ,
+          "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY ("user_id", "game_id")
+        );
+        CREATE TABLE IF NOT EXISTS "gate_state" (
+          "ip" TEXT PRIMARY KEY,
+          "fails" INTEGER NOT NULL DEFAULT 0,
+          "ban_level" INTEGER NOT NULL DEFAULT 0,
+          "banned_until" TIMESTAMPTZ,
+          "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS "upvote_cooldown" (
+          "ip" TEXT NOT NULL,
+          "request_id" TEXT NOT NULL,
+          "last_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY ("ip", "request_id")
+        );
+        CREATE INDEX IF NOT EXISTS "upvote_cooldown_last_idx" ON "upvote_cooldown" ("last_at");
       `);
       // Tolerate tables created by older schemas.
       await p.query(`ALTER TABLE "banned_user" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMPTZ`);
+      await p.query(`ALTER TABLE "visits" ADD COLUMN IF NOT EXISTS "userId" TEXT`);
+      await p.query(`CREATE INDEX IF NOT EXISTS "visits_userId_idx" ON "visits" ("userId")`);
       await p.query(`ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'pending'`);
+      await p.query(`ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "votes" INTEGER NOT NULL DEFAULT 1`);
+      await p.query(`ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "html" TEXT`);
     })().catch((err) => {
       migratePromise = null;
       throw err;
@@ -132,11 +240,36 @@ async function pgQuery<T = Record<string, unknown>>(
 
 /* ---------------- Local JSON fallback ---------------- */
 
+export interface UserAchievement {
+  userId: string;
+  gameId: string;
+  achievementId: string;
+  progress: number;
+  unlocked: boolean;
+  unlockedAt: string | null;
+  updatedAt: string;
+}
+export interface UserGameStats {
+  userId: string;
+  gameId: string;
+  plays: number;
+  timeSeconds: number;
+  lastPlayedAt: string | null;
+  updatedAt: string;
+}
 interface LocalStore {
   bans: Ban[];
   visits: Visit[];
   requests: GameRequest[];
   games: PublishedGame[];
+  reports: Report[];
+  userStates: Record<string, UserState>;
+  users: AuthUser[];
+  sessions: AuthSession[];
+  saves: GameSave[];
+  achievements: UserAchievement[];
+  gameStats: UserGameStats[];
+  gateStates: Record<string, { ip: string; fails: number; banLevel: number; bannedUntil: string | null; updatedAt: string }>;
 }
 
 let localDir: string | null = null;
@@ -170,15 +303,48 @@ async function readLocal(): Promise<LocalStore> {
       visits: parsed.visits ?? [],
       requests: parsed.requests ?? [],
       games: parsed.games ?? [],
+      reports: (parsed as any).reports ?? [],
+      userStates: (parsed as any).userStates ?? {},
+      users: (parsed as any).users ?? [],
+      sessions: (parsed as any).sessions ?? [],
+      saves: (parsed as any).saves ?? [],
+      achievements: (parsed as any).achievements ?? [],
+      gameStats: (parsed as any).gameStats ?? [],
+      gateStates: (parsed as any).gateStates ?? {},
     };
   } catch {
-    return { bans: [], visits: [], requests: [], games: [] };
+    return { bans: [], visits: [], requests: [], games: [], reports: [], userStates: {}, users: [], sessions: [], saves: [], achievements: [], gameStats: [], gateStates: {} };
   }
 }
 
-async function writeLocal(store: LocalStore): Promise<void> {
+async function writeLocalRaw(store: LocalStore): Promise<void> {
   const dir = await getLocalDir();
-  await fs.writeFile(path.join(dir, "lounge.json"), JSON.stringify(store));
+  // atomic: write tmp then rename
+  const tmp = path.join(dir, "lounge.json.tmp");
+  await fs.writeFile(tmp, JSON.stringify(store));
+  await fs.rename(tmp, path.join(dir, "lounge.json"));
+}
+async function writeLocal(store: LocalStore): Promise<void> {
+  const task = writeQueue.then(() => writeLocalRaw(store));
+  // keep queue alive even if one fails
+  writeQueue = task.catch(() => {});
+  return task;
+}
+// Fix 7: serialize read-modify-write for local JSON to prevent lost updates
+async function withLocalLock<T>(fn: (store: LocalStore) => Promise<T> | T): Promise<T> {
+  let result!: T
+  const task = writeQueue.then(async () => {
+    const store = await readLocal();
+    result = await fn(store);
+    await writeLocalRaw(store);
+  });
+  writeQueue = task.catch(() => {});
+  await task;
+  return result;
+}
+async function readLocalLocked(): Promise<LocalStore> {
+  // For pure reads, just read without lock (ok to be slightly stale)
+  return readLocal();
 }
 
 /* ---------------- Bans & kicks ---------------- */
@@ -210,17 +376,18 @@ export async function addBan(
     );
     return rows[0];
   }
-  const s = await readLocal();
-  s.bans = s.bans.filter((b) => b.identifier !== identifier);
-  const ban: Ban = {
-    id,
-    identifier,
-    reason,
-    createdAt: new Date().toISOString(),
-    expiresAt: expiresAt ? expiresAt.toISOString() : null,
-  };
-  s.bans.push(ban);
-  await writeLocal(s);
+  let ban!: Ban
+  await withLocalLock(async (s) => {
+    s.bans = s.bans.filter((b) => b.identifier !== identifier);
+    ban = {
+      id,
+      identifier,
+      reason,
+      createdAt: new Date().toISOString(),
+      expiresAt: expiresAt ? expiresAt.toISOString() : null,
+    };
+    s.bans.push(ban);
+  });
   return ban;
 }
 
@@ -229,9 +396,9 @@ export async function removeBan(id: string): Promise<void> {
     await pgQuery('DELETE FROM "banned_user" WHERE "id"=$1', [id]);
     return;
   }
-  const s = await readLocal();
-  s.bans = s.bans.filter((b) => b.id !== id);
-  await writeLocal(s);
+  await withLocalLock(async (s) => {
+    s.bans = s.bans.filter((b) => b.id !== id);
+  });
 }
 
 /** Returns the active ban for an identifier (null when clean/expired). Prunes expired rows. */
@@ -247,21 +414,193 @@ export async function findActiveBan(identifier: string): Promise<Ban | null> {
   }
   const s = await readLocal();
   const before = s.bans.length;
-  s.bans = s.bans.filter((b) => !b.expiresAt || new Date(b.expiresAt) > now);
-  if (s.bans.length !== before) await writeLocal(s);
-  return s.bans.find((b) => b.identifier === identifier) ?? null;
+  const filtered = s.bans.filter((b) => !b.expiresAt || new Date(b.expiresAt) > now);
+  if (filtered.length !== before) {
+    await withLocalLock(async (store) => {
+      store.bans = store.bans.filter((b) => !b.expiresAt || new Date(b.expiresAt) > now);
+    });
+  }
+  // re-read after prune? keep simple: read again
+  const s2 = await readLocal();
+  return s2.bans.find((b) => b.identifier === identifier) ?? null;
+}
+
+/* ---------------- Gate (site password + escalating IP bans) ---------------- */
+
+export const GATE_DURATIONS_MS: number[] = [
+  60 * 1000,
+  5 * 60 * 1000,
+  10 * 60 * 1000,
+  30 * 60 * 1000,
+  60 * 60 * 1000,
+  120 * 60 * 1000,
+  24 * 60 * 60 * 1000,
+  3 * 24 * 60 * 60 * 1000,
+  7 * 24 * 60 * 60 * 1000,
+  30 * 24 * 60 * 60 * 1000,
+  // permanent -> null expiresAt
+];
+
+export interface GateState {
+  ip: string;
+  fails: number;
+  banLevel: number;
+  bannedUntil: string | null;
+  updatedAt: string;
+}
+
+export async function getGateState(ip: string): Promise<GateState> {
+  const norm = ip.slice(0, 80);
+  if (getMode() === "postgres") {
+    const rows = await pgQuery<any>('SELECT "ip","fails","ban_level" as "banLevel","banned_until" as "bannedUntil","updated_at" as "updatedAt" FROM "gate_state" WHERE "ip"=$1', [norm]);
+    if (rows[0]) {
+      const r = rows[0] as any;
+      // prune expired ban
+      if (r.bannedUntil && new Date(r.bannedUntil) <= new Date() && r.banLevel < GATE_DURATIONS_MS.length) {
+        // expired, clear bannedUntil but keep banLevel for escalation
+        await pgQuery('UPDATE "gate_state" SET "banned_until"=NULL, "updated_at"=NOW() WHERE "ip"=$1', [norm]);
+        r.bannedUntil = null;
+      }
+      return { ip: r.ip, fails: Number(r.fails)||0, banLevel: Number(r.banLevel)||0, bannedUntil: r.bannedUntil ? new Date(r.bannedUntil).toISOString() : null, updatedAt: r.updatedAt };
+    }
+    return { ip: norm, fails: 0, banLevel: 0, bannedUntil: null, updatedAt: new Date().toISOString() };
+  }
+  const s = await readLocal();
+  const gs = (s.gateStates || {})[norm];
+  if (!gs) return { ip: norm, fails: 0, banLevel: 0, bannedUntil: null, updatedAt: new Date().toISOString() };
+  if (gs.bannedUntil && new Date(gs.bannedUntil) <= new Date() && gs.banLevel < GATE_DURATIONS_MS.length) {
+    // expired, clear
+    await withLocalLock(async (store) => {
+      const cur = store.gateStates?.[norm];
+      if (cur) cur.bannedUntil = null;
+    });
+    gs.bannedUntil = null;
+  }
+  return { ip: gs.ip, fails: gs.fails, banLevel: gs.banLevel, bannedUntil: gs.bannedUntil, updatedAt: gs.updatedAt };
+}
+
+export async function isGateBanned(ip: string): Promise<{ banned: boolean; expiresAt: string | null; banLevel: number }> {
+  const st = await getGateState(ip);
+  // permanent is banLevel >= length (null expiry)
+  if (st.banLevel >= GATE_DURATIONS_MS.length) return { banned: true, expiresAt: null, banLevel: st.banLevel };
+  if (st.bannedUntil) {
+    const exp = new Date(st.bannedUntil);
+    if (exp > new Date()) return { banned: true, expiresAt: st.bannedUntil, banLevel: st.banLevel };
+  }
+  // also check banned_user table for gate:ip (handles postgres fallback and ensures consistency)
+  const ban = await findActiveBan(`gate:${ip.slice(0,80)}`);
+  if (ban) return { banned: true, expiresAt: ban.expiresAt, banLevel: st.banLevel };
+  return { banned: false, expiresAt: null, banLevel: st.banLevel };
+}
+
+export async function recordGateFailure(ip: string): Promise<{ banned: boolean; expiresAt: string | null; banLevel: number }> {
+  const norm = ip.slice(0, 80);
+  const st = await getGateState(norm);
+  // if already banned, don't increment
+  if (st.bannedUntil && new Date(st.bannedUntil) > new Date()) {
+    return { banned: true, expiresAt: st.bannedUntil, banLevel: st.banLevel };
+  }
+  const newFails = st.fails + 1;
+  if (newFails < 3) {
+    // just increment fails
+    if (getMode() === "postgres") {
+      await pgQuery('INSERT INTO "gate_state" ("ip","fails","ban_level","banned_until") VALUES ($1,$2,$3,$4) ON CONFLICT ("ip") DO UPDATE SET "fails"=EXCLUDED."fails","updated_at"=NOW()', [norm, newFails, st.banLevel, st.bannedUntil ? new Date(st.bannedUntil) : null]);
+    } else {
+      await withLocalLock(async (store) => {
+        store.gateStates = store.gateStates || {};
+        store.gateStates[norm] = { ip: norm, fails: newFails, banLevel: st.banLevel, bannedUntil: st.bannedUntil, updatedAt: new Date().toISOString() };
+      });
+    }
+    return { banned: false, expiresAt: null, banLevel: st.banLevel };
+  }
+  // fails reached 3 -> trigger ban
+  const nextLevel = st.banLevel; // 0-indexed
+  let expiresAt: Date | null = null;
+  if (nextLevel < GATE_DURATIONS_MS.length) {
+    const dur = GATE_DURATIONS_MS[nextLevel];
+    expiresAt = new Date(Date.now() + dur);
+  } else {
+    expiresAt = null; // permanent handled as banLevel >= length
+  }
+  const newBanLevel = st.banLevel + 1;
+  const bannedUntilStr = expiresAt ? expiresAt.toISOString() : null;
+
+  if (getMode() === "postgres") {
+    await pgQuery('INSERT INTO "gate_state" ("ip","fails","ban_level","banned_until") VALUES ($1,$2,$3,$4) ON CONFLICT ("ip") DO UPDATE SET "fails"=0,"ban_level"=EXCLUDED."ban_level","banned_until"=EXCLUDED."banned_until","updated_at"=NOW()', [norm, 0, newBanLevel, expiresAt]);
+  } else {
+    await withLocalLock(async (store) => {
+      store.gateStates = store.gateStates || {};
+      store.gateStates[norm] = { ip: norm, fails: 0, banLevel: newBanLevel, bannedUntil: bannedUntilStr, updatedAt: new Date().toISOString() };
+    });
+  }
+  // also add to banned_user for visibility in admin and for middleware fetch via findActiveBan
+  const identifier = `gate:${norm}`;
+  const reason = `gate escalating ban level ${newBanLevel}`;
+  await addBan(identifier, reason, expiresAt);
+
+  return { banned: true, expiresAt: bannedUntilStr, banLevel: newBanLevel - 1 };
+}
+
+export async function checkUpvoteCooldown(ip: string, requestId: string, cooldownMs=30000): Promise<{allowed:boolean, retryAfter:number}>{
+  const normIp = ip.slice(0,80)
+  if(getMode()==="postgres"){
+    await migrate()
+    const rows = await pgQuery<any>('SELECT last_at FROM upvote_cooldown WHERE ip=$1 AND request_id=$2', [normIp, requestId])
+    if(rows[0]){
+      const last = new Date(rows[0].last_at as string).getTime()
+      const diff = Date.now() - last
+      if(diff < cooldownMs) return {allowed:false, retryAfter: Math.ceil((cooldownMs - diff)/1000)}
+      await pgQuery('UPDATE upvote_cooldown SET last_at=NOW() WHERE ip=$1 AND request_id=$2', [normIp, requestId])
+      return {allowed:true, retryAfter:0}
+    }
+    await pgQuery('INSERT INTO upvote_cooldown (ip, request_id) VALUES ($1,$2) ON CONFLICT (ip, request_id) DO UPDATE SET last_at=NOW()', [normIp, requestId])
+    return {allowed:true, retryAfter:0}
+  }
+  // local fallback: file-backed via withLocalLock
+  let allowed = true
+  let retry = 0
+  await withLocalLock(async (s:any)=>{
+    s.upvoteCooldown = s.upvoteCooldown || {}
+    const key = normIp + ':' + requestId
+    const last = s.upvoteCooldown[key] ? new Date(s.upvoteCooldown[key]).getTime() : 0
+    const diff = Date.now() - last
+    if(diff < cooldownMs){ allowed=false; retry=Math.ceil((cooldownMs-diff)/1000); return }
+    s.upvoteCooldown[key]= new Date().toISOString()
+    // prune old entries >1h (keep 2000 max)
+    const keys = Object.keys(s.upvoteCooldown)
+    if(keys.length>2000){ for(const k of keys){ if(Date.now()- new Date(s.upvoteCooldown[k]).getTime() > 3600000) delete s.upvoteCooldown[k] } }
+  })
+  return {allowed, retryAfter: retry}
+}
+export async function recordGateSuccess(ip: string): Promise<void> {
+  const norm = ip.slice(0, 80);
+  const st = await getGateState(norm);
+  // If currently banned, do not lift ban — just reset fails, keep bannedUntil and level
+  const now = new Date();
+  const isCurrentlyBanned = !!(st.bannedUntil && new Date(st.bannedUntil) > now) || (st.banLevel >= GATE_DURATIONS_MS.length);
+  if (isCurrentlyBanned) return;
+  // reset fails but keep banLevel for escalation history, clear expired ban
+  if (getMode() === "postgres") {
+    await pgQuery('INSERT INTO "gate_state" ("ip","fails","ban_level","banned_until") VALUES ($1,0,$2,NULL) ON CONFLICT ("ip") DO UPDATE SET "fails"=0,"banned_until"=NULL,"updated_at"=NOW()', [norm, st.banLevel]);
+  } else {
+    await withLocalLock(async (store) => {
+      store.gateStates = store.gateStates || {};
+      store.gateStates[norm] = { ip: norm, fails: 0, banLevel: st.banLevel, bannedUntil: null, updatedAt: new Date().toISOString() };
+    });
+  }
 }
 
 /* ---------------- Visits ---------------- */
 
-export async function logVisit(ip: string, ua: string, visitPath: string): Promise<void> {
+export async function logVisit(ip: string, ua: string, visitPath: string, userId?: string | null): Promise<void> {
   try {
     if (getMode() === "postgres") {
-      await pgQuery('INSERT INTO "visits" ("id","ip","ua","path") VALUES ($1,$2,$3,$4)', [
+      await pgQuery('INSERT INTO "visits" ("id","ip","ua","path","userId") VALUES ($1,$2,$3,$4,$5)', [
         randomUUID(),
         ip.slice(0, 80),
         ua.slice(0, 300),
         visitPath.slice(0, 200),
+        userId || null,
       ]);
       if (Math.random() < 0.02) {
         await pgQuery(
@@ -270,16 +609,17 @@ export async function logVisit(ip: string, ua: string, visitPath: string): Promi
       }
       return;
     }
-    const s = await readLocal();
-    s.visits.push({
-      id: randomUUID(),
-      ip: ip.slice(0, 80),
-      ua: ua.slice(0, 300),
-      path: visitPath.slice(0, 200),
-      createdAt: new Date().toISOString(),
+    await withLocalLock(async (s) => {
+      s.visits.push({
+        id: randomUUID(),
+        ip: ip.slice(0, 80),
+        ua: ua.slice(0, 300),
+        path: visitPath.slice(0, 200),
+        createdAt: new Date().toISOString(),
+        userId: userId || null,
+      } as any);
+      s.visits = s.visits.slice(-500);
     });
-    s.visits = s.visits.slice(-500);
-    await writeLocal(s);
   } catch {
     // visit logging must never break page loads
   }
@@ -302,42 +642,363 @@ export function validateGameHtml(html: string): string | null {
   if (!html || typeof html !== "string") return "Missing game HTML.";
   if (html.length > MAX_HTML_BYTES) return "Game file is too large (50MB max).";
   if (!/<html[\s>]/i.test(html)) return "That file doesn't look like an index.html page.";
+  const risks = scanHtmlForRisks(html)
+  if (risks.includes("external-script") && html.length> 500_000) return "External scripts need manual review — flagged for admin.";
   return null;
 }
 
 export async function createRequest(
   title: string,
   icon: string | null,
-  html: string,
+  html: string = "",
 ): Promise<GameRequest> {
   const id = randomUUID();
   const createdAt = new Date().toISOString();
   if (getMode() === "postgres") {
-    await pgQuery('INSERT INTO "game_request" ("id","title","icon","html","status") VALUES ($1,$2,$3,$4,$5)', [
+    await pgQuery('INSERT INTO "game_request" ("id","title","icon","html","status","votes") VALUES ($1,$2,$3,$4,$5,$6)', [
       id,
       title,
       icon,
-      html,
+      html || "",
       "pending",
+      1,
     ]);
   } else {
-    const s = await readLocal();
-    s.requests.push({ id, title, icon, html, status: "pending", createdAt });
-    await writeLocal(s);
+    await withLocalLock(async (s) => {
+      s.requests.push({ id, title, icon, html: html||"", status: "pending", createdAt, votes: 1 });
+    });
   }
-  return { id, title, icon, status: "pending", createdAt };
+  return { id, title, icon, status: "pending", createdAt, votes: 1 };
+}
+export async function createSimpleRequest(title: string): Promise<GameRequest> {
+  const key = canonicalGameTitle(title);
+  if (!key) throw new Error("A game title must include letters or numbers.");
+  const created: GameRequest = { id: randomUUID(), title: title.trim(), icon: null, html: "", status: "pending", votes: 1, createdAt: new Date().toISOString() };
+  if (getMode() === "postgres") {
+    await migrate();
+    const client = await getPool().connect();
+    try {
+      await client.query('BEGIN');
+      // Transaction-level lock serializes simultaneous requests for one identity.
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['game-request:' + key]);
+      const rows = await client.query<GameRequest>(`SELECT "id","title","icon","status","createdAt",COALESCE("votes",1) AS "votes" FROM "game_request" WHERE "status"='pending' ORDER BY "createdAt", "id"`);
+      const existing = rows.rows.find(row => canonicalGameTitle(row.title) === key);
+      if (!existing) await client.query(`INSERT INTO "game_request" ("id","title","icon","html","status","votes") VALUES ($1,$2,NULL,'','pending',1)`, [created.id, created.title]);
+      await client.query('COMMIT');
+      return existing || created;
+    } catch (error) { await client.query('ROLLBACK'); throw error; }
+    finally { client.release(); }
+  }
+  let result = created;
+  await withLocalLock(async state => {
+    const existing = state.requests.filter(row => row.status === 'pending' && canonicalGameTitle(row.title) === key).sort((a,b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))[0];
+    if (existing) result = existing;
+    else state.requests.push(created);
+  });
+  return result;
+}
+export async function upvoteRequest(id: string): Promise<GameRequest | null> {
+  if (getMode() === "postgres") {
+    await pgQuery('UPDATE "game_request" SET "votes" = COALESCE("votes",0)+1 WHERE "id"=$1', [id]);
+    const rows = await pgQuery<GameRequest>('SELECT "id","title","icon","status","createdAt","votes" FROM "game_request" WHERE "id"=$1', [id]);
+    return rows[0] ?? null;
+  }
+  let out: GameRequest | null = null
+  await withLocalLock(async (s) => {
+    const r = s.requests.find(x=> x.id===id);
+    if(!r){ out=null; return; }
+    r.votes = (r.votes||0)+1;
+    out = r;
+  });
+  return out;
+}
+export async function addReport(gameId: string, title: string): Promise<Report> {
+  const id = randomUUID();
+  const createdAt = new Date().toISOString();
+  const rep: Report = { id, gameId, title, createdAt };
+  if (getMode() === "postgres") {
+    try{ await pgQuery('INSERT INTO "reports" ("id","gameId","title") VALUES ($1,$2,$3)', [id, gameId, title]); }catch{}
+  } else {
+    await withLocalLock(async (s) => {
+      s.reports = s.reports || [];
+      s.reports.push(rep);
+      s.reports = s.reports.slice(-200);
+    });
+  }
+  return rep;
+}
+export async function listReports(): Promise<Report[]> {
+  if (getMode() === "postgres") {
+    try{ return await pgQuery<Report>('SELECT "id","gameId","title","createdAt" FROM "reports" ORDER BY "createdAt" DESC LIMIT 100'); }catch{ return []}
+  }
+  const s = await readLocal();
+  return (s.reports||[]).slice().reverse().slice(0,100);
+}
+export async function logGamePlay(gameId: string, ip: string, userId?: string | null): Promise<void> {
+  // only signed-in users count for leaderboard — guests are ignored
+  if (!userId) return;
+  await logVisit(ip, "play", "/play/"+gameId, userId);
+}
+export async function leaderboard(limit=10): Promise<{gameId:string,count:number}[]>{
+  if(getMode()==="postgres"){
+    try{
+      // Only signed-in users (userId IS NOT NULL) count — guests ignored
+      const rows = await pgQuery<{gameId:string,count:string}>('SELECT substring("path" from 7) as "gameId", COUNT(*) as count FROM "visits" WHERE "path" LIKE \'/play/%\' AND "userId" IS NOT NULL GROUP BY "gameId" ORDER BY count DESC LIMIT $1', [limit]);
+      return rows.map(r=> ({gameId:r.gameId, count: Number(r.count)}));
+    }catch{ return []}
+  }
+  const s = await readLocal();
+  const map: Record<string,number>={}
+  for(const v of s.visits) if(v.path.startsWith('/play/') && (v as any).userId) map[v.path.slice(6)] = (map[v.path.slice(6)]||0)+1
+  return Object.entries(map).sort((a,b)=> b[1]-a[1]).slice(0,limit).map(([gameId,count])=> ({gameId,count}))
+}
+// --- Moderation & user state ---
+export function scanHtmlForRisks(html:string): string[] {
+  const risks:string[]=[]
+  if(/<script[^>]*src=["']https?:\/\/[^"']+["']/i.test(html)) risks.push("external-script")
+  if(/eval\s*\(|Function\s*\(|\bimport\s*\(/i.test(html)) risks.push("obfuscated-code")
+  if(/fetch\s*\(\s*["']https?:/i.test(html)) risks.push("external-fetch")
+  if(/<iframe[^>]*src=["']https?:/i.test(html)) risks.push("iframe-embed")
+  if(html.length> 2_000_000) risks.push("large-file")
+  return risks
+}
+export interface UserState { id:string; favorites:string[]; playCounts:Record<string,number>; recentlyPlayed?: string[]; updatedAt:string }
+export interface AuthUser { id:string; username:string; usernameLower:string; passwordHash:string; favoriteFoodHash:string; favoriteFoodNorm:string; createdAt:string }
+export interface AuthSession { token:string; userId:string; createdAt:string; expiresAt:string }
+export interface GameSave { userId:string; gameId:string; data:string; updatedAt:string }
+export async function getUserState(id:string): Promise<UserState|null>{
+  if(getMode()==="postgres"){
+    try{
+      const rows = await pgQuery<{payload:string}>('SELECT payload FROM user_state WHERE id=$1',[id])
+      if(rows[0]?.payload) return JSON.parse(rows[0].payload as string)
+    }catch{}
+    return null
+  }
+  const s = await readLocal() as any
+  const map = (s.userStates||{}) as Record<string,UserState>
+  return map[id]||null
+}
+export async function setUserState(id:string, state: Omit<UserState,'id'|'updatedAt'>): Promise<UserState>{
+  const full: UserState = { id, ...state, updatedAt: new Date().toISOString() }
+  if(getMode()==="postgres"){
+    try{
+      await pgQuery('CREATE TABLE IF NOT EXISTS user_state (id TEXT PRIMARY KEY, payload TEXT NOT NULL, updatedAt TIMESTAMPTZ NOT NULL DEFAULT NOW())')
+      await pgQuery('INSERT INTO user_state (id,payload) VALUES ($1,$2) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload, updatedAt=NOW()',[id, JSON.stringify(full)])
+    }catch{}
+    return full
+  }
+  await withLocalLock(async (store:any)=>{
+    store.userStates = store.userStates || {}
+    store.userStates[id]=full
+  })
+  return full
 }
 
-export async function listRequests(): Promise<GameRequest[]> {
+function hashPassword(password:string): string {
+  const salt = randomBytes(16).toString('hex')
+  const hash = scryptSync(password, salt, 64).toString('hex')
+  return salt + ':' + hash
+}
+function verifyPassword(password:string, stored:string): boolean {
+  try {
+    const [salt, hash] = stored.split(':')
+    if(!salt || !hash) return false
+    const derived = scryptSync(password, salt, 64).toString('hex')
+    const a = Buffer.from(hash, 'hex')
+    const b = Buffer.from(derived, 'hex')
+    if(a.length !== b.length) return false
+    return timingSafeEqual(a,b)
+  } catch { return false }
+}
+function normFood(s:string){ return s.trim().toLowerCase().replace(/\s+/g,' ') }
+function hashFood(food:string): string {
+  const n = normFood(food)
+  const salt = randomBytes(8).toString('hex')
+  const hash = scryptSync(n, salt, 32).toString('hex')
+  return salt+':'+hash
+}
+function verifyFood(food:string, stored:string, norm:string|undefined): boolean {
+  const n = normFood(food)
+  if(norm && n===norm) return true
+  try{
+    const [salt, hash] = stored.split(':')
+    if(!salt||!hash) return false
+    const derived = scryptSync(n, salt, 32).toString('hex')
+    return timingSafeEqual(Buffer.from(hash,'hex'), Buffer.from(derived,'hex'))
+  }catch{ return false }
+}
+
+export async function createAuthUser(username:string, password:string, favoriteFood:string): Promise<AuthUser>{
+  const usernameTrim = username.trim()
+  const usernameLower = usernameTrim.toLowerCase()
+  if(!/^[a-z0-9_]{3,20}$/.test(usernameLower)) throw new Error('Username must be 3-20 letters, numbers or _')
+  const pwErr = isStrongPassword(password)
+  if (pwErr) throw new Error(pwErr)
+  if(!favoriteFood.trim()) throw new Error('Favorite food is required')
+  if(getMode()==="postgres"){
+    await migrate()
+    const exists = await pgQuery<{id:string}>('SELECT id FROM auth_user WHERE username_lower=$1 LIMIT 1',[usernameLower])
+    if(exists.length) throw new Error('Username taken')
+    const id=randomUUID()
+    const passwordHash=hashPassword(password)
+    const favoriteFoodHash=hashFood(favoriteFood)
+    const favoriteFoodNorm=normFood(favoriteFood)
+    const createdAt=new Date().toISOString()
+    await pgQuery('INSERT INTO auth_user (id, username, username_lower, password_hash, favorite_food_hash, favorite_food_norm, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',[id, usernameTrim, usernameLower, passwordHash, favoriteFoodHash, favoriteFoodNorm, createdAt])
+    return { id, username: usernameTrim, usernameLower, passwordHash, favoriteFoodHash, favoriteFoodNorm, createdAt }
+  }
+  let user!: AuthUser
+  await withLocalLock(async (s:any) => {
+    if(s.users.find((u:any)=> u.usernameLower===usernameLower)) throw new Error('Username taken')
+    const id=randomUUID()
+    const passwordHash=hashPassword(password)
+    const favoriteFoodHash=hashFood(favoriteFood)
+    const favoriteFoodNorm=normFood(favoriteFood)
+    const createdAt=new Date().toISOString()
+    user={ id, username: usernameTrim, usernameLower, passwordHash, favoriteFoodHash, favoriteFoodNorm, createdAt }
+    s.users.push(user)
+  })
+  return user
+}
+export async function findAuthUserByUsername(username:string): Promise<AuthUser|null>{
+  const lower=username.trim().toLowerCase()
+  if(getMode()==="postgres"){
+    await migrate()
+    const rows=await pgQuery<any>('SELECT id, username, username_lower as "usernameLower", password_hash as "passwordHash", favorite_food_hash as "favoriteFoodHash", favorite_food_norm as "favoriteFoodNorm", created_at as "createdAt" FROM auth_user WHERE username_lower=$1 LIMIT 1',[lower])
+    return rows[0] as AuthUser || null
+  }
+  const s=await readLocal() as any
+  return s.users.find((u:any)=> u.usernameLower===lower) || null
+}
+export async function findAuthUserById(id:string): Promise<AuthUser|null>{
+  if(getMode()==="postgres"){
+    await migrate()
+    const rows=await pgQuery<any>('SELECT id, username, username_lower as "usernameLower", password_hash as "passwordHash", favorite_food_hash as "favoriteFoodHash", favorite_food_norm as "favoriteFoodNorm", created_at as "createdAt" FROM auth_user WHERE id=$1 LIMIT 1',[id])
+    return rows[0] as AuthUser || null
+  }
+  const s=await readLocal() as any
+  return s.users.find((u:any)=> u.id===id) || null
+}
+export async function verifyAuthUser(username:string, password:string): Promise<AuthUser|null>{
+  const u=await findAuthUserByUsername(username)
+  if(!u) return null
+  if(!verifyPassword(password, u.passwordHash)) return null
+  return u
+}
+export async function verifyFavoriteFood(username:string, food:string): Promise<boolean>{
+  const u=await findAuthUserByUsername(username)
+  if(!u) return false
+  return verifyFood(food, u.favoriteFoodHash, u.favoriteFoodNorm)
+}
+export async function resetAuthPassword(username:string, newPassword:string): Promise<void>{
+  const pwErr = isStrongPassword(newPassword)
+  if (pwErr) throw new Error(pwErr)
+  const hash=hashPassword(newPassword)
+  if(getMode()==="postgres"){
+    await migrate()
+    await pgQuery('UPDATE auth_user SET password_hash=$2 WHERE username_lower=$1',[username.trim().toLowerCase(), hash])
+    return
+  }
+  await withLocalLock(async (s:any)=>{
+    const u=s.users.find((x:any)=> x.usernameLower===username.trim().toLowerCase())
+    if(u) u.passwordHash=hash
+  })
+}
+export async function createSession(userId:string): Promise<AuthSession>{
+  const token=randomBytes(32).toString('hex')
+  const createdAt=new Date().toISOString()
+  const expiresAt=new Date(Date.now()+ 30*24*3600*1000).toISOString()
+  const sess:AuthSession={ token, userId, createdAt, expiresAt }
+  if(getMode()==="postgres"){
+    await migrate()
+    await pgQuery('INSERT INTO auth_session (token, user_id, created_at, expires_at) VALUES ($1,$2,$3,$4)',[token, userId, createdAt, expiresAt])
+    return sess
+  }
+  await withLocalLock(async (s:any) => {
+    s.sessions.push(sess)
+    s.sessions=s.sessions.slice(-500)
+  })
+  return sess
+}
+export async function getSession(token:string): Promise<AuthSession|null>{
+  if(!token) return null
+  if(getMode()==="postgres"){
+    await migrate()
+    const rows=await pgQuery<any>('SELECT token, user_id as "userId", created_at as "createdAt", expires_at as "expiresAt" FROM auth_session WHERE token=$1 LIMIT 1',[token])
+    const r=rows[0] as AuthSession
+    if(!r) return null
+    if(new Date(r.expiresAt) < new Date()){ await pgQuery('DELETE FROM auth_session WHERE token=$1',[token]); return null }
+    return r
+  }
+  const s=await readLocal() as any
+  const sess=s.sessions.find((x:any)=> x.token===token) as AuthSession|null
+  if(!sess) return null
+  if(new Date(sess.expiresAt) < new Date()){ s.sessions=s.sessions.filter((x:any)=> x.token!==token); await writeLocal(s); return null }
+  return sess
+}
+export async function deleteSession(token:string): Promise<void>{
+  if(getMode()==="postgres"){ await migrate(); await pgQuery('DELETE FROM auth_session WHERE token=$1',[token]); return }
+  await withLocalLock(async (s:any)=>{
+    s.sessions=s.sessions.filter((x:any)=> x.token!==token)
+  })
+}
+export async function getUserFromToken(token:string): Promise<AuthUser|null>{
+  const sess=await getSession(token)
+  if(!sess) return null
+  return findAuthUserById(sess.userId)
+}
+export async function getSave(userId:string, gameId:string): Promise<GameSave|null>{
+  if(getMode()==="postgres"){
+    await migrate()
+    const rows=await pgQuery<any>('SELECT user_id as "userId", game_id as "gameId", data, updated_at as "updatedAt" FROM game_save WHERE user_id=$1 AND game_id=$2 LIMIT 1',[userId, gameId])
+    return rows[0] as GameSave||null
+  }
+  const s=await readLocal() as any
+  return s.saves.find((x:any)=> x.userId===userId && x.gameId===gameId) || null
+}
+export async function setSave(userId:string, gameId:string, data:string): Promise<GameSave>{
+  const updatedAt=new Date().toISOString()
+  const save:GameSave={ userId, gameId, data: data.slice(0, 500_000), updatedAt }
+  if(getMode()==="postgres"){
+    await migrate()
+    await pgQuery('INSERT INTO game_save (user_id, game_id, data, updated_at) VALUES ($1,$2,$3,$4) ON CONFLICT (user_id, game_id) DO UPDATE SET data=EXCLUDED.data, updated_at=EXCLUDED.updated_at',[userId, gameId, save.data, updatedAt])
+    return save
+  }
+  await withLocalLock(async (s:any) => {
+    const idx=s.saves.findIndex((x:any)=> x.userId===userId && x.gameId===gameId)
+    if(idx>=0) s.saves[idx]=save
+    else s.saves.push(save)
+    if(s.saves.length>5000) s.saves=s.saves.slice(-5000)
+  })
+  return save
+}
+export async function listSaves(userId:string): Promise<GameSave[]>{
+  if(getMode()==="postgres"){
+    await migrate()
+    return pgQuery<any>('SELECT user_id as "userId", game_id as "gameId", updated_at as "updatedAt" FROM game_save WHERE user_id=$1 ORDER BY updated_at DESC',[userId]) as Promise<GameSave[]>
+  }
+  const s=await readLocal() as any
+  return s.saves.filter((x:any)=> x.userId===userId).map((x:any)=> ({ userId:x.userId, gameId:x.gameId, updatedAt:x.updatedAt }))
+}
+
+async function listRawRequests(): Promise<GameRequest[]> {
   if (getMode() === "postgres") {
-    return pgQuery<GameRequest>(
-      'SELECT "id","title","icon","status","createdAt" FROM "game_request" ORDER BY "createdAt" DESC',
-    );
+    try{
+      return await pgQuery<GameRequest>(
+        'SELECT "id","title","icon","status","createdAt",COALESCE("votes",1) as "votes" FROM "game_request" ORDER BY COALESCE("votes",0) DESC, "createdAt" DESC',
+      );
+    }catch{
+      return pgQuery<GameRequest>('SELECT "id","title","icon","status","createdAt" FROM "game_request" ORDER BY "createdAt" DESC').then(rs=> rs.map(r=> ({...r, votes:1})));
+    }
   }
   const s = await readLocal();
   return s.requests
-    .map(({ html: _h, ...rest }) => rest)
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    .map(({ html: _h, ...rest }) => ({...rest, votes: (rest as any).votes||1}))
+    .sort((a, b) => ((b as any).votes||0) - ((a as any).votes||0) || (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+export async function listRequests(): Promise<GameRequest[]> {
+  return mergeDuplicateRequests(await listRawRequests());
 }
 
 export async function getRequest(id: string): Promise<GameRequest | null> {
@@ -357,10 +1018,10 @@ export async function setRequestStatus(id: string, status: string): Promise<void
     await pgQuery('UPDATE "game_request" SET "status"=$2 WHERE "id"=$1', [id, status]);
     return;
   }
-  const s = await readLocal();
-  const r = s.requests.find((x) => x.id === id);
-  if (r) r.status = status;
-  await writeLocal(s);
+  await withLocalLock(async (s) => {
+    const r = s.requests.find((x) => x.id === id);
+    if (r) r.status = status;
+  });
 }
 
 export async function deleteRequest(id: string): Promise<void> {
@@ -368,9 +1029,9 @@ export async function deleteRequest(id: string): Promise<void> {
     await pgQuery('DELETE FROM "game_request" WHERE "id"=$1', [id]);
     return;
   }
-  const s = await readLocal();
-  s.requests = s.requests.filter((x) => x.id !== id);
-  await writeLocal(s);
+  await withLocalLock(async (s) => {
+    s.requests = s.requests.filter((x) => x.id !== id);
+  });
 }
 
 export async function publishFromRequest(id: string): Promise<PublishedGame | null> {
@@ -383,7 +1044,7 @@ export async function publishDirect(
   title: string,
   icon: string | null,
   html: string,
-  id = randomUUID(),
+  id: string = randomUUID(),
 ): Promise<PublishedGame> {
   const createdAt = new Date().toISOString();
   if (getMode() === "postgres") {
@@ -392,10 +1053,10 @@ export async function publishDirect(
       [id, title, icon, html],
     );
   } else {
-    const s = await readLocal();
-    s.games = s.games.filter((g) => g.id !== id);
-    s.games.push({ id, title, icon, html, createdAt });
-    await writeLocal(s);
+    await withLocalLock(async (s) => {
+      s.games = s.games.filter((g) => g.id !== id);
+      s.games.push({ id, title, icon, html, createdAt });
+    });
   }
   return { id, title, icon, createdAt };
 }
@@ -429,9 +1090,9 @@ export async function deleteGame(id: string): Promise<void> {
     await pgQuery('DELETE FROM "published_game" WHERE "id"=$1', [id]);
     return;
   }
-  const s = await readLocal();
-  s.games = s.games.filter((g) => g.id !== id);
-  await writeLocal(s);
+  await withLocalLock(async (s) => {
+    s.games = s.games.filter((g) => g.id !== id);
+  });
 }
 
 /* ---------------- Chunked uploads ---------------- */
@@ -485,4 +1146,140 @@ export async function dropUpload(uploadId: string): Promise<void> {
   } catch {
     // best effort
   }
+}
+
+/* ---------------- Achievements (CrazyGames-style) ---------------- */
+
+export async function listUserAchievements(userId: string): Promise<UserAchievement[]> {
+  if (getMode() === "postgres") {
+    await migrate();
+    return pgQuery<UserAchievement>('SELECT user_id as "userId", game_id as "gameId", achievement_id as "achievementId", progress, unlocked, unlocked_at as "unlockedAt", updated_at as "updatedAt" FROM user_achievement WHERE user_id=$1 ORDER BY updated_at DESC', [userId]);
+  }
+  const s = await readLocal();
+  return (s.achievements || []).filter(a => a.userId === userId).sort((a,b)=> (a.updatedAt < b.updatedAt ? 1 : -1));
+}
+
+export async function getUserAchievementsForGame(userId: string, gameId: string): Promise<UserAchievement[]> {
+  if (getMode() === "postgres") {
+    await migrate();
+    return pgQuery<UserAchievement>('SELECT user_id as "userId", game_id as "gameId", achievement_id as "achievementId", progress, unlocked, unlocked_at as "unlockedAt", updated_at as "updatedAt" FROM user_achievement WHERE user_id=$1 AND game_id=$2', [userId, gameId]);
+  }
+  const s = await readLocal();
+  return (s.achievements || []).filter(a => a.userId === userId && a.gameId === gameId);
+}
+
+export async function upsertAchievementProgress(userId: string, gameId: string, achievementId: string, progress: number, unlocked?: boolean): Promise<UserAchievement> {
+  const now = new Date().toISOString();
+  const shouldUnlock = unlocked ?? false;
+  if (getMode() === "postgres") {
+    await migrate();
+    // fetch existing
+    const rows = await pgQuery<UserAchievement>('SELECT progress, unlocked FROM user_achievement WHERE user_id=$1 AND achievement_id=$2', [userId, achievementId]);
+    let newProgress = progress;
+    let newUnlocked = shouldUnlock;
+    let unlockedAt: string | null = null;
+    if (rows.length) {
+      const cur = rows[0] as any;
+      newProgress = Math.max(Number(cur.progress) || 0, progress);
+      newUnlocked = Boolean(cur.unlocked) || shouldUnlock;
+      if (newUnlocked && !cur.unlocked) unlockedAt = now;
+      else if (cur.unlocked) unlockedAt = (cur as any).unlockedAt || now;
+      await pgQuery('UPDATE user_achievement SET progress=$3, unlocked=$4, unlocked_at=COALESCE($5, unlocked_at), updated_at=$6, game_id=$7 WHERE user_id=$1 AND achievement_id=$2', [userId, achievementId, newProgress, newUnlocked, unlockedAt, now, gameId]);
+    } else {
+      if (newUnlocked) unlockedAt = now;
+      await pgQuery('INSERT INTO user_achievement (user_id, game_id, achievement_id, progress, unlocked, unlocked_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7)', [userId, gameId, achievementId, newProgress, newUnlocked, unlockedAt, now]);
+    }
+    const out = await pgQuery<UserAchievement>('SELECT user_id as "userId", game_id as "gameId", achievement_id as "achievementId", progress, unlocked, unlocked_at as "unlockedAt", updated_at as "updatedAt" FROM user_achievement WHERE user_id=$1 AND achievement_id=$2', [userId, achievementId]);
+    return out[0];
+  }
+  let result!: UserAchievement;
+  await withLocalLock(async (s:any)=>{
+    s.achievements = s.achievements || [];
+    const idx = s.achievements.findIndex((x:any)=> x.userId===userId && x.achievementId===achievementId);
+    if (idx>=0) {
+      const cur = s.achievements[idx];
+      const newProg = Math.max(cur.progress||0, progress);
+      const wasUnlocked = !!cur.unlocked;
+      const nowUnlocked = wasUnlocked || shouldUnlock;
+      cur.progress = newProg;
+      cur.unlocked = nowUnlocked;
+      cur.updatedAt = now;
+      cur.gameId = gameId;
+      if (nowUnlocked && !wasUnlocked) cur.unlockedAt = now;
+      result = cur;
+    } else {
+      result = { userId, gameId, achievementId, progress, unlocked: shouldUnlock, unlockedAt: shouldUnlock? now : null, updatedAt: now };
+      s.achievements.push(result);
+    }
+    if (s.achievements.length>10000) s.achievements=s.achievements.slice(-10000);
+  });
+  return result;
+}
+
+export async function bulkUpsertAchievements(userId: string, updates: Array<{gameId:string, achievementId:string, progress:number, unlocked?:boolean}>): Promise<UserAchievement[]> {
+  const out: UserAchievement[] = [];
+  for (const u of updates) {
+    const r = await upsertAchievementProgress(userId, u.gameId, u.achievementId, u.progress, u.unlocked);
+    out.push(r);
+  }
+  return out;
+}
+
+export async function getUserStats(userId: string): Promise<{totalUnlocked:number, totalPoints:number, perGame: Record<string,{unlocked:number,total:number}>}> {
+  const all = await listUserAchievements(userId);
+  // need definitions to calc points
+  try {
+    const { ACHIEVEMENTS } = await import('./achievements');
+    const map = new Map(ACHIEVEMENTS.map(a=>[a.id,a]));
+    let points=0;
+    const perGame: Record<string,{unlocked:number,total:number}> = {};
+    for (const a of ACHIEVEMENTS) {
+      perGame[a.gameId] = perGame[a.gameId] || {unlocked:0, total:0};
+      perGame[a.gameId].total++;
+    }
+    for (const ua of all) if (ua.unlocked) {
+      const def = map.get(ua.achievementId);
+      if (def) points+= def.points;
+      if (perGame[ua.gameId]) perGame[ua.gameId].unlocked++;
+    }
+    return { totalUnlocked: all.filter(x=>x.unlocked).length, totalPoints: points, perGame };
+  } catch { return { totalUnlocked: all.filter(x=>x.unlocked).length, totalPoints: 0, perGame: {} } }
+}
+
+export async function incrementGameStats(userId: string, gameId: string, timeSeconds=0): Promise<UserGameStats> {
+  const now = new Date().toISOString();
+  if (getMode()==="postgres") {
+    await migrate();
+    await pgQuery('INSERT INTO user_game_stats (user_id, game_id, plays, time_seconds, last_played_at, updated_at) VALUES ($1,$2,1,$3,$4,$4) ON CONFLICT (user_id, game_id) DO UPDATE SET plays=user_game_stats.plays+1, time_seconds=user_game_stats.time_seconds+EXCLUDED.time_seconds, last_played_at=EXCLUDED.last_played_at, updated_at=EXCLUDED.updated_at', [userId, gameId, timeSeconds, now]);
+    const rows = await pgQuery<UserGameStats>('SELECT user_id as "userId", game_id as "gameId", plays, time_seconds as "timeSeconds", last_played_at as "lastPlayedAt", updated_at as "updatedAt" FROM user_game_stats WHERE user_id=$1 AND game_id=$2', [userId, gameId]);
+    return rows[0];
+  }
+  let out!: UserGameStats;
+  await withLocalLock(async (s:any)=>{
+    s.gameStats = s.gameStats || [];
+    let cur = s.gameStats.find((x:any)=> x.userId===userId && x.gameId===gameId);
+    if (!cur) { cur = { userId, gameId, plays:1, timeSeconds, lastPlayedAt: now, updatedAt: now }; s.gameStats.push(cur); }
+    else { cur.plays++; cur.timeSeconds+= timeSeconds; cur.lastPlayedAt=now; cur.updatedAt=now; }
+    out=cur as UserGameStats;
+  });
+  return out;
+}
+
+export async function getUserGameStats(userId: string, gameId: string): Promise<UserGameStats | null> {
+  if (getMode()==="postgres") {
+    await migrate();
+    const rows = await pgQuery<UserGameStats>('SELECT user_id as "userId", game_id as "gameId", plays, time_seconds as "timeSeconds", last_played_at as "lastPlayedAt", updated_at as "updatedAt" FROM user_game_stats WHERE user_id=$1 AND game_id=$2', [userId, gameId]);
+    return rows[0]||null;
+  }
+  const s= await readLocal();
+  return (s.gameStats||[]).find(x=> x.userId===userId && x.gameId===gameId) || null;
+}
+
+export async function listUserGameStats(userId: string): Promise<UserGameStats[]> {
+  if (getMode()==="postgres") {
+    await migrate();
+    return pgQuery<UserGameStats>('SELECT user_id as "userId", game_id as "gameId", plays, time_seconds as "timeSeconds", last_played_at as "lastPlayedAt", updated_at as "updatedAt" FROM user_game_stats WHERE user_id=$1 ORDER BY last_played_at DESC', [userId]);
+  }
+  const s= await readLocal();
+  return (s.gameStats||[]).filter(x=> x.userId===userId).sort((a,b)=> (a.lastPlayedAt||'') < (b.lastPlayedAt||'') ? 1 : -1);
 }

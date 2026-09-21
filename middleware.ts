@@ -1,49 +1,58 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+// ——— Simple in-memory rate limit for API abuse (per-IP, per-route) ———
+const _rlBuckets = new Map<string, { count: number; resetAt: number }>()
+function _rl(key: string, limit: number, windowMs: number) {
+  const now = Date.now()
+  if (_rlBuckets.size > 5000) for (const [key, bucket] of _rlBuckets) if (bucket.resetAt <= now) _rlBuckets.delete(key)
+  const b = _rlBuckets.get(key)
+  if (!b || b.resetAt <= now) {
+    const nb = { count: 1, resetAt: now + windowMs }
+    _rlBuckets.set(key, nb)
+    return { ok: true, remaining: limit - 1, resetAt: nb.resetAt }
+  }
+  if (b.count >= limit) return { ok: false, remaining: 0, resetAt: b.resetAt }
+  b.count++
+  return { ok: true, remaining: limit - b.count, resetAt: b.resetAt }
+}
+
 /**
- * Ban enforcement + visit logging for page navigations.
- * Only runs on document navigations (sec-fetch-mode == navigate),
- * so game assets / API calls / media streams pass straight through.
+ * Gate disabled — public lounge (user requested remove password for everything)
+ * Only rate limiting remains for abuse protection.
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/api/") ||
-    pathname === "/banned" ||
-    pathname === "/favicon.ico"
-  ) {
-    return NextResponse.next();
+  // ——— Rate limit high-abuse APIs ———
+  const _ipRL = (request.headers.get("x-forwarded-for") || "").split(",")[0].trim() || request.headers.get("x-real-ip") || "unknown";
+  if (pathname.startsWith("/api/yt")) {
+    const media = pathname === '/api/yt/media' || pathname === '/api/yt/img';
+    const r = _rl(`yt:${media ? 'media' : 'api'}:${_ipRL}`, media ? 1200 : 120, 60_000);
+    if (!r.ok) return new NextResponse(JSON.stringify({ error: "Rate limited — slow down", retryAfter: Math.ceil((r.resetAt - Date.now()) / 1000) }), { status: 429, headers: { "content-type": "application/json", "retry-after": String(Math.ceil((r.resetAt - Date.now()) / 1000)), "x-ratelimit-limit": "60", "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(Math.ceil(r.resetAt / 1000)) } });
+  }
+  if (pathname.startsWith("/api/bare") || pathname.startsWith("/api/edu") || pathname.startsWith("/api/learn") || pathname.startsWith("/api/t")) {
+    const r = _rl(`bare:${_ipRL}`, 1800, 60_000);
+    if (!r.ok) return new NextResponse(JSON.stringify({ error: "Rate limited — bare busy", retryAfter: Math.ceil((r.resetAt - Date.now()) / 1000) }), { status: 429, headers: { "content-type": "application/json", "retry-after": String(Math.ceil((r.resetAt - Date.now()) / 1000)), "x-ratelimit-limit": "120", "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(Math.ceil(r.resetAt / 1000)) } });
+  }
+  if (pathname === "/api/visit" || pathname.startsWith("/api/visit")) {
+    const r = _rl(`visit:${_ipRL}`, 30, 60_000);
+    if (!r.ok) return new NextResponse(JSON.stringify({ error: "Rate limited" }), { status: 429, headers: { "retry-after": String(Math.ceil((r.resetAt - Date.now()) / 1000)) } });
+  }
+  if (pathname.startsWith("/api/game-requests")) {
+    const r = _rl(`req:${_ipRL}`, 20, 60_000);
+    if (!r.ok) return new NextResponse(JSON.stringify({ error: "Rate limited" }), { status: 429, headers: { "retry-after": String(Math.ceil((r.resetAt - Date.now()) / 1000)) } });
   }
 
-  const fetchMode = request.headers.get("sec-fetch-mode");
-  if (fetchMode && fetchMode !== "navigate") {
-    return NextResponse.next();
+  // Everything is public now — no gate, no ban redirect
+  // Gate page still exists but just redirects home
+  if (pathname === "/gate" || pathname.startsWith("/gate/")) {
+    const url = new URL("/", request.url);
+    return NextResponse.redirect(url);
   }
 
-  try {
-    const forwarded = request.headers.get("x-forwarded-for") || "";
-    const ip = forwarded.split(",")[0].trim() || "unknown";
-    const gate = await fetch(new URL("/api/gate", request.url), {
-      headers: {
-        "x-gate-ip": ip,
-        "x-gate-path": pathname,
-        "user-agent": request.headers.get("user-agent") || "",
-      },
-    });
-    if (gate.ok) {
-      const data = (await gate.json()) as { banned?: boolean };
-      if (data.banned) {
-        return NextResponse.rewrite(new URL("/banned", request.url));
-      }
-    }
-  } catch {
-    // Fail open: gate errors must not break the lounge.
-  }
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/", "/admin", "/request-game", "/games/:path*"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png).*)"],
 };

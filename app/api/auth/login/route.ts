@@ -1,0 +1,30 @@
+import { NextResponse } from "next/server";
+import { verifyAuthUser, createSession, checkRateLimit } from "@/lib/db";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+function cookieForToken(token:string){
+  return `ggl_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30*24*3600}; Secure;`
+}
+function getIp(req:Request){
+  try{ const h=req.headers.get('x-forwarded-for'); if(h) return h.split(',')[0].trim(); return req.headers.get('x-real-ip')||'unknown' }catch{ return 'unknown'}
+}
+export async function POST(req: Request){
+  try{
+    const ip=getIp(req)
+    if(!checkRateLimit('login:'+ip, 8, 10*60*1000)) return NextResponse.json({ error: "Too many attempts — wait 10 minutes." }, { status: 429 })
+    const { username, password } = await req.json() as any
+    if(!username || !password) return NextResponse.json({ error: "Username and password required." }, { status: 400 })
+    const usernameLower = String(username).trim().toLowerCase()
+    if(!checkRateLimit('login:user:'+usernameLower, 5, 15*60*1000)) return NextResponse.json({ error: "Too many attempts for this username — wait 15 minutes." }, { status: 429 })
+    const user = await verifyAuthUser(String(username), String(password))
+    if(!user) return NextResponse.json({ error: "Wrong username or password." }, { status: 401 })
+    const sess = await createSession(user.id)
+    const res = NextResponse.json({ ok: true, user: { id: user.id, username: user.username } })
+    res.headers.set('Set-Cookie', cookieForToken(sess.token))
+    return res
+  }catch(e:any){
+    return NextResponse.json({ error: e?.message || "Login failed" }, { status: 500 })
+  }
+}

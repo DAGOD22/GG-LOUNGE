@@ -1,0 +1,21 @@
+{
+  "files": {
+    "main.css": "./static/css/main.b457d7a6.css",
+    "main.js": "./static/js/main.061188c9.js",
+    "static/media/BOMB.png": "./static/media/BOMB.972d8c28dd9dc139ec3f.png",
+    "static/media/GOLDWATERMELON.png": "./static/media/GOLDWATERMELON.1cf4078cde429802200d.png",
+    "static/media/AVOCADO.png": "./static/media/AVOCADO.feb5c5c4a43ff1fb2548.png",
+    "static/media/pung.mp3": "./static/media/pung.8de39b1fd2365bb3b573.mp3",
+    "static/media/MELON.png": "./static/media/MELON.49cbe7113f30dafc4625.png",
+    "static/media/WATERMELON.png": "./static/media/WATERMELON.732a067ccfa663d2f426.png",
+    "static/media/STRAWBERRY.png": "./static/media/STRAWBERRY.9cfeb6dd00c515996ceb.png",
+    "static/media/KOREANMELON.png": "./static/media/KOREANMELON.520b071b8ca168f70af2.png",
+    "static/media/pop.mp3": "./static/media/pop.aad1876107786cd34875.mp3",
+    "static/media/pop2.mp3": "./static/media/pop2.be611a1bcb32ab485a96.mp3",
+    "index.html": "./index.html"
+  },
+  "entrypoints": [
+    "static/css/main.b457d7a6.css",
+    "static/js/main.061188c9.js"
+  ]
+}

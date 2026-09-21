@@ -1,0 +1,371 @@
+--- a/src/firebase.tsx
++++ b/src/firebase.tsx
+@@ -1,45 +1,3 @@
+-// Import the functions you need from the SDKs you need
+-import { FirebaseError, initializeApp } from "firebase/app";
+-import { getAnalytics } from "firebase/analytics";
+-import { getFirestore, Firestore } from 'firebase/firestore';
+-// TODO: Add SDKs for Firebase products that you want to use
+-// https://firebase.google.com/docs/web/setup#available-libraries
+-
+-// Your web app's Firebase configuration
+-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+-const firebaseConfig = {
+-  apiKey: process.env.REACT_APP_FB_API_KEY,
+-  authDomain: process.env.REACT_APP_FB_AUTH_DOMAIN,
+-  projectId: process.env.REACT_APP_FB_PROJECT_ID,
+-  storageBucket: process.env.REACT_APP_FB_STORAGE_BUCKET,
+-  messagingSenderId: process.env.REACT_APP_FB_MESSAGING_SENDER_ID,
+-  appId: process.env.REACT_APP_FB_APP_ID,
+-  measurementId: process.env.REACT_APP_FB_MEASUREMENT_ID
+-};
+-
+-let app: any;
+-let analytics: any;
+-
+-let db: any | Firestore;
+-const userDoc = "users";
+-const resultDoc = "results";
+-const scoreDoc = "scores";
+-
+-// Initialize Firebase
+-try
+-{
+-  app = initializeApp(firebaseConfig);
+-  analytics = getAnalytics(app);
+-  db = getFirestore(app);
+-}
+-catch (error)
+-{
+-  if (error instanceof FirebaseError) {
+-    console.log("FirestoreError: ", error.message);
+-  }
+-  else {
+-    throw error;
+-  }
+-}
+-
+-export {db, userDoc, resultDoc, scoreDoc}
++// GG-Lounge self-hosted edition: no third-party analytics or database connection.
++export const db: any = undefined;
++export const userDoc = "users", resultDoc = "results", scoreDoc = "scores";
+--- a/src/index.tsx
++++ b/src/index.tsx
+@@ -1,3 +1,4 @@
++import 'bootstrap/dist/css/bootstrap.min.css';
+ import React from 'react';
+ import ReactDOM from 'react-dom/client';
+ import Test from './test';
+@@ -56,7 +57,7 @@
+ if (exitsOnBack())
+   handleBackEvents();
+ 
+-console.log(`The orientation of the screen is: ${window.screen.orientation.type}`);
++console.log(`The orientation of the screen is: ${(window.screen.orientation?.type || (window.innerWidth>window.innerHeight?'landscape-primary':'portrait-primary'))}`);
+ 
+ const root = ReactDOM.createRoot(
+   document.getElementById('root') as HTMLElement
+@@ -76,7 +77,7 @@
+ function handleRotation(first: boolean = false) {
+   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+ 
+-  if (isMobile && window.screen.orientation.type.startsWith('landscape')) {
++  if (isMobile && (window.screen.orientation?.type || (window.innerWidth>window.innerHeight?'landscape-primary':'portrait-primary')).startsWith('landscape')) {
+     let rootDiv = document.getElementById("root");
+     let screenDiv = document.getElementById("rotateScreen");
+     if (rootDiv) {
+@@ -91,7 +92,7 @@
+       firstLandscape = true;
+     }
+   }
+-  else if (isMobile && window.screen.orientation.type.startsWith('portrait'))
++  else if (isMobile && (window.screen.orientation?.type || (window.innerWidth>window.innerHeight?'landscape-primary':'portrait-primary')).startsWith('portrait'))
+   {
+     if (firstLandscape) {
+       window.location.reload();
+@@ -112,7 +113,7 @@
+ handleRotation(true);
+ 
+ window.addEventListener("orientationchange", () => {
+-  console.log(`The orientation of the screen is: ${window.screen.orientation.type}`);
++  console.log(`The orientation of the screen is: ${(window.screen.orientation?.type || (window.innerWidth>window.innerHeight?'landscape-primary':'portrait-primary'))}`);
+   handleRotation();
+ })
+ 
+--- a/src/lib/suikaGame/GameResult.ts
++++ b/src/lib/suikaGame/GameResult.ts
+@@ -52,7 +52,7 @@
+     static userId: string;
+     static userName: string = "New User";
+     static userAgent: string = navigator.userAgent;
+-    static network: boolean = true;
++    static network: boolean = false;
+     static rankScores: Array<ScoreInfo>;
+     static scoreRef: DocumentReference<DocumentData, DocumentData>;
+     static loadInfo: boolean = false;
+@@ -61,8 +61,8 @@
+     static currentItemSizeConfig: number;
+ 
+     constructor() {
+-        this.bestScore = Number(localStorage.getItem('bestScore'));
+-        this.bombCountAtStart = Number(localStorage.getItem('cumBombCount'));
++        this.bestScore = Number(localStorage.getItem('suika:bestScore'));
++        this.bombCountAtStart = Number(localStorage.getItem('suika:cumBombCount'));
+         this.startAt = new Date();
+ 
+         Object.values(Fruit).map(k => this.detail.set(k, 0));
+@@ -135,28 +135,8 @@
+     }
+ 
+     public static async loadScoreRankInfo(useCache = true) {
+-        if (useCache && GameResult.rankScores) {
+-            return;
+-        }
+-
+-        try {
+-            const q = query(collection(db, scoreDoc), where("bestScore", ">", 0), orderBy("bestScore", "desc"), limit(99));
+-            const querySnapshot = await getDocs(q);
+-            GameResult.rankScores = querySnapshot.docs.map((doc) => {
+-                return {id: doc.id, ...doc.data()}
+-            }) as ScoreInfo[];
+-        } catch (error) {
+-            if (error instanceof FirebaseError) {
+-                console.log("FirestoreError: ", error.message);
+-                return;
+-            }
+-
+-            throw error;
+-        }
+-
+-        // querySnapshot.forEach((doc) => {
+-        //     console.log(doc.id, " => ", doc.data());
+-        // });
++        GameResult.rankScores = []; // No global ranking is fabricated for a local game.
++        return;
+     }
+ 
+     public static calculateUserRank() {
+@@ -218,65 +198,16 @@
+     }
+ 
+     public static isNewUser() {
+-        let userId = localStorage.getItem('userId');
++        let userId = localStorage.getItem('suika:userId');
+ 
+         return userId ? false : true;
+     }
+ 
+     public static async loadUserInfo() {
+-        try {
+-            let userId = localStorage.getItem('userId');
+-    
+-            if (userId)
+-            {
+-                let docSnap = await getDoc(doc(db, userDoc, userId, "info", "value"));
+-                if (docSnap.exists()) {
+-                    GameResult.userId = userId;
+-                    GameResult.userName = docSnap.data().name;
+-                    GameResult.scoreRef = docSnap.data().score;
+-                    return;
+-                }
+-            }
+-            
+-            let info = {model: "", platform: ""};
+-
+-            if ((window.navigator as any).userAgentData) {
+-                info = await (window.navigator as any).userAgentData.getHighEntropyValues([  
+-                    "model",
+-                    "platform",
+-                ])
+-            }
+-
+-            const batch = writeBatch(db);
+-            const userRef = doc(collection(db, userDoc));
+-            const scoreRef = doc(collection(db, scoreDoc));
+-
+-            const name = getRandomUserName();
+-            batch.set(scoreRef, { bestScore: Number(localStorage.getItem('bestScore')), name: name, createdAt: new Date(), url: window.location.href })
+-
+-            batch.set(userRef, {});
+-            const userInfoRef = doc(collection(userRef, "info"), "value");
+-
+-            batch.set(userInfoRef, {name: name, score: scoreRef, createdAt: new Date(), model: info.model, platform: info.platform});
+-            
+-            await batch.commit()
+-    
+-            localStorage.setItem("userId", userRef.id);
+-            GameResult.userId = userRef.id;
+-            GameResult.userName = name;
+-            GameResult.scoreRef = scoreRef;
+-
+-            GameResult.loadInfo = true;
+-            return;
+-        } catch (error) {
+-            GameResult.network = false;
+-
+-            if (error instanceof FirebaseError) {
+-                console.log("FirestoreError", error.message);
+-                return;
+-            }
+-
+-            // throw error;
+-        }
+-    }
+-}
++        GameResult.userId = 'local';
++        GameResult.userName = 'Local player';
++        GameResult.network = false;
++        GameResult.loadInfo = true;
++        return;
++    }
++}
+--- a/src/lib/suikaGame/index.tsx
++++ b/src/lib/suikaGame/index.tsx
+@@ -31,10 +31,10 @@
+   const { clear, createFixedItem } = useMatterJS({ score, setScore, bombItemCount, setBombItemCount, nextItem, setNextItem, isGameOver, setIsGameOver });
+ 
+   useEffect(() => {
+-    const bestScore = localStorage.getItem('bestScore');
++    const bestScore = localStorage.getItem('suika:bestScore');
+     if (bestScore) setBestScore(Number(bestScore));
+ 
+-    const bombCount = localStorage.getItem('cumBombCount');
++    const bombCount = localStorage.getItem('suika:cumBombCount');
+     if (bombCount) setBombItemCount(Number(bombCount));
+ 
+     if (startBombCount === undefined)
+@@ -61,16 +61,16 @@
+         return;
+       }
+ 
+-      localStorage.setItem('cumBombCount', bombItemCount.toString());
++      localStorage.setItem('suika:cumBombCount', bombItemCount.toString());
+     }
+   }, [bombItemCount]);
+ 
+   useEffect(() => {
+     if(isGameOver) {
+-      const bestScore = localStorage.getItem('bestScore') || 0;
++      const bestScore = localStorage.getItem('suika:bestScore') || 0;
+       
+       if (score > Number(bestScore)) {
+-        localStorage.setItem('bestScore', score.toString());
++        localStorage.setItem('suika:bestScore', score.toString());
+         localStorage.setItem('bestScoreUpdatedAt', new Date().getTime().toString());
+       }
+ 
+@@ -185,7 +185,7 @@
+     <div className={cx('gameArea')}>
+       <div className={`${cx('shareButton')} top-0 end-0 p-3`} style={{position: "absolute", zIndex: 1, pointerEvents: "auto", display: !isStart ? "block" : "none"}}>
+         <button type="button" className='btn' onClick={share} style={{width: "1.8em", height: "1.8em", padding: 0, opacity: "0.85"}}>
+-        <img src="/share.svg" className="" alt="" style={{width: "1.8em"}}/>
++        <img src="./share.svg" className="" alt="" style={{width: "1.8em"}}/>
+         </button>
+       </div>
+       <div className={cx('gameWrap')} style={{ visibility: isStart ? 'visible' : 'hidden'}}>
+--- a/src/lib/suikaGame/gameOverModal/index.tsx
++++ b/src/lib/suikaGame/gameOverModal/index.tsx
+@@ -74,7 +74,7 @@
+     <div className={cx('gameOverArea')}>
+       <div className="top-0 end-0 p-3" style={{position: "absolute", zIndex: 1, pointerEvents: "auto"}}>
+         <button type="button" className='btn' onClick={share} style={{width: "1.8em", height: "1.8em", padding: 0, opacity: "0.85"}}>
+-        <img src="/share.svg" className="" alt="" style={{width: "1.8em"}}/>
++        <img src="./share.svg" className="" alt="" style={{width: "1.8em"}}/>
+         </button>
+       </div>
+       <span className={cx('text')}>GAME OVER</span>
+--- a/src/lib/suikaGame/intro/index.tsx
++++ b/src/lib/suikaGame/intro/index.tsx
+@@ -42,7 +42,7 @@
+   
+   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+   const [isShowPWACard, setIsShowPWACard] = useState<boolean>(false);
+-  const [isShowOpenWithChrome, setIsShowOpenWithChrome] = useState<boolean>(true);
++  const [isShowOpenWithChrome, setIsShowOpenWithChrome] = useState<boolean>(false);
+ 
+   const handleBeforeInstallPrompt = (event: any) => {
+     event.preventDefault();
+@@ -156,7 +156,7 @@
+           {/* <Card.Header>Featured</Card.Header> */}
+           <Card.Body>
+             <div className='' style={{display: "flex"}}>
+-              <img src="/maskable_icon_x72.png" className="rounded mb-2 me-2" alt="" style={{width: "15%"}}/>
++              <img src="./maskable_icon_x72.png" className="rounded mb-2 me-2" alt="" style={{width: "15%"}}/>
+               <div className='d-flex justify-content-between align-items-center' style={{flex: "auto"}}>
+                 <Card.Title>
+                       Suika with Bomb
+@@ -177,7 +177,7 @@
+           {/* <Card.Header>Featured</Card.Header> */}
+           <Card.Body>
+             <div className='' style={{display: "flex"}}>
+-              <img src="/maskable_icon_x72.png" className="rounded mb-2 me-2" alt="" style={{width: "15%"}}/>
++              <img src="./maskable_icon_x72.png" className="rounded mb-2 me-2" alt="" style={{width: "15%"}}/>
+               <div className='d-flex justify-content-between align-items-center' style={{flex: "auto"}}>
+                 <Card.Title>
+                       Suika with Bomb
+@@ -194,9 +194,9 @@
+         </Card>
+       </ToastContainer>
+ 
+-      <button className={`${cx('rank-btn')}`} onClick={handleShowRankModal}>{userName}</button>
++      <button className={`${cx('rank-btn')}`} disabled={!GameResult.network} title="High scores are saved locally in this edition" onClick={handleShowRankModal}>{GameResult.network ? userName : "Local high scores"}</button>
+       {/* <a href={'https://github.com/MycroftKang/Suika#readme'} target='_blank' className={cx('patchLink')}>{GameResult.userName}</a> */}
+-      <a className={cx('version')} href={'https://github.com/MycroftKang/Suika'}>© Mycroft Kang & Contributors</a>
++      <a className={cx('version')} href={'https://github.com/MycroftKang/Suika'} target="_blank" rel="noopener noreferrer">© Mycroft Kang & Contributors</a>
+     </div>
+   )
+ }
+--- a/public/index.html
++++ b/public/index.html
+@@ -2,20 +2,7 @@
+ <html lang="ko">
+ 
+ <head>
+-  <!-- Google tag (gtag.js) -->
+-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BQYL7PNLWS"></script>
+-  <script>
+-    if (window.location.hostname != 'localhost') {
+-      window.dataLayer = window.dataLayer || [];
+-      function gtag(){dataLayer.push(arguments);}
+-      gtag('js', new Date());
+-  
+-      gtag('config', 'G-BQYL7PNLWS');
+-    }
+-    else {
+-      function gtag(){}
+-    }
+-  </script>
++  <script>window.gtag=function(){};</script>
+   <meta name="theme-color" content="#A0633B"/>
+   <meta charset="utf-8" />
+   <meta name="viewport"
+@@ -26,21 +13,15 @@
+   <meta property="og:type" content="website">
+   <meta property="og:image" content="./thumbnail.png">
+   <meta name="apple-mobile-web-app-capable" content="yes">
+-  <link rel="alternate" hreflang="ko" href="https://game.mulgyeol.com/?lng=ko">
+-  <link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
+-  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Patrick+Hand" />
+-  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Pacifico">
+-  <link rel="canonical" href="https://game.mulgyeol.com/" />
+-  <link rel="stylesheet" type="text/css"
+-    href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
+-  <link
+-  rel="stylesheet"
+-  href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+-  integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM"
+-  crossorigin="anonymous"
+-  />
++  
++  
++  
++  
++  
++  
++  
+   <link rel="icon" href="./suika.ico" type="image/x-icon">
+-  <title>Suika Game with Bomb</title>
++  <title>Suika with Bomb — open-source browser edition</title>
+ </head>
+ 
+ <body>

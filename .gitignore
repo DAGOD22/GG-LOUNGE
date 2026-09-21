@@ -15,3 +15,12 @@ node_modules
 .DS_Store
 # Local lounge database (dev visits, bans, uploads)
 .data/
+
+# Reproducible proxy runtimes and test artifacts
+public/proxy-runtime/
+.cache/
+playwright-report/
+test-results/
+*.tsbuildinfo
+public/game-runtime/
+.next-build/
