@@ -1,7 +1,9 @@
 {
   "2048": {
-    "available": true,
-    "issues": []
+    "available": false,
+    "issues": [
+      "Missing local index.html"
+    ]
   },
   "suika": {
     "available": true,
@@ -36,8 +38,10 @@
     "issues": []
   },
   "hextris": {
-    "available": true,
-    "issues": []
+    "available": false,
+    "issues": [
+      "Missing local index.html"
+    ]
   },
   "solar-smash": {
     "available": false,

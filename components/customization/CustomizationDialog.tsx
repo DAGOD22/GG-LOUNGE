@@ -1,4 +1,5 @@
 'use client';
+import { CursorGallery } from './CursorGallery';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { X, Palette, Image as ImageIcon, MousePointer2, Keyboard, EyeOff, Upload, Check, RotateCcw, Sparkles } from 'lucide-react';
 import { useCustomization } from './CustomizationProvider';
@@ -74,10 +75,18 @@ export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onC
         </Section>
       </>}
       {tab==='cursor'&&<>
-        <Section title="Point your own way" description="Choose a native cursor or your own image. Games that lock the mouse can hide the cursor."><div className="gg-chip-row">{[{id:'system',name:'System'},{id:'crosshair',name:'Crosshair'},{id:'dot',name:'Neon dot'},{id:'ring',name:'Neon ring'}].map(p=><button key={p.id} className="gg-chip" aria-pressed={settings.cursor.preset===p.id} onClick={()=>update(s=>({...s,cursor:{...s.cursor,preset:p.id as any}}))}>{p.name}</button>)}</div>
+        <Section title="Animated cursors" description="Fourteen hand-built pointer engines: soft-body jelly, particle comets, verlet snake chains, glitch RGB-split, sonar pings and more. They react to what you hover - links, text, media, drag handles - and pulse when you click.">
+          <CursorGallery />
+          <label className="gg-slider"><span>Size <b>{settings.cursor.size}px</b></span><input type="range" min={16} max={64} step={2} value={settings.cursor.size} onChange={e=>update(s=>({...s,cursor:{...s.cursor,size:Number(e.target.value)}}))} aria-label="Cursor size"/></label>
+          <label className="gg-slider"><span>Follow speed <b>{Math.round(settings.cursor.speed*100)}%</b></span><input type="range" min={0} max={1} step={0.05} value={settings.cursor.speed} onChange={e=>update(s=>({...s,cursor:{...s.cursor,speed:Number(e.target.value)}}))} aria-label="Cursor follow speed"/></label>
+          <Toggle label="Ribbon trail" description="A tapered light ribbon behind the pointer. Respects reduced motion." checked={settings.cursor.trail} onChange={trail=>update(s=>({...s,cursor:{...s.cursor,trail}}))}/>
+        </Section>
+        <Section title="System or your own" description="Prefer the native pointer or a static image? Games that lock the mouse can hide any cursor.">
+          <div className="gg-chip-row">
+            <button className="gg-chip" aria-pressed={settings.cursor.preset==='system'} onClick={()=>update(s=>({...s,cursor:{...s.cursor,preset:'system'}}))}>System cursor</button>
+          </div>
           <label className="gg-upload-zone"><MousePointer2 size={24}/><strong>Upload a cursor image</strong><span>Up to 4 MB · resized to 32 × 32 · centered hotspot</span><input aria-label="Upload cursor" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/x-icon,image/vnd.microsoft.icon" disabled={busy} onChange={e=>{void uploadImage(e.target.files?.[0],'cursor');e.target.value='';}}/></label>
           {settings.cursor.image&&<button className="gg-secondary" onClick={()=>update(s=>({...s,cursor:{...s.cursor,preset:'custom'}}))}><img src={settings.cursor.image} alt="Uploaded cursor" width={32} height={32}/> Use uploaded cursor</button>}
-          <Toggle label="Ambient pointer trail" description="A subtle trail over the background. Respects reduced motion." checked={settings.cursor.trail} onChange={trail=>update(s=>({...s,cursor:{...s.cursor,trail}}))}/>
         </Section>
       </>}
       {tab==='reactive'&&<>

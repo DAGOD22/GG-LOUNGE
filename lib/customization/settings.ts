@@ -1,3 +1,4 @@
+import { ANIMATED_CURSOR_IDS } from './cursor-presets';
 export const SETTINGS_KEY = 'ggl_customization_v1';
 export const RELEASE_NAME = 'new upadted version';
 export type Colors = { background: string; surface: string; panel: string; text: string; muted: string; accent: string; secondary: string };
@@ -26,7 +27,7 @@ export type Settings = {
   panic: { enabled: boolean; binding: KeyBinding; destination: string; whileTyping: boolean };
   theme: { preset: string; mode: 'dark' | 'light'; colors: Colors };
   background: { preset: string; mediaId: string; mediaKind: 'image' | 'video'; mediaName: string; dim: number; blur: number; fit: 'cover' | 'contain'; respectMotion: boolean };
-  cursor: { preset: 'system' | 'crosshair' | 'dot' | 'ring' | 'custom'; image: string; size: number; trail: boolean };
+  cursor: { preset: string; image: string; size: number; trail: boolean; speed: number };
   reactive: { enabled: boolean; style: 'ripples' | 'particles' | 'constellation'; intensity: number; pointer: boolean };
 };
 export function defaults(): Settings { return {
@@ -35,7 +36,7 @@ export function defaults(): Settings { return {
   panic:{enabled:false,binding:{code:'Backquote',key:'`',ctrl:false,alt:false,shift:false,meta:false},destination:'about:blank',whileTyping:false},
   theme:{preset:'lounge',mode:'dark',colors:{...THEMES.lounge.colors}},
   background:{preset:'none',mediaId:'',mediaKind:'image',mediaName:'',dim:38,blur:0,fit:'cover',respectMotion:true},
-  cursor:{preset:'system',image:'',size:32,trail:false},
+  cursor:{preset:'system',image:'',size:32,trail:false,speed:0.6},
   reactive:{enabled:false,style:'ripples',intensity:50,pointer:true},
 }; }
 const text=(v:unknown,fallback:string,max=200)=> typeof v==='string' ? v.slice(0,max) : fallback;
@@ -60,6 +61,9 @@ export function iconHref(input:string,base='https://gg-lounge.vercel.app'):strin
   const escaped=v.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
   return 'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><text x="32" y="48" text-anchor="middle" font-size="48">${escaped}</text></svg>`);
 }
+/** legacy static-cursor ids from earlier releases → animated equivalents */
+const LEGACY_CURSOR_MAP: Record<string, string> = { crosshair: 'sonar', dot: 'lounge', ring: 'halo' };
+
 export function sanitizeSettings(input:unknown):Settings {
   const d=defaults(),v=obj(input),c=obj(v.cloak),p=obj(v.panic),b=obj(p.binding),t=obj(v.theme),bg=obj(v.background),cu=obj(v.cursor),r=obj(v.reactive);
   const colors={...d.theme.colors};const supplied=obj(t.colors);
@@ -72,7 +76,7 @@ export function sanitizeSettings(input:unknown):Settings {
     panic:{enabled:bool(p.enabled,false),destination,whileTyping:bool(p.whileTyping,false),binding:{code,key:text(b.key,d.panic.binding.key,60),ctrl:bool(b.ctrl,false),alt:bool(b.alt,false),shift:bool(b.shift,false),meta:bool(b.meta,false)}},
     theme:{preset:oneOf(t.preset,[...Object.keys(THEMES),'custom'],'lounge'),mode:oneOf(t.mode,['dark','light'],'dark'),colors},
     background:{preset:oneOf(bg.preset,[...WALLPAPERS.map(x=>x.id),'upload'],'none'),mediaId:text(bg.mediaId,'',80),mediaKind:oneOf(bg.mediaKind,['image','video'],'image'),mediaName:text(bg.mediaName,'',160),dim:num(bg.dim,38,0,90),blur:num(bg.blur,0,0,24),fit:oneOf(bg.fit,['cover','contain'],'cover'),respectMotion:bool(bg.respectMotion,true)},
-    cursor:{preset:oneOf(cu.preset,['system','crosshair','dot','ring','custom'],'system'),image:/^data:image\/png;base64,[a-z\d+/=]+$/i.test(text(cu.image,'',180000))?cu.image:'',size:num(cu.size,32,16,64),trail:bool(cu.trail,false)},
+    cursor:{preset:oneOf(LEGACY_CURSOR_MAP[cu.preset as string] ?? cu.preset,['system','custom',...ANIMATED_CURSOR_IDS],'system'),image:/^data:image\/png;base64,[a-z\d+/=]+$/i.test(text(cu.image,'',180000))?cu.image:'',size:num(cu.size,32,16,64),trail:bool(cu.trail,false),speed:num(cu.speed,0.6,0,1)},
     reactive:{enabled:bool(r.enabled,false),style:oneOf(r.style,['ripples','particles','constellation'],'ripples'),intensity:num(r.intensity,50,10,100),pointer:bool(r.pointer,true)},
   };
 }
@@ -88,6 +92,7 @@ export function isTypingTarget(target:EventTarget|null):boolean {const el=target
 export function accentInk(hex:string):string {const rgb=hex.slice(1).match(/../g)?.map(x=>parseInt(x,16)/255)||[1,1,1];const [r,g,b]=rgb.map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));return .2126*r+.7152*g+.0722*b>.35?'#0b0d12':'#ffffff';}
 export function cursorValue(cursor:Settings['cursor'],accent:string):string {
   if(cursor.preset==='system')return '';
+  if(ANIMATED_CURSOR_IDS.includes(cursor.preset))return '';
   if(cursor.preset==='crosshair')return 'crosshair';
   if(cursor.preset==='custom')return cursor.image?`url("${cursor.image}") ${Math.round(cursor.size/2)} ${Math.round(cursor.size/2)}, auto`:'';
   const ring=cursor.preset==='ring';const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><circle cx="16" cy="16" r="${ring?9:5}" fill="${ring?'none':accent}" stroke="#09101c" stroke-width="${ring?5:3}"/><circle cx="16" cy="16" r="${ring?9:5}" fill="${ring?'none':accent}" stroke="${accent}" stroke-width="2"/></svg>`;
