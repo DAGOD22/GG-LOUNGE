@@ -40,7 +40,7 @@ export interface CursorInstance {
   draw: (ctx: CanvasRenderingContext2D, f: CursorFrame) => void;
 }
 
-export type CursorPack = "gaming" | "typing" | "creative" | "classic";
+export type CursorPack = "gaming" | "typing" | "creative" | "classic" | "mascots";
 
 export const CURSOR_PACKS: { id: "all" | CursorPack; name: string }[] = [
   { id: "all", name: "All" },
@@ -48,6 +48,7 @@ export const CURSOR_PACKS: { id: "all" | CursorPack; name: string }[] = [
   { id: "typing", name: "Typing" },
   { id: "creative", name: "Creative" },
   { id: "classic", name: "Classic" },
+  { id: "mascots", name: "Mascots" },
 ];
 
 export interface CursorPreset {
@@ -1673,6 +1674,16 @@ function createStardust(): CursorInstance {
   };
 }
 
+import {
+  createBat,
+  createBunny,
+  createCat,
+  createChick,
+  createDog,
+  createFox,
+  createGhost,
+} from "./cursor-mascots";
+
 export const CURSOR_PRESETS: CursorPreset[] = [
   { id: "lounge", name: "Lounge Jelly", packs: ["classic", "typing", "creative"], accent: LIME, create: createLounge },
   { id: "comet", name: "Comet", packs: ["gaming"], accent: "#fff3b0", create: createComet },
@@ -1698,6 +1709,13 @@ export const CURSOR_PRESETS: CursorPreset[] = [
   { id: "holo", name: "Hologram", packs: ["gaming", "creative"], accent: ICE, create: createHolo },
   { id: "spinner", name: "Yin-Yang", packs: ["typing", "classic"], accent: LIME, create: createSpinner },
   { id: "stardust", name: "Stardust", packs: ["creative", "typing"], accent: ICE, create: createStardust },
+  { id: "cat", name: "Lounge Cat", packs: ["mascots", "classic"], accent: CORAL, create: createCat },
+  { id: "dog", name: "Good Dog", packs: ["mascots", "classic"], accent: "#e8b06a", create: createDog },
+  { id: "fox", name: "Fox", packs: ["mascots", "gaming"], accent: "#ff8a4a", create: createFox },
+  { id: "bunny", name: "Bunny", packs: ["mascots", "typing"], accent: CORAL, create: createBunny },
+  { id: "ghost", name: "Ghost", packs: ["mascots", "gaming"], accent: "#9db8ff", create: createGhost },
+  { id: "bat", name: "Bat", packs: ["mascots", "gaming"], accent: "#7d6bff", create: createBat },
+  { id: "chick", name: "Chick", packs: ["mascots", "typing"], accent: "#ffd75e", create: createChick },
 ];
 
 export const ANIMATED_CURSOR_IDS: string[] = CURSOR_PRESETS.map((p) => p.id);

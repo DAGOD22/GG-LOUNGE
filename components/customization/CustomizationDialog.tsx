@@ -75,7 +75,7 @@ export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onC
         </Section>
       </>}
       {tab==='cursor'&&<>
-        <Section title="Animated cursors" description="Twenty-four hand-built pointer engines: soft-body jelly, particle comets, verlet snake chains, glitch RGB-split, sonar pings and more. They react to what you hover - links, text, media, drag handles - and pulse when you click.">
+        <Section title="Animated cursors" description="Thirty-one hand-built pointer engines - including animated mascots (cat, dog, fox, bunny, ghost, bat, chick) with blinks, tail wags and pounce squashes -: soft-body jelly, particle comets, verlet snake chains, glitch RGB-split, sonar pings and more. They react to what you hover - links, text, media, drag handles - and pulse when you click.">
           <CursorGallery />
           <label className="gg-slider"><span>Size <b>{settings.cursor.size}px</b></span><input type="range" min={16} max={64} step={2} value={settings.cursor.size} onChange={e=>update(s=>({...s,cursor:{...s.cursor,size:Number(e.target.value)}}))} aria-label="Cursor size"/></label>
           <label className="gg-slider"><span>Follow speed <b>{Math.round(settings.cursor.speed*100)}%</b></span><input type="range" min={0} max={1} step={0.05} value={settings.cursor.speed} onChange={e=>update(s=>({...s,cursor:{...s.cursor,speed:Number(e.target.value)}}))} aria-label="Cursor follow speed"/></label>

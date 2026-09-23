@@ -36,7 +36,7 @@ export function defaults(): Settings { return {
   panic:{enabled:false,binding:{code:'Backquote',key:'`',ctrl:false,alt:false,shift:false,meta:false},destination:'about:blank',whileTyping:false},
   theme:{preset:'lounge',mode:'dark',colors:{...THEMES.lounge.colors}},
   background:{preset:'none',mediaId:'',mediaKind:'image',mediaName:'',dim:38,blur:0,fit:'cover',respectMotion:true},
-  cursor:{preset:'system',image:'',size:32,trail:false,speed:0.6,glow:true},
+  cursor:{preset:'system',image:'',size:40,trail:false,speed:0.6,glow:true},
   reactive:{enabled:false,style:'ripples',intensity:50,pointer:true},
 }; }
 const text=(v:unknown,fallback:string,max=200)=> typeof v==='string' ? v.slice(0,max) : fallback;
@@ -76,7 +76,7 @@ export function sanitizeSettings(input:unknown):Settings {
     panic:{enabled:bool(p.enabled,false),destination,whileTyping:bool(p.whileTyping,false),binding:{code,key:text(b.key,d.panic.binding.key,60),ctrl:bool(b.ctrl,false),alt:bool(b.alt,false),shift:bool(b.shift,false),meta:bool(b.meta,false)}},
     theme:{preset:oneOf(t.preset,[...Object.keys(THEMES),'custom'],'lounge'),mode:oneOf(t.mode,['dark','light'],'dark'),colors},
     background:{preset:oneOf(bg.preset,[...WALLPAPERS.map(x=>x.id),'upload'],'none'),mediaId:text(bg.mediaId,'',80),mediaKind:oneOf(bg.mediaKind,['image','video'],'image'),mediaName:text(bg.mediaName,'',160),dim:num(bg.dim,38,0,90),blur:num(bg.blur,0,0,24),fit:oneOf(bg.fit,['cover','contain'],'cover'),respectMotion:bool(bg.respectMotion,true)},
-    cursor:{preset:oneOf(LEGACY_CURSOR_MAP[cu.preset as string] ?? cu.preset,['system','custom',...ANIMATED_CURSOR_IDS],'system'),image:/^data:image\/png;base64,[a-z\d+/=]+$/i.test(text(cu.image,'',180000))?cu.image:'',size:num(cu.size,32,16,64),trail:bool(cu.trail,false),speed:num(cu.speed,0.6,0,1),glow:bool(cu.glow,true)},
+    cursor:{preset:oneOf(LEGACY_CURSOR_MAP[cu.preset as string] ?? cu.preset,['system','custom',...ANIMATED_CURSOR_IDS],'system'),image:/^data:image\/png;base64,[a-z\d+/=]+$/i.test(text(cu.image,'',180000))?cu.image:'',size:num(cu.size,40,16,64),trail:bool(cu.trail,false),speed:num(cu.speed,0.6,0,1),glow:bool(cu.glow,true)},
     reactive:{enabled:bool(r.enabled,false),style:oneOf(r.style,['ripples','particles','constellation'],'ripples'),intensity:num(r.intensity,50,10,100),pointer:bool(r.pointer,true)},
   };
 }
