@@ -48,9 +48,21 @@ export interface CursorInstance {
   draw: (ctx: CanvasRenderingContext2D, f: CursorFrame) => void;
 }
 
+export type CursorPack = 'gaming' | 'typing' | 'creative' | 'classic';
+
+export const CURSOR_PACKS: { id: 'all' | CursorPack; name: string }[] = [
+  { id: 'all', name: 'All' },
+  { id: 'gaming', name: 'Gaming' },
+  { id: 'typing', name: 'Typing' },
+  { id: 'creative', name: 'Creative' },
+  { id: 'classic', name: 'Classic' },
+];
+
 export interface CursorPreset {
   id: string;
   name: string;
+  /** which curated packs this preset belongs to */
+  packs: CursorPack[];
   accent: string;
   trailColor?: string;
   trailDefault?: boolean;
@@ -130,6 +142,12 @@ function seg(
   ctx.stroke();
   ctx.globalAlpha = 1;
 }
+/** eased blend for state morphs: fast out, soft landing */
+function easeOutCubic(a: number): number {
+  const k = clamp(a, 0, 1);
+  return 1 - Math.pow(1 - k, 3);
+}
+
 function noise1(seed: number): number {
   const v = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
   return v - Math.floor(v);
@@ -188,7 +206,7 @@ export function drawContextOverlays(ctx: CanvasRenderingContext2D, f: CursorFram
   if (f.hover === "text" && a > 0.02) {
     // draw-on I-beam with serif caps + soft blink when idle
     const blink = !f.reduced && f.speed < 0.4 ? (Math.floor(f.t * 1.7) % 2 === 0 ? 1 : 0.4) : 1;
-    const h = 11 * s * Math.min(1, a * 1.4);
+    const h = 11 * s * easeOutCubic(Math.min(1, a * 1.4));
     ctx.globalAlpha = a * blink;
     seg(ctx, f.x, f.y - h, f.x, f.y + h, WHITE, 1.7 * s);
     const cap = 4 * s * a;
@@ -216,9 +234,10 @@ export function drawContextOverlays(ctx: CanvasRenderingContext2D, f: CursorFram
   }
 
   if (f.hover === "media" && a > 0.02) {
-    // corner brackets that breathe
+    // corner brackets that breathe, eased in
+    const ea = easeOutCubic(a);
     const breathe = f.reduced ? 0 : Math.sin(f.t * 3.2) * 1.5;
-    const b = (11 + 4 * (1 - a) + breathe) * s;
+    const b = (11 + 4 * (1 - ea) + breathe) * s;
     const arm = 6.5 * s;
     ctx.globalAlpha = a * 0.95;
     ctx.strokeStyle = LIME;
@@ -242,8 +261,8 @@ export function drawContextOverlays(ctx: CanvasRenderingContext2D, f: CursorFram
   }
 
   if (f.hover === "grab" && a > 0.02) {
-    // four arrows spring outward; pressing pulls them in (grabbing)
-    const dist = lerp(11, 5.5, f.pressAmt) * s;
+    // four arrows spring outward (eased); pressing pulls them in (grabbing)
+    const dist = lerp(11, 5.5, f.pressAmt) * lerp(0.6, 1, easeOutCubic(a)) * s;
     const size = 3.4 * s;
     ctx.globalAlpha = a;
     ctx.fillStyle = LIME;
@@ -1063,20 +1082,20 @@ function createAurora(): CursorInstance {
 }
 
 export const CURSOR_PRESETS: CursorPreset[] = [
-  { id: "lounge", name: "Lounge Jelly", accent: LIME, create: createLounge },
-  { id: "comet", name: "Comet", accent: "#fff3b0", trailDefault: false, create: createComet },
-  { id: "jelly", name: "Lime Blob", accent: LIME, create: createJelly },
-  { id: "snake", name: "Neon Snake", accent: LIME, create: createSnake },
-  { id: "halo", name: "Halo", accent: VIOLET, create: createHalo },
-  { id: "pixel", name: "Pixel Pop", accent: WHITE, create: createPixel },
-  { id: "glitch", name: "Glitch", accent: CORAL, create: createGlitch },
-  { id: "orbit", name: "Orbit", accent: CORAL, create: createOrbit },
-  { id: "spray", name: "Spray Paint", accent: LIME, create: createSpray },
-  { id: "magnet", name: "Magnet", accent: VIOLET, create: createMagnet },
-  { id: "sonar", name: "Sonar", accent: LIME, create: createSonar },
-  { id: "ember", name: "Ember", accent: CORAL, create: createEmber },
-  { id: "prism", name: "Prism", accent: VIOLET, create: createPrism },
-  { id: "aurora", name: "Aurora Ribbon", accent: "#7df3d1", create: createAurora },
+  { id: "lounge", name: "Lounge Jelly", packs: ['classic', 'typing', 'creative'], accent: LIME, create: createLounge },
+  { id: "comet", name: "Comet", packs: ['gaming'], accent: "#fff3b0", trailDefault: false, create: createComet },
+  { id: "jelly", name: "Lime Blob", packs: ['typing', 'creative'], accent: LIME, create: createJelly },
+  { id: "snake", name: "Neon Snake", packs: ['gaming'], accent: LIME, create: createSnake },
+  { id: "halo", name: "Halo", packs: ['classic', 'typing'], accent: VIOLET, create: createHalo },
+  { id: "pixel", name: "Pixel Pop", packs: ['classic', 'gaming'], accent: WHITE, create: createPixel },
+  { id: "glitch", name: "Glitch", packs: ['gaming', 'creative'], accent: CORAL, create: createGlitch },
+  { id: "orbit", name: "Orbit", packs: ['creative', 'classic'], accent: CORAL, create: createOrbit },
+  { id: "spray", name: "Spray Paint", packs: ['creative'], accent: LIME, create: createSpray },
+  { id: "magnet", name: "Magnet", packs: ['typing', 'creative'], accent: VIOLET, create: createMagnet },
+  { id: "sonar", name: "Sonar", packs: ['gaming', 'classic'], accent: LIME, create: createSonar },
+  { id: "ember", name: "Ember", packs: ['gaming'], accent: CORAL, create: createEmber },
+  { id: "prism", name: "Prism", packs: ['creative'], accent: VIOLET, create: createPrism },
+  { id: "aurora", name: "Aurora Ribbon", packs: ['creative'], accent: "#7df3d1", create: createAurora },
 ];
 
 export const ANIMATED_CURSOR_IDS: string[] = CURSOR_PRESETS.map((p) => p.id);

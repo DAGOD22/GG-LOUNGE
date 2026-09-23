@@ -4,9 +4,11 @@
 // every visible preview canvas; each canvas owns an isolated animation
 // instance so particle systems and soft-body state never leak between tiles.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
+  CURSOR_PACKS,
   CURSOR_PRESETS,
+  type CursorPack,
   getCursorPreset,
   renderCursorPreview,
   type CursorInstance,
@@ -15,6 +17,8 @@ import { useCustomization } from './CustomizationProvider';
 
 export function CursorGallery() {
   const { settings, update } = useCustomization();
+  const [pack, setPack] = useState<'all' | CursorPack>('all');
+  const visible = pack === 'all' ? CURSOR_PRESETS : CURSOR_PRESETS.filter((p) => p.packs.includes(pack));
   const refs = useRef(new Map<string, HTMLCanvasElement>());
   const instances = useRef(new Map<string, CursorInstance>());
 
@@ -47,7 +51,12 @@ export function CursorGallery() {
 
   return (
     <div className="gg-cursor-grid" role="listbox" aria-label="Animated cursor presets">
-      {CURSOR_PRESETS.map((preset) => (
+      <div className="gg-chip-row" role="tablist" aria-label="Cursor packs">
+        {CURSOR_PACKS.map((pk) => (
+          <button key={pk.id} type="button" aria-pressed={pack === pk.id} className="gg-chip" onClick={() => setPack(pk.id)}>{pk.name}</button>
+        ))}
+      </div>
+      {visible.map((preset) => (
         <button
           key={preset.id}
           type="button"

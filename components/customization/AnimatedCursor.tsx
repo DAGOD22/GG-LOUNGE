@@ -51,7 +51,7 @@ export function AnimatedCursor({ cursor }: Props) {
   const settings = {
     enabled: ANIMATED_CURSOR_IDS.includes(cursor.preset),
     preset: ANIMATED_CURSOR_IDS.includes(cursor.preset) ? cursor.preset : "lounge",
-    scale: Math.max(0.6, Math.min(1.6, cursor.size / 32)),
+    scale: Math.max(0.5, Math.min(2, cursor.size / 32)),
     speed: cursor.speed,
     trail: cursor.trail,
     trailLength: 0.5,
@@ -116,6 +116,27 @@ export function AnimatedCursor({ cursor }: Props) {
 
     let instance: CursorInstance = getCursorPreset(settingsRef.current.preset).create();
 
+    /* per-context spring stiffness: text feels tight & precise, games loose,
+       disabled controls heavy — the pointer "weighs" different per surface */
+    const CTX_K: Record<HoverState, number> = {
+      text: 1.4,
+      link: 1.05,
+      default: 1,
+      grab: 0.9,
+      media: 0.95,
+      disabled: 0.8,
+    };
+    /* magnetic pull of the lagging ring toward the hovered element's centre */
+    const MAG: Record<HoverState, number> = {
+      link: 0.38,
+      media: 0.26,
+      grab: 0.18,
+      default: 0,
+      text: 0,
+      disabled: 0,
+    };
+    const hist: { x: number; y: number }[] = [];
+
     function onMove(e: PointerEvent) {
       if (e.pointerType !== "mouse" && e.pointerType !== "pen") return;
       tx = e.clientX;
@@ -177,16 +198,29 @@ export function AnimatedCursor({ cursor }: Props) {
       prev = now;
       const t = (now - startTime) / 1000;
 
-      const k = 0.16 + s.speed * 0.34;
-      const k2 = 0.07 + s.speed * 0.16;
+      const k = (0.16 + s.speed * 0.34) * CTX_K[hover];
+      const k2 = (0.07 + s.speed * 0.16) * (hover === "text" ? 1.3 : 1);
       const kk = dt / 16.67;
 
       px = x;
       py = y;
       x += (tx - x) * k * kk;
       y += (ty - y) * k * kk;
-      rx += (x - rx) * k2 * kk;
-      ry += (y - ry) * k2 * kk;
+      // magnetic snap: the lag ring leans into the hovered element's centre
+      let ringTx = x;
+      let ringTy = y;
+      const mag = MAG[hover];
+      if (targetRect && mag > 0) {
+        const pull = mag * hoverAmt;
+        ringTx = x + (targetRect.x + targetRect.w / 2 - x) * pull;
+        ringTy = y + (targetRect.y + targetRect.h / 2 - y) * pull;
+      }
+      rx += (ringTx - rx) * k2 * kk;
+      ry += (ringTy - ry) * k2 * kk;
+
+      // motion-blur history (velocity ghosts)
+      hist.unshift({ x, y });
+      if (hist.length > 6) hist.length = 6;
       vx = x - px;
       vy = y - py;
       speed = Math.hypot(vx, vy);
@@ -240,6 +274,12 @@ export function AnimatedCursor({ cursor }: Props) {
         rect: targetRect,
       };
       const useTrail = s.trail && !reduced ? trail : null;
+      // velocity ghosts: soft accent after-images on fast flicks
+      if (!reduced && speed > 6 && hist.length > 4) {
+        const accent = getCursorPreset(s.preset).accent;
+        dot(c, hist[2].x, hist[2].y, 3 * s.scale, accent, 0.12);
+        dot(c, hist[4].x, hist[4].y, 2.4 * s.scale, accent, 0.06);
+      }
       drawCursorScene(c, instance, f, useTrail, animRect);
     }
 
@@ -271,6 +311,23 @@ export function AnimatedCursor({ cursor }: Props) {
       }}
     />
   );
+}
+
+function dot(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  color: string,
+  alpha: number,
+) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.arc(x, y, Math.max(0.4, r), 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.restore();
 }
 
 function lerp(a: number, b: number, t: number): number {
