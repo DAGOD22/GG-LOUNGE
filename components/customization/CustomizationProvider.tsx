@@ -1,6 +1,7 @@
 'use client';
 import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { Settings2 } from 'lucide-react';
+import { AnimatedCursor } from './AnimatedCursor';
 import { defaults, sanitizeSettings, SETTINGS_KEY, THEMES, WALLPAPERS, iconHref, normalizeDestination, matchesBinding, isTypingTarget, accentInk, cursorValue, type Settings } from '@/lib/customization/settings';
 import { getMedia } from '@/lib/customization/media';
 import { watchFrameEvents } from '@/lib/customization/frame-events';
@@ -76,5 +77,6 @@ export function CustomizationProvider({children}:{children:ReactNode}) {
     <div className="gg-site-content">{children}</div>
     <button type="button" className="gg-customize-trigger" onClick={openSettings} aria-label="Customize lounge" title="Customize appearance, tab and panic key"><Settings2 size={17}/><span>Customize</span></button>
     <CustomizationDialog open={open} onClose={()=>{setOpen(false);setCapturing(false);}} onPlayVideo={()=>{video.current?.play().then(()=>setMediaError('')).catch(()=>setMediaError('Playback is blocked or the format is unsupported.'));}}/>
+      <AnimatedCursor cursor={settings.cursor} />
   </CustomizationContext.Provider>;
 }
