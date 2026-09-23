@@ -37,8 +37,12 @@ export function CursorGallery() {
           inst = getCursorPreset(id).create();
           instances.current.set(id, inst);
         }
-        ctx.setTransform(2, 0, 0, 2, 0, 0);
-        renderCursorPreview(ctx, inst, canvas.width / 2, canvas.height / 2, t + id.length * 1.7, prevT);
+        try {
+          ctx.setTransform(2, 0, 0, 2, 0, 0);
+          renderCursorPreview(ctx, inst, canvas.width / 2, canvas.height / 2, t + id.length * 1.7, prevT);
+        } catch {
+          // a bad frame in one preset must never stop the other previews
+        }
       });
       prevT = t;
     };

@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "audit:games": "node scripts/audit-games.mjs",
     "prepare:customization": "esbuild scripts/customization-game.ts --bundle --minify --format=iife --target=es2020 --outfile=public/customization-game.js",
-    "lint": "eslint . --max-warnings=0"
+    "lint": "eslint . --max-warnings=0",
+    "test:cursors": "tsx scripts/cursor-smoke.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

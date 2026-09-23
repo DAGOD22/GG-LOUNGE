@@ -281,7 +281,11 @@ export function AnimatedCursor({ cursor }: Props) {
         dot(c, hist[2].x, hist[2].y, 3 * s.scale, accent, 0.12);
         dot(c, hist[4].x, hist[4].y, 2.4 * s.scale, accent, 0.06);
       }
-      drawCursorScene(c, instance, f, useTrail, animRect);
+      try {
+        drawCursorScene(c, instance, f, useTrail, animRect);
+      } catch {
+        // a malformed frame must never kill the cursor loop
+      }
     }
 
     raf = requestAnimationFrame(frame);
