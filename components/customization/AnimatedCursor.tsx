@@ -18,6 +18,7 @@ import {
   type HoverState,
 } from "@/lib/customization/cursor-presets";
 import type { Settings } from "@/lib/customization/settings";
+import { AfterglowLayer } from "./AfterglowLayer";
 
 interface Props {
   cursor: Settings["cursor"];
@@ -300,16 +301,19 @@ export function AnimatedCursor({ cursor }: Props) {
   if (!settings.enabled) return null;
 
   return (
-    <canvas
-      ref={canvasRef}
-      aria-hidden="true"
-      style={{
-        position: "fixed",
-        inset: 0,
-        pointerEvents: "none",
-        zIndex: 2147483000,
-      }}
-    />
+    <>
+      <AfterglowLayer source={canvasRef} enabled={cursor.glow !== false} />
+      <canvas
+        ref={canvasRef}
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 2147483000,
+        }}
+      />
+    </>
   );
 }
 
