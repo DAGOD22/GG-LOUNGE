@@ -1,0 +1,365 @@
+/* GG Lounge proxy chrome — readable inputs are the #1 fix here:
+   explicit light text + dark color-scheme so browsers/autofill/dark-mode
+   forced colors can never paint black-on-black in the address bar. */
+
+.pgx-shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(circle at 85% -10%, rgba(125, 107, 255, 0.16), transparent 34rem),
+    var(--background, #0b0d12);
+  color: var(--foreground, #f4f2ec);
+  color-scheme: dark;
+}
+
+.pgx-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px clamp(10px, 2vw, 18px);
+  border-bottom: 1px solid var(--line, rgba(244, 242, 236, 0.13));
+  background: rgba(13, 16, 23, 0.92);
+  backdrop-filter: blur(10px);
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.pgx-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: var(--foreground, #f4f2ec);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.pgx-brand span {
+  color: var(--lime, #d7f34a);
+  font-weight: 700;
+}
+
+.pgx-nav {
+  display: flex;
+  gap: 5px;
+}
+.pgx-nav button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--line, rgba(244, 242, 236, 0.13));
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--foreground, #f4f2ec);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.pgx-nav button:hover:not(:disabled) {
+  background: rgba(215, 243, 74, 0.14);
+  border-color: rgba(215, 243, 74, 0.45);
+}
+.pgx-nav button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.pgx-form {
+  flex: 1 1 260px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 200px;
+  padding: 6px 8px 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(215, 243, 74, 0.38);
+  background: rgba(5, 7, 11, 0.9);
+  color: var(--muted, #9699a8);
+}
+.pgx-form:focus-within {
+  border-color: var(--lime, #d7f34a);
+  box-shadow: 0 0 0 3px rgba(215, 243, 74, 0.16);
+}
+
+/* THE fix for "typing is black": force light text, dark scheme, light caret. */
+.pgx-form input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #f4f2ec !important;
+  caret-color: var(--lime, #d7f34a);
+  font-size: 14px;
+  color-scheme: dark;
+  -webkit-text-fill-color: #f4f2ec;
+}
+.pgx-form input::placeholder {
+  color: #8b90a0 !important;
+  -webkit-text-fill-color: #8b90a0;
+  opacity: 1;
+}
+.pgx-form input:-webkit-autofill,
+.pgx-form input:-webkit-autofill:hover,
+.pgx-form input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f4f2ec !important;
+  -webkit-box-shadow: 0 0 0 1000px #0a0d13 inset !important;
+  caret-color: #f4f2ec;
+  transition: background-color 9999s ease-out;
+}
+.pgx-form > svg {
+  flex: none;
+  color: var(--lime, #d7f34a);
+}
+
+.pgx-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: var(--lime, #d7f34a);
+  color: var(--ink, #0b0d12);
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.pgx-go:hover {
+  filter: brightness(1.06);
+}
+
+.pgx-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 340px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--muted, #9699a8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pgx-status.is-loading {
+  color: var(--lime, #d7f34a);
+}
+.pgx-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lime, #d7f34a);
+  animation: pgx-pulse 1s ease-in-out infinite;
+  flex: none;
+}
+@keyframes pgx-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.75);
+  }
+}
+
+.pgx-alerts {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 10px clamp(10px, 2vw, 18px) 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 108, 131, 0.5);
+  background: rgba(44, 25, 32, 0.9);
+  color: #ffd4d8;
+  border-radius: 12px;
+  font-size: 13px;
+}
+.pgx-alerts svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--coral, #ff6c83);
+}
+.pgx-alerts p {
+  margin: 0 0 4px;
+}
+.pgx-alerts p:last-child {
+  margin-bottom: 0;
+}
+
+.pgx-home {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 16px;
+  padding: clamp(28px, 6vh, 70px) 20px;
+}
+.pgx-home h1 {
+  margin: 0;
+  font-size: clamp(2.6rem, 7vw, 5.4rem);
+  line-height: 0.9;
+  letter-spacing: -0.07em;
+  font-weight: 900;
+  max-width: 780px;
+}
+.pgx-home h1 em {
+  color: var(--lime, #d7f34a);
+  font-style: normal;
+}
+.pgx-lede {
+  max-width: 560px;
+  color: var(--muted, #9699a8);
+  font-size: 14px;
+  line-height: 1.65;
+  margin: 0;
+}
+.pgx-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 6px;
+}
+.pgx-quick button {
+  display: grid;
+  gap: 2px;
+  padding: 12px 22px;
+  border-radius: 14px;
+  border: 1px solid var(--line, rgba(244, 242, 236, 0.13));
+  background: var(--panel, #141720);
+  color: var(--foreground, #f4f2ec);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.15s, border-color 0.15s;
+}
+.pgx-quick button strong {
+  font-size: 14px;
+}
+.pgx-quick button small {
+  color: var(--muted, #9699a8);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.pgx-quick button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(215, 243, 74, 0.5);
+}
+.pgx-quick button:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+.pgx-allow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--muted, #9699a8);
+  margin: 4px 0 0;
+}
+.pgx-allow svg {
+  color: var(--lime, #d7f34a);
+}
+
+.pgx-honesty {
+  max-width: 620px;
+  margin-top: 14px;
+  padding: 18px 20px;
+  border: 1px dashed var(--line, rgba(244, 242, 236, 0.13));
+  border-radius: 16px;
+  text-align: left;
+  background: rgba(20, 23, 32, 0.6);
+}
+.pgx-honesty h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lime, #d7f34a);
+}
+.pgx-honesty ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted, #9699a8);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.pgx-honesty p {
+  margin: 12px 0 0;
+  font-size: 11px;
+  color: var(--muted, #9699a8);
+}
+.pgx-honesty code {
+  color: var(--foreground, #f4f2ec);
+}
+
+.pgx-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.pgx-frame {
+  flex: 1;
+  width: 100%;
+  min-height: calc(100dvh - 110px);
+  border: 0;
+  background: #fff;
+}
+.pgx-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 7px clamp(10px, 2vw, 18px);
+  border-top: 1px solid var(--line, rgba(244, 242, 236, 0.13));
+  background: rgba(13, 16, 23, 0.92);
+  font-size: 11px;
+  color: var(--muted, #9699a8);
+}
+.pgx-foot span,
+.pgx-foot a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pgx-foot a {
+  color: var(--lime, #d7f34a);
+  text-decoration: none;
+}
+.pgx-foot a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 720px) {
+  .pgx-status {
+    order: 5;
+    flex: 1 1 100%;
+    max-width: none;
+    white-space: normal;
+  }
+  .pgx-brand span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pgx-dot {
+    animation: none;
+  }
+  .pgx-quick button {
+    transition: none;
+  }
+}

@@ -1686,6 +1686,7 @@ const Game = {
   level: null,
   player: null,
   deaths: 0,
+  failedLevels: new Set(),
   invertControls: false,
   flags: {},
   deathT: 0,
@@ -1732,6 +1733,7 @@ const Game = {
   die(x, y) {
     if (this.state !== "play") return;
     this.deaths++;
+    this.failedLevels.add(this.levelIndex);
     saveProgress();
     updateDeathHud();
     AudioFX.death();
@@ -1744,11 +1746,14 @@ const Game = {
   },
 
   winLevel() {
+    if (this.state !== "play") return;
     this.state = "win";
     this.winT = 0;
     AudioFX.win();
     const done = getDone();
     done[this.levelIndex] = true;
+    window.GGLounge?.emit('cleared', Object.values(done).filter(Boolean).length);
+    if (this.failedLevels.has(this.levelIndex)) window.GGLounge?.emit('comeback', 1);
     localStorage.setItem("fd_done", JSON.stringify(done));
   },
 

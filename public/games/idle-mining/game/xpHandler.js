@@ -33,6 +33,7 @@ function checkLevelUp()
     let rpGained = globals.Exp.Level;
     globals.Exp.ResearchPoints += rpGained;
     globals.Exp.Level ++;
+    window.GGLounge?.emit('level', globals.Exp.Level);
     if(globals.Exp.Level >= 3)logMessage("Leveled Up! Gained " + rpGained.toString() + " research points!  Check the Research Panel to see if you unlocked anything!");
     else logMessage("Leveled Up! Gained " + rpGained.toString() + " research points!");
   }
