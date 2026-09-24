@@ -4949,6 +4949,7 @@ Game.Launch=function()
 			if (Game.OnAscend) return;
 			Game.cookies+=howmuch;
 			Game.cookiesEarned+=howmuch;
+			if (howmuch>0) window.GGLounge?.emit("baked",Game.cookiesEarned);
 		}
 		Game.Spend=function(howmuch)
 		{
@@ -5085,6 +5086,7 @@ Game.Launch=function()
 				
 				Game.playCookieClickSound();
 				Game.cookieClicks++;
+				window.GGLounge?.emit("clicks",Game.cookieClicks);
 				
 				if (Game.clicksThisSession==0) PlayCue('preplay');
 				Game.clicksThisSession++;
@@ -8225,6 +8227,7 @@ Game.Launch=function()
 						if (this.amount==1 && this.id!=0) l('row'+this.id).classList.add('enabled');
 						this.highest=Math.max(this.highest,this.amount);
 						Game.BuildingsOwned++;
+						window.GGLounge?.emit("buildings",Game.BuildingsOwned);
 						success=1;
 					}
 				}

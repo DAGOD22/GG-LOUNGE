@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>FableDevil · GG-Lounge</title>
+  <link rel="stylesheet" href="/games/level-devil/style.css">
+  <script src="/games/gg-events.js"></script>
+</head>
+<body>
+  <div id="topbar"><button id="btn-theme" class="ic-btn" aria-label="Toggle theme"><span id="ic-theme"></span></button><button id="btn-mute" class="ic-btn" aria-label="Toggle sound"><span id="ic-mute"></span></button><button id="btn-fs" class="ic-btn" aria-label="Fullscreen"><span id="ic-fs"></span></button></div>
+  <main id="stage">
+    <canvas id="game" width="960" height="540" aria-label="FableDevil platformer"></canvas>
+    <section id="menu"><div class="menu-inner"><h1 class="title"><span class="t-fable">FABLE</span><span class="t-devil">DEVIL</span></h1><p class="subtitle">A clean little rage platformer. Trust nothing.</p><button id="play-btn">PLAY</button><p class="grid-label">Choose your level</p><div id="level-grid"></div><p class="menu-deaths">Deaths: <span id="menu-deaths">0</span></p><p class="subtitle">← → / A D to move · Space to jump · R to retry</p></div></section>
+    <div id="hud" class="hidden"><div class="hud-left"><span id="hud-levelnum">1</span><span id="hud-levelname"></span></div><div class="hud-right">Deaths <span id="hud-deaths">0</span><span class="hint">R to restart</span></div></div>
+    <section id="end-screen" class="hidden"><div class="menu-inner"><h2 class="title">You made it.</h2><p id="end-roast"></p><p>Deaths: <span id="end-deaths">0</span></p><button id="end-menu-btn">BACK TO MENU</button></div></section>
+  </main>
+  <div id="touch-controls" class="hidden"><div class="tc-group"><button id="tc-left" class="tc-btn" aria-label="Move left">←</button><button id="tc-right" class="tc-btn" aria-label="Move right">→</button></div><div class="tc-group tc-actions"><button id="tc-restart" class="tc-btn tc-small" aria-label="Restart">↻</button><button id="tc-jump" class="tc-btn tc-jump" aria-label="Jump">↑</button></div></div>
+  <div id="rotate-hint">Rotate your device to landscape for the best experience.</div>
+  <!-- Bundled MIT-licensed FableDevil by Leonxlnx. See /games/level-devil/LICENSE. -->
+  <script src="/games/level-devil/game.js"></script>
+</body>
+</html>

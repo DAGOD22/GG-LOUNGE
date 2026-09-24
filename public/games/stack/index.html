@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" >
 <head>
+<script src="/games/gg-events.js"></script>
   <meta charset="UTF-8">
   <title>Javascript Stack Game</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><link rel="stylesheet" href="./style.css">
@@ -353,6 +354,7 @@ class Game {
     startGame() {
         if (this.state != this.STATES.PLAYING) {
             this.scoreContainer.innerHTML = '0';
+            this.perfectStreak = 0;
             this.updateState(this.STATES.PLAYING);
             this.addBlock();
         }
@@ -379,8 +381,12 @@ class Game {
         let currentBlock = this.blocks[this.blocks.length - 1];
         let newBlocks = currentBlock.place();
         this.newBlocks.remove(currentBlock.mesh);
-        if (newBlocks.placed)
+        if (newBlocks.placed) {
             this.placedBlocks.add(newBlocks.placed);
+            this.perfectStreak = newBlocks.bonus ? (this.perfectStreak || 0) + 1 : 0;
+            window.GGLounge?.emit('height', this.blocks.length - 1);
+            window.GGLounge?.emit('perfectStreak', this.perfectStreak);
+        }
         if (newBlocks.chopped) {
             this.choppedBlocks.add(newBlocks.chopped);
             let positionParams = { y: '-=30', ease: Power1.easeIn, onComplete: () => this.choppedBlocks.remove(newBlocks.chopped) };
