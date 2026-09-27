@@ -117,8 +117,7 @@ function disableButtons() {
 
 function goToMods() {
   storeItem('globals', globals);
-  if(desktop)location.href = "file:///home/me/Desktop/P5%20Offline/game/importMod.html";
-  else location.href = "importMod.html";
+  location.href = "importMod.html";
 }
 
 function saveGame() {

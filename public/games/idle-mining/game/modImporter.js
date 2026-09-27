@@ -131,12 +131,7 @@ function home()
     storeItem('mods', mods);
     storeItem('globals', globals);
     // go to game.html
-    if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
-      location.href = "file:///home/me/Desktop/P5%20Offline/game/game.html";
-    }
-    else {
-      location.href = "game.html";
-    }
+    location.href = "game.html";
   } catch (e) {
     errorElement.html("<b>Encountered an error while combining:<br>" + e + "</b>");
   }

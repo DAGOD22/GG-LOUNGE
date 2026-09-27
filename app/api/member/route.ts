@@ -18,10 +18,24 @@ export async function GET() {
 }
 export async function POST(request: Request) {
   const session = await member(); if (!session?.user) return NextResponse.json({ error: 'Sign in required' }, { status: 401 })
-  const body = await request.json(); const userId = session.user.id; const username = String(body.username || session.user.name || 'Player').slice(0, 40)
-  await pool.query('INSERT INTO "profile" ("id","userId","username") VALUES ($1,$2,$3) ON CONFLICT ("userId") DO UPDATE SET "username"=EXCLUDED."username"', [randomUUID(), userId, username])
-  if (body.action === 'note') await pool.query('INSERT INTO "note" ("id","userId","title","body") VALUES ($1,$2,$3,$4)', [randomUUID(), userId, String(body.title || 'Untitled').slice(0, 100), String(body.note || '').slice(0, 10000)])
-  if (body.action === 'chat') await pool.query('INSERT INTO "chat_message" ("id","userId","username","body") VALUES ($1,$2,$3,$4)', [randomUUID(), userId, username, String(body.message || '').trim().slice(0, 500)])
-  if (body.action === 'achievement') await pool.query('INSERT INTO "achievement" ("id","userId","slug") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', [randomUUID(), userId, String(body.slug).slice(0, 80)])
-  return NextResponse.json({ ok: true })
+  let body
+  try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  if (!['note', 'chat'].includes(body?.action)) return NextResponse.json({ error: 'Unsupported action. Achievements are earned through gameplay.' }, { status: 400 })
+  const content = String(body.action === 'note' ? body.note || '' : body.message || '').trim()
+  if (!content) return NextResponse.json({ error: 'Write something first.' }, { status: 400 })
+  const userId = session.user.id
+  const username = String(session.user.name || 'Player').slice(0, 40)
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query('INSERT INTO "profile" ("id","userId","username") VALUES ($1,$2,$3) ON CONFLICT ("userId") DO UPDATE SET "username"=EXCLUDED."username"', [randomUUID(), userId, username])
+    if (body.action === 'note') await client.query('INSERT INTO "note" ("id","userId","title","body") VALUES ($1,$2,$3,$4)', [randomUUID(), userId, String(body.title || 'Untitled').slice(0, 100), content.slice(0, 10000)])
+    else await client.query('INSERT INTO "chat_message" ("id","userId","username","body") VALUES ($1,$2,$3,$4)', [randomUUID(), userId, username, content.slice(0, 500)])
+    const award = await client.query('INSERT INTO "achievement" ("id","userId","slug") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING "slug"', [randomUUID(), userId, body.action])
+    await client.query('COMMIT')
+    return NextResponse.json({ ok: true, unlocked: award.rows.map(row => row.slug) })
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally { client.release() }
 }

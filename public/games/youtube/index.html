@@ -5,20 +5,136 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>GG-Lounge YouTube</title>
   <style>
-    :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0f1014;color:#f5f5f5;font:16px system-ui,sans-serif;display:grid;place-items:center;padding:24px}.app{width:min(980px,100%)}h1{color:#ff4d5f;text-align:center;font-size:clamp(28px,5vw,48px);margin:0 0 24px}.search{display:flex;gap:10px;margin-bottom:24px}.search input{flex:1;min-width:0;border:1px solid #3b3e47;background:#1b1d24;color:inherit;border-radius:999px;padding:14px 18px;font-size:16px}.search button{border:0;border-radius:999px;padding:0 24px;background:#ff4d5f;color:#fff;font-weight:700;cursor:pointer}.player{aspect-ratio:16/9;background:#050505;border:1px solid #30323a;border-radius:16px;overflow:hidden;box-shadow:0 18px 50px #0008}.player iframe{width:100%;height:100%;border:0}.hint{text-align:center;color:#9599a6;margin-top:12px;font-size:14px}
+    :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0f1014;color:#f5f5f5;font:16px system-ui,sans-serif;display:grid;place-items:center;padding:24px}.app{width:min(980px,100%)}h1{color:#ff4d5f;text-align:center;font-size:clamp(28px,5vw,48px);margin:0 0 24px}.search{display:flex;gap:10px;margin-bottom:24px}.search input{flex:1;min-width:0;border:1px solid #3b3e47;background:#1b1d24;color:inherit;border-radius:999px;padding:14px 18px;font-size:16px}.search button{border:0;border-radius:999px;padding:0 24px;background:#ff4d5f;color:#fff;font-weight:700;cursor:pointer}.player{aspect-ratio:16/9;background:#050505;border:1px solid #30323a;border-radius:16px;overflow:hidden;box-shadow:0 18px 50px #0008}.player iframe{width:100%;height:100%;border:0}.hint{text-align:center;color:#9599a6;margin-top:12px;font-size:14px;line-height:1.5}.hint a{color:#ff4d5f}.hint.warn{color:#ffb3bd}.hint.bad{color:#ff8a97}
   </style>
 </head>
 <body>
   <main class="app">
     <h1>YouTube Lounge</h1>
-    <form class="search" id="form"><input id="url" placeholder="Paste a youtube.com or youtu.be link" aria-label="YouTube URL"><button>Load video</button></form>
-    <section class="player"><iframe id="player" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></section>
-    <p class="hint" id="status">Uses YouTube's official privacy-enhanced embed player. No proxy or network bypass.</p>
+    <form class="search" id="form"><input id="url" placeholder="Paste a youtube.com or youtu.be link (or video ID)" aria-label="YouTube URL"><button>Load video</button></form>
+    <section class="player"><iframe id="player" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></section>
+    <p class="hint" id="status">Uses YouTube's official privacy-enhanced embed player (youtube-nocookie.com). No proxy, no network bypass.</p>
+    <p class="hint" id="links" hidden><a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" id="search-link">Search &amp; browse on youtube.com (opens the real site) →</a></p>
   </main>
   <script>
-    const form=document.getElementById('form'),input=document.getElementById('url'),player=document.getElementById('player'),status=document.getElementById('status');
-    function videoId(value){try{const url=new URL(value);if(url.hostname==='youtu.be')return url.pathname.slice(1).split('/')[0];if(url.hostname.endsWith('youtube.com'))return url.searchParams.get('v')||url.pathname.split('/').filter(Boolean).pop()}catch{}return /^[\w-]{11}$/.test(value)?value:null}
-    form.addEventListener('submit',e=>{e.preventDefault();const id=videoId(input.value.trim());if(!id){status.textContent='Enter a valid YouTube video URL or 11-character video ID.';return}player.src='https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'?autoplay=1&rel=0';status.textContent='Loaded through YouTube privacy-enhanced embed.'});
+  (function () {
+    'use strict'
+    var EMBED = 'https://www.youtube-nocookie.com/embed/'
+    var ID_RE = /^[\w-]{11}$/
+    var form = document.getElementById('form')
+    var input = document.getElementById('url')
+    var player = document.getElementById('player')
+    var statusEl = document.getElementById('status')
+    var links = document.getElementById('links')
+
+    // Strict ID extraction — every candidate must be an 11-char YouTube ID,
+    // so we can never navigate the player to garbage like "/embed/watch".
+    function videoId(value) {
+      value = String(value || '').trim()
+      if (ID_RE.test(value)) return value
+      var url
+      try { url = new URL(value) } catch (e) { return null }
+      var host = url.hostname.replace(/^www\./, '')
+      if (host === 'youtu.be') {
+        var short = url.pathname.slice(1).split('/')[0]
+        return ID_RE.test(short) ? short : null
+      }
+      if (host === 'youtube.com' || host === 'youtube-nocookie.com' || /(\.|^)youtube\.com$/.test(host)) {
+        var q = url.searchParams.get('v')
+        if (q && ID_RE.test(q)) return q
+        var seg = url.pathname.split('/').filter(Boolean)
+        if (seg.length >= 2 && ['shorts', 'embed', 'live', 'v', 'e'].indexOf(seg[0]) !== -1 && ID_RE.test(seg[1])) return seg[1]
+      }
+      return null
+    }
+
+    // Reachability probe: a no-cors request to the embed origin. It cannot
+    // read anything (opaque response) — it only tells us whether THIS network
+    // can reach YouTube at all, so we never mislabel an embedding/player
+    // reachability problem as a player/embedding problem (or vice versa).
+    var reach = 'unknown' // unknown | probing | ok | fail | offline
+    function probe() {
+      if (!navigator.onLine) { reach = 'offline'; render(); return Promise.resolve(reach) }
+      reach = 'probing'; render()
+      return fetch(EMBED + 'favicon.ico', { mode: 'no-cors', cache: 'no-store', credentials: 'omit' })
+        .then(function () { reach = 'ok'; render(); return reach })
+        .catch(function () { reach = 'fail'; render(); return reach })
+    }
+
+    function hasVideo() { return !!currentId }
+    var currentId = null
+
+    function render() {
+      links.hidden = !hasVideo()
+      var base
+      if (reach === 'offline') {
+        statusEl.className = 'hint bad'
+        statusEl.textContent = 'You appear to be offline — your device itself reports no network connection. Reconnect, then reload this page.'
+        return
+      }
+      if (reach === 'fail') {
+        statusEl.className = 'hint bad'
+        statusEl.textContent = 'This network cannot reach YouTube (DNS or connection blocked, or YouTube is unreachable from here). The app itself is working — the real cause is the network path to YouTube, nothing in this app.'
+        return
+      }
+      if (reach === 'probing' || reach === 'unknown') {
+        statusEl.className = 'hint'
+        statusEl.textContent = 'Checking whether YouTube is reachable from this network…'
+        return
+      }
+      // reach === 'ok'
+      statusEl.className = hasVideo() ? 'hint' : 'hint'
+      statusEl.textContent = hasVideo()
+        ? 'Playing through YouTube\u2019s official privacy-enhanced embed. If the player itself shows an error, YouTube rejected that video \u2014 private, embedding disabled by the creator, region-blocked, or playback restrictions. The app cannot and does not bypass that.'
+        : 'Paste any youtube.com / youtu.be link or an 11-character video ID and press Load. YouTube is reachable from this network.'
+    }
+
+    function load(id, viaHash) {
+      currentId = id
+      player.src = EMBED + encodeURIComponent(id) + '?rel=0&autoplay=1'
+      if (!viaHash && location.hash.slice(1) !== id) {
+        // Persist the video in the URL so refresh/back keep working.
+        location.hash = id
+      }
+      render()
+      probe()
+    }
+
+    function clear() {
+      currentId = null
+      player.removeAttribute('src')
+      render()
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault()
+      var id = videoId(input.value)
+      if (!id) {
+        statusEl.className = 'hint warn'
+        statusEl.textContent = 'Enter a valid YouTube URL (youtube.com/watch?v=…, youtu.be/…, /shorts/…) or an 11-character video ID.'
+        return
+      }
+      input.value = id
+      load(id, false)
+    })
+
+    // Refresh / back / forward: the hash IS the app state.
+    window.addEventListener('hashchange', function () {
+      var id = location.hash.slice(1)
+      if (ID_RE.test(id)) load(id, true)
+      else clear()
+    })
+
+    // Startup: restore from hash (refresh keeps the video), then probe.
+    var initial = location.hash.slice(1)
+    if (ID_RE.test(initial)) load(initial, true)
+    else render()
+    probe()
+    player.addEventListener('load', function () {
+      // Frame answered; re-render so the status reflects the latest probe.
+      render()
+    })
+  })()
   </script>
 </body>
 </html>

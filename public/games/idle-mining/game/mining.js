@@ -1,7 +1,10 @@
+let ggGatherCount = 0;
 function gatherResource(resource)
 {
+  if (!globals.resources[resource] || globals.resources[resource].strength > globals.pickaxeLevel) return;
   let addition = globals.clickMulti + round(Math.sqrt(globals.pickaxeLevel - globals.resources[resource].strength));
   globals.resources[resource].amount += globals.clickMulti;
+  window.GGLounge?.emit('gathers', ++ggGatherCount);
   gainXP(globals.resources[resource].xp * globals.clickMulti + (globals.pickaxeLevel - globals.resources[resource].strength));
 }
 
