@@ -98,6 +98,68 @@ ok(rD.status === 502, 'dead upstream → 502', 'got ' + rD.status)
 const bD = await rD.text()
 ok(/Could not reach|unreachable|not allowed|failed/i.test(bD), 'honest failure message', bD.slice(0, 200))
 
+// 10b. failure classification — six honest classes, never one vague bucket
+console.log('10b. failure classification')
+{
+  const r403 = await fetch(`${ORIGIN}/api/proxy/${enc(MOCK + '/forbidden')}`, { headers: { accept: 'text/html' } })
+  const t403 = await r403.text()
+  ok(r403.status === 403 && t403.includes('custom403 content'), 'real provider 403 page passes through untouched')
+
+  const rBlank = await fetch(`${ORIGIN}/api/proxy/${enc(MOCK + '/blank403')}`, { headers: { accept: 'text/html' } })
+  const tBlank = await rBlank.text()
+  ok(rBlank.status === 403 && /PROVIDER RESTRICTION/.test(tBlank), 'blank 403 → PROVIDER RESTRICTION card', String(rBlank.status))
+  ok(/directly instead/i.test(tBlank), 'card offers direct-open fallback')
+
+  const rChal = await fetch(`${ORIGIN}/api/proxy/${enc(MOCK + '/challenge503')}`, { headers: { accept: 'text/html' } })
+  const tChal = await rChal.text()
+  ok(rChal.status === 503 && /PROVIDER RESTRICTION/.test(tChal), 'anti-bot challenge → PROVIDER RESTRICTION card')
+
+  const jPriv = await fetch(`${ORIGIN}/api/proxy/${enc('http://192.168.1.1/admin')}`, { headers: { accept: 'application/json' } })
+  const jPrivBody = await jPriv.json().catch(() => ({}))
+  ok(jPrivBody.kind === 'blocked', 'private IP JSON error classifies as blocked', JSON.stringify(jPrivBody))
+
+  const jFile = await fetch(`${ORIGIN}/api/proxy/${enc('file:///etc/passwd')}`, { headers: { accept: 'application/json' } })
+  const jFileBody = await jFile.json().catch(() => ({}))
+  ok(jFileBody.kind === 'unsupported', 'file:// classifies as unsupported', JSON.stringify(jFileBody))
+
+  const rDead = await fetch(`${ORIGIN}/api/proxy/${enc('http://127.0.0.1:1/')}`, { headers: { accept: 'text/html' } })
+  const tDead = await rDead.text()
+  ok(rDead.status === 502 && /NETWORK FAILURE/.test(tDead), 'dead upstream → NETWORK FAILURE card')
+  ok(/not a client-side/i.test(tDead), 'network card explicitly says it is not your device')
+}
+
+// 10c. named providers through the proxy — outcome depends on where this
+// runs (sandbox DNS fails fast → honest network card; a real network may
+// actually reach them). In EVERY case the response must be honest.
+console.log('10c. providers through proxy (youtube/poki/crazygames)')
+for (const [name, url] of [
+  ['YouTube', 'https://www.youtube.com/'],
+  ['Poki', 'https://poki.com/en/'],
+  ['CrazyGames', 'https://www.crazygames.com/'],
+]) {
+  try {
+    const r = await fetch(`${ORIGIN}/api/proxy/${enc(url)}`, {
+      headers: { accept: 'text/html' },
+      signal: AbortSignal.timeout(20000),
+    })
+    const t = await r.text()
+    ok(!/no internet/i.test(t), name + ': never says "No Internet"')
+    if (r.status === 502) {
+      ok(/NETWORK FAILURE/.test(t), name + ': unreachable → NETWORK FAILURE card')
+    } else if (r.status === 504) {
+      ok(/TIMEOUT/.test(t), name + ': slow → TIMEOUT card')
+    } else if (r.status === 200) {
+      ok(t.includes('/api/proxy/'), name + ': page actually proxied + rewritten')
+      console.log('   (' + name + ' reachable from this network — full load verified)')
+    } else {
+      ok(/PROVIDER RESTRICTION|upstream|refused|HTTP/.test(t), name + ': classified error ' + r.status)
+      console.log('   (' + name + ' answered HTTP ' + r.status + ')')
+    }
+  } catch (e) {
+    ok(false, name + ': request errored — ' + String(e && e.message))
+  }
+}
+
 // 11. config endpoint
 console.log('11. config')
 const cfg = await (await fetch(ORIGIN + '/api/proxy/config')).json()

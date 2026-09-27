@@ -11,6 +11,9 @@ export type TargetError = {
   status: 400 | 403
   code: 'BAD_URL' | 'BAD_SCHEME' | 'BAD_PORT' | 'CREDENTIALS' | 'NOT_ALLOWED' | 'PRIVATE_IP' | 'TOO_LONG' | 'LOOP'
   message: string
+  hint?: string
+  /** Failure class override (defaults to kindForCode(code) downstream). */
+  kind?: 'blocked' | 'unsupported' | 'network' | 'timeout' | 'provider' | 'server'
 }
 
 export type ValidTarget = {
@@ -117,7 +120,7 @@ export function validateTarget(raw: string): ValidTarget | TargetError {
   let host = url.hostname.toLowerCase()
   if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1)
   if (HOST_ALIASES.has(host) || /\.localhost$/.test(host) || /\.local$/.test(host) || /\.internal$/.test(host)) {
-    return { status: 403, code: 'NOT_ALLOWED', message: `"${host}" is an internal address and cannot be proxied.` }
+    return { status: 403, code: 'NOT_ALLOWED', kind: 'blocked', message: `"${host}" is an internal address and cannot be proxied.` }
   }
   const isLoopback = loopbackAllowed() && /^127\./.test(host)
   if (isIP(host) && !isPublicAddress(host) && !isLoopback) {
@@ -132,7 +135,9 @@ export function validateTarget(raw: string): ValidTarget | TargetError {
     return {
       status: 403,
       code: 'NOT_ALLOWED',
+      kind: 'unsupported',
       message: `"${host}" is not on the supported-sites list for this proxy.`,
+      hint: 'This proxy only opens its supported-sites list. Operators can add hosts with GG_PROXY_EXTRA_HOSTS.',
     }
   }
   return { url, rule }

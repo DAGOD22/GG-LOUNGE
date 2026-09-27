@@ -19,6 +19,12 @@ export function GET(request: Request) {
         websockets: 'Realtime WebSocket upgrades cannot be proxied on this host.',
         webrtc: 'WebRTC peer connections bypass the proxy and are blocked in sandboxed frames.',
         drm: 'DRM-protected video cannot be proxied.',
+        youtube:
+          'Browsing can pass through, but watch pages depend on signed playback URLs and embed rules this proxy never bypasses. The Apps → YouTube nocookie embed is the supported way to watch.',
+        portals:
+          'Poki & CrazyGames apply anti-bot checks, frame protections and off-site game CDNs that can refuse proxying. Refusals are reported honestly with a direct link; pages are never faked.',
+        failures:
+          'Errors are classified: network failure vs timeout vs security block vs unsupported target vs provider restriction vs site server error — never one vague connectivity claim.',
       },
     },
     { headers: { 'cache-control': 'no-store' } },

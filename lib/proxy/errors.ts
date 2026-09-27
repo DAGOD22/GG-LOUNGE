@@ -6,6 +6,8 @@
  * never pretend a blocked site worked.
  */
 
+import { KIND_LABEL, kindForCode, type ErrorKind } from './error-kind.ts'
+
 export type ProxyErrorInfo = {
   status: number
   code: string
@@ -13,6 +15,12 @@ export type ProxyErrorInfo = {
   /** Host the user was trying to reach, when known. */
   host?: string
   hint?: string
+  /** Failure class; defaults to kindForCode(code) when omitted. */
+  kind?: ErrorKind
+}
+
+export function infoKind(info: ProxyErrorInfo): ErrorKind {
+  return info.kind ?? kindForCode(info.code)
 }
 
 export function errorJson(info: ProxyErrorInfo, jar: string | null): Response {
@@ -22,20 +30,28 @@ export function errorJson(info: ProxyErrorInfo, jar: string | null): Response {
     'x-content-type-options': 'nosniff',
   }
   if (jar) headers['x-gg-jar'] = jar
-  return new Response(JSON.stringify({ error: info.code, message: info.message, status: info.status, host: info.host ?? null }), {
-    status: info.status,
-    headers,
-  })
+  return Response.json(
+    {
+      error: info.code,
+      kind: infoKind(info),
+      message: info.message,
+      hint: info.hint ?? null,
+      status: info.status,
+      host: info.host ?? null,
+    },
+    { status: info.status, headers },
+  )
 }
 
 export function errorHtml(info: ProxyErrorInfo, opts: { origin: string; jar: string | null }): Response {
   const { origin, jar } = opts
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
+  const kind = infoKind(info)
   const boot = JSON.stringify({
     origin,
     target: info.host ? `https://${info.host}/` : null,
     status: info.status,
-    error: { code: info.code, message: info.message, hint: info.hint ?? null },
+    error: { code: info.code, kind, message: info.message, hint: info.hint ?? null },
     jar: jar ? JSON.parse(safeB64Json(jar)) : {},
   })
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -56,11 +72,12 @@ p{color:var(--muted);margin:10px 0}
 code{color:var(--fg);background:rgba(255,255,255,.06);padding:1px 6px;border-radius:6px}
 a{color:var(--lime)}
 </style></head><body><main class="card">
-<p class="kicker">GG-LOUNGE PROXY · ${esc(info.code)}</p>
+<p class="kicker">GG-LOUNGE PROXY · ${esc(KIND_LABEL[kind])} · ${esc(info.code)}</p>
 <h1>${esc(info.message)}</h1>
 ${info.host ? `<p>Target: <span class="host">${esc(info.host)}</span></p>` : ''}
 <p>Upstream status: <code>${esc(String(info.status))}</code></p>
 ${info.hint ? `<p class="hint">${esc(info.hint)}</p>` : '<p class="hint">GG Lounge only proxies its supported-sites list and does not bypass logins, CAPTCHAs, bot checks or DRM.</p>'}
+${info.host && kind !== 'blocked' ? `<p class="hint"><a href="https://${esc(info.host)}/" target="_blank" rel="noopener noreferrer">Open ${esc(info.host)} directly instead →</a></p>` : ''}
 </main></body></html>`
   const headers: Record<string, string> = {
     'content-type': 'text/html; charset=utf-8',

@@ -12,12 +12,13 @@
  *    cannot reach into it).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { kindTitle, upstreamStatusNote, type ErrorKind } from '@/lib/proxy/error-kind'
 import { ArrowLeft, ArrowRight, ExternalLink, Globe, Home, Lock, RotateCw, Search, TriangleAlert } from 'lucide-react'
 
 type FrameMessage = {
   gg: 'ready' | 'navigate' | 'net-error' | 'patch-failed'
   url?: string
-  detail?: { status?: number; title?: string; host?: string; path?: string; error?: { message: string } | null; api?: string; message?: string } | null
+  detail?: { status?: number | null; title?: string; host?: string; path?: string; error?: { code?: string; kind?: string; message: string; hint?: string | null } | null; api?: string; message?: string } | null
 }
 
 type Config = { engine: string; origin: string; allowlist: string[]; limitations: Record<string, string> }
@@ -160,10 +161,15 @@ export default function ProxyPage() {
         if (loadTimer.current) clearTimeout(loadTimer.current)
         const d = data.detail ?? {}
         if (d.error) {
-          setStatus(`Upstream error ${d.status ?? ''} — ${d.error.message}`.trim())
-          setProblems((p) => [...p.slice(-3), `${d.host ?? hostOf(data.url ?? '')}: ${d.error!.message}`])
+          const label = d.error.kind ? kindTitle(d.error.kind as ErrorKind) : null
+          setStatus(`${label ? `${label} — ` : ''}${d.error.message}${d.status && d.status >= 400 ? ` (HTTP ${d.status})` : ''}`)
+          setProblems((p) => {
+            const line = `${d.host ?? hostOf(data.url ?? '')}: ${label ? `[${label}] ` : ''}${d.error!.message}`
+            return p[p.length - 1] === line ? p : [...p.slice(-3), line]
+          })
         } else {
-          const suffix = d.status && d.status !== 200 ? ` (upstream ${d.status})` : ''
+          const note = d.status ? upstreamStatusNote(d.status) : null
+          const suffix = d.status && d.status !== 200 ? ` (upstream ${note ?? d.status})` : ''
           setStatus(`${d.host ?? hostOf(data.url ?? '')}${suffix} · ${d.title ? d.title.slice(0, 60) : 'loaded'}`)
         }
         if (data.url) setDisplayUrl(data.url)
@@ -329,6 +335,12 @@ export default function ProxyPage() {
               <li>WebSockets and WebRTC are not proxied — realtime apps that need them will show a real error, not a fake load.</li>
               <li>DRM video (Widevine etc.), site logins, CAPTCHAs and bot checks are never bypassed.</li>
               <li>Only allowlisted hosts load; localhost, private IPs and metadata addresses are blocked server-side.</li>
+              <li>
+                YouTube: browsing can pass through, but watch pages depend on signed playback URLs and embed rules this proxy never bypasses — the Apps→YouTube nocookie embed is the supported way to watch.
+              </li>
+              <li>
+                Poki &amp; CrazyGames: anti-bot checks, frame protections and off-site game CDNs can refuse to load through any proxy. When that happens you get a real error (and a direct link), never a fake page.
+              </li>
             </ul>
             <p>
               Source-open engine · <code>lib/proxy</code> · <code>{config?.engine ?? '…'}</code>

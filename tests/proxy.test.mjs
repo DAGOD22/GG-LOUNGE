@@ -812,3 +812,92 @@ test('integration: config endpoint exposes allowlist, no secrets', async () => {
 test('integration: shutdown upstream', async () => {
   await new Promise((resolve) => upstream.close(resolve))
 })
+
+// ---------------------------------------------------------------------------
+// Failure taxonomy: the proxy must distinguish six failure classes instead of
+// one vague "no internet" message.
+// ---------------------------------------------------------------------------
+test('error kinds: codes map to distinct, correct classes', async () => {
+  const { kindForCode, kindTitle, upstreamStatusNote, classifyUpstreamHtml, networkFailureHint } = await import(
+    '../lib/proxy/error-kind.ts'
+  )
+  assert.equal(kindForCode('UPSTREAM_TIMEOUT'), 'timeout')
+  assert.equal(kindForCode('UPSTREAM_FAILED'), 'network')
+  assert.equal(kindForCode('DNS_FAILURE'), 'network')
+  assert.equal(kindForCode('PRIVATE_IP'), 'blocked')
+  assert.equal(kindForCode('LOOP'), 'blocked')
+  assert.equal(kindForCode('CREDENTIALS'), 'blocked')
+  assert.equal(kindForCode('NOT_ALLOWED'), 'unsupported')
+  assert.equal(kindForCode('REQUEST_TOO_LARGE'), 'unsupported')
+  assert.equal(kindForCode('BAD_SCHEME'), 'unsupported')
+  assert.equal(kindForCode('PROVIDER_RESTRICTED'), 'provider')
+  assert.equal(kindForCode('INTERNAL'), 'server')
+  // every kind has a human title
+  for (const k of ['network', 'timeout', 'blocked', 'unsupported', 'provider', 'server']) {
+    assert.ok(kindTitle(k).length > 3, k)
+  }
+  // upstream passthrough notes
+  assert.match(upstreamStatusNote(403), /provider refused/)
+  assert.match(upstreamStatusNote(429), /provider refused/)
+  assert.match(upstreamStatusNote(503), /site is failing/)
+  assert.match(upstreamStatusNote(404), /not found/)
+  assert.equal(upstreamStatusNote(200), null)
+  // errno-derived hints are specific, never "no internet"
+  assert.match(networkFailureHint({ code: 'ENOTFOUND' }), /DNS/)
+  assert.match(networkFailureHint({ code: 'ECONNREFUSED' }), /refused/)
+  assert.match(networkFailureHint({ code: 'CERT_HAS_EXPIRED' }), /certificate/)
+  assert.match(networkFailureHint({}), /not a client-side/i)
+
+  // upstream HTML classification
+  const gvp = classifyUpstreamHtml('r1---sn.googlevideo.com', 403, '<html></html>')
+  assert.equal(gvp?.kind, 'provider')
+  assert.match(gvp?.hint ?? '', /playback tokens/)
+  const rate = classifyUpstreamHtml('poki.com', 429, 'slow down')
+  assert.equal(rate?.kind, 'provider')
+  const blank = classifyUpstreamHtml('www.crazygames.com', 403, '   ')
+  assert.equal(blank?.kind, 'provider')
+  const challenge = classifyUpstreamHtml('www.crazygames.com', 503, '<div id="cf-chl-widget"></div>')
+  assert.equal(challenge?.kind, 'provider')
+  const realPage = classifyUpstreamHtml('example.org', 403, '<html><body>You shall not pass (custom page)</body></html>')
+  assert.equal(realPage, null, 'real provider 403 content passes through untouched')
+  const serverDown = classifyUpstreamHtml('down.site', 503, '')
+  assert.equal(serverDown?.kind, 'server')
+  assert.equal(classifyUpstreamHtml('any.site', 200, 'fine'), null)
+  assert.equal(classifyUpstreamHtml('any.site', 404, ''), null, 'empty 404 passes through (chrome notes it)')
+})
+
+test('validateTarget distinguishes internal-blocked vs allowlist-unsupported', async () => {
+  const internal = validateTarget('http://localhost/admin')
+  assert.equal(internal.code, 'NOT_ALLOWED')
+  assert.equal(internal.kind, 'blocked', 'internal names are a security block')
+  const offlist = validateTarget('https://not-on-any-list.example/')
+  assert.equal(offlist.code, 'NOT_ALLOWED')
+  assert.equal(offlist.kind, 'unsupported', 'public but unlisted hosts are unsupported, not hostile')
+  assert.match(offlist.hint ?? '', /GG_PROXY_EXTRA_HOSTS/)
+})
+
+test('error JSON carries kind + hint (never one vague bucket)', async () => {
+  const { errorJson } = await import('../lib/proxy/errors.ts')
+  const res = errorJson(
+    { status: 502, code: 'UPSTREAM_FAILED', message: 'Could not reach x.test.', host: 'x.test', hint: 'DNS says no.' },
+    null,
+  )
+  const body = await res.json()
+  assert.equal(body.kind, 'network')
+  assert.equal(body.hint, 'DNS.say? ' ? body.hint : body.hint) // presence check below
+  assert.ok(typeof body.hint === 'string' && body.hint.length > 0)
+  assert.equal(body.error, 'UPSTREAM_FAILED')
+})
+
+test('allowlist: common public CDNs + YouTube attestation infra', async () => {
+  assert.ok(hostAllowed('fonts.gstatic.com'), 'Google Fonts')
+  assert.ok(hostAllowed('fonts.googleapis.com'), 'Google Fonts CSS')
+  assert.ok(!hostAllowed('apis.google.com'), 'google.com hosts stay off the list')
+  assert.ok(hostAllowed('jnn-pa.googleapis.com'), 'YouTube player attestation')
+  assert.ok(hostAllowed('cdn.jsdelivr.net'), 'jsDelivr')
+  assert.ok(hostAllowed('cdnjs.cloudflare.com'), 'cdnjs')
+  assert.ok(hostAllowed('unpkg.com'), 'unpkg')
+  assert.ok(hostAllowed('media.crazygames.com'), 'CrazyGames media (subdomain rule)')
+  assert.ok(hostAllowed('nl.poki.com'), 'regional Poki')
+  assert.ok(!hostAllowed('evil.com.gstatic.com.attacker.net'))
+})

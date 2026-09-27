@@ -38,6 +38,14 @@ const DEFAULT_RULES: string[] = [
   'duckduckgo.com',
   'wikipedia.org',
   'wikimedia.org',
+  // Common public web infrastructure so ordinary sites render fully through
+  // the proxy (Google Fonts, YouTube's googleapis.com attestation calls,
+  // standard JS asset CDNs). All are large public CDNs, never internal.
+  'googleapis.com',
+  'gstatic.com',
+  'jsdelivr.net',
+  'unpkg.com',
+  'cdnjs.cloudflare.com',
 ]
 
 function parseRules(extra: string | undefined): AllowlistRule[] {

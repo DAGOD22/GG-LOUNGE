@@ -74,6 +74,25 @@ inside the encoded segment, so nothing is lost or double-decoded.
 | `GG_PROXY_RATE_LIMIT` | Requests / 60 s / client (default 600) |
 | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | Lounge auth (unrelated to proxy but required for clean deploys) |
 
+## Failure taxonomy (no vague buckets)
+
+Every error is classified (`lib/proxy/error-kind.ts`) and labelled in JSON
+(`kind`), on the HTML card kicker, and in the chrome status line:
+
+| kind | meaning | example |
+| --- | --- | --- |
+| `network` | lounge server could not reach the site | DNS fail, conn refused, TLS verify |
+| `timeout` | site accepted but never answered | 504 `UPSTREAM_TIMEOUT` |
+| `blocked` | our security policy refused the target | private IP, loopback, credentials |
+| `unsupported` | proxy does not support it | off-allowlist host, `file://`, oversize |
+| `provider` | site itself refused (connection worked) | 403/429/451, anti-bot challenge, googlevideo playback refusal |
+| `server` | remote site answered with a failure | upstream 5xx with empty/challenge body |
+
+Real provider 403 pages with actual content pass through untouched (the site
+speaks for itself); blank/challenge/refusal responses get an honest card with
+a direct "open the original site" link. Nothing ever reports a single generic
+connectivity claim.
+
 ## Honest limitations (cannot be legitimately fixed)
 
 - **No WebSockets / WebRTC** — Vercel route handlers cannot upgrade

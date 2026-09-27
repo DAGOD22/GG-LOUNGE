@@ -34,6 +34,7 @@ import {
 import { isCssType, isHtmlType, isJsType, isMediaType, rewriteCss, rewriteHtml, rewriteJs } from './rewrite.ts'
 import { errorHtml, errorJson, wantsHtml, type ProxyErrorInfo } from './errors.ts'
 import { originOf } from './origin.ts'
+import { classifyUpstreamHtml, networkFailureHint } from './error-kind.ts'
 import { rateLimitFor } from './rate-limit.ts'
 
 export const runtime = 'nodejs'
@@ -396,7 +397,7 @@ export async function handleProxyRequest(request: Request, segment: string): Pro
               code: 'UPSTREAM_FAILED',
               message: `Could not reach ${target.hostname}.`,
               host: target.hostname,
-              hint: 'The connection to the site failed. It may be down or blocking this server.',
+              hint: networkFailureHint(e),
             }
     console.warn('[proxy]', method, target.protocol + '//' + target.host + target.pathname, '→', e.code || e.message)
     return respondError(request, info, null, origin)
@@ -440,6 +441,13 @@ export async function handleProxyRequest(request: Request, segment: string): Pro
     const encoding = charset === 'utf-16' || charset === 'utf16' ? 'utf16le' : 'utf8'
     const text = result.buffered.toString(encoding as BufferEncoding)
     if (html) {
+      // >=400 HTML: classify BEFORE serving. Anti-bot challenges, hard
+      // refusals and blank error bodies get an honest card naming the
+      // provider; real provider content passes through untouched.
+      if (result.status >= 400) {
+        const classified = classifyUpstreamHtml(target.hostname, result.status, text)
+        if (classified) return respondError(request, classified, null, origin)
+      }
       const boot = JSON.stringify({
         origin,
         target: result.finalUrl.href,

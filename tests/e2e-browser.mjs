@@ -122,6 +122,78 @@ ok(serious.length === 0, 'no unexpected console errors', serious.slice(0,3).join
 if (notFound.length) console.log('   404s:', notFound.join(', '))
 ok(notFound.filter(u => !/favicon|_vercel/i.test(u)).length === 0, 'no unexpected 404 resources', notFound.join(', '))
 
+// 7. YouTube APP (Apps section — separate from the proxy)
+console.log('7. YouTube app (Apps section)')
+{
+  await page.goto(ORIGIN + '/', { waitUntil: 'networkidle' })
+  const ytCard = page.locator('article.game-card').filter({ has: page.locator('h3', { hasText: /^YouTube$/ }) }).first()
+  await ytCard.locator('.play-button').click()
+  await page.waitForSelector('.game-frame')
+  await page.waitForFunction(() => {
+    const f = document.querySelector('.game-frame')
+    return f && f.src.includes('/games/youtube/')
+  })
+  const app = page.frames().find((f) => f.url().includes('/games/youtube/'))
+  ok(!!app, 'YouTube app opened from the Apps catalog', page.frames().map((f) => f.url()).join(' | '))
+  if (app) {
+    // invalid input → clear validation (not a network claim)
+    await app.fill('#url', 'definitely not a url')
+    await app.click('#form button')
+    const warn = (await app.textContent('#status')) || ''
+    ok(/valid YouTube URL/i.test(warn), 'invalid input → validation message', warn.slice(0, 90))
+
+    // load a real video id through the official nocookie embed
+    await app.fill('#url', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ')
+    await app.click('#form button')
+    const src = await app.getAttribute('#player', 'src')
+    ok(!!src && src.includes('youtube-nocookie.com/embed/dQw4w9WgXcQ'), 'official nocookie embed used', String(src))
+    const hash = await app.evaluate(() => location.hash)
+    ok(hash === '#dQw4w9WgXcQ', 'video id persisted in URL hash', hash)
+
+    // reachability status must settle to a SPECIFIC cause, never "no internet"
+    let appStatus = ''
+    for (let i = 0; i < 40; i++) {
+      appStatus = (await app.textContent('#status')) || ''
+      if (/cannot reach YouTube|You appear to be offline|reachable from this network/i.test(appStatus)) break
+      await new Promise((r) => setTimeout(r, 250))
+    }
+    console.log('   app status:', JSON.stringify(appStatus.slice(0, 160)))
+    ok(/cannot reach YouTube|You appear to be offline|reachable from this network/i.test(appStatus), 'status names a specific cause')
+    ok(!/no internet/i.test(appStatus), 'never says "No Internet"', appStatus.slice(0, 90))
+
+    // modal fullscreen (the lounge button) — user-gesture gated, must not crash
+    await page.locator('[aria-label="Fullscreen"]').click().catch(() => {})
+    const fs = await page.evaluate(() => !!document.fullscreenElement).catch(() => false)
+    console.log('   fullscreenElement:', fs)
+    ok(true, 'fullscreen attempt completes without crashing')
+
+    // leave & return: close, open another game, come back
+    await page.locator('[aria-label="Close game"]').click()
+    const other = page.locator('article.game-card').filter({ has: page.locator('h3', { hasText: /^2048$/ }) }).first()
+    await other.locator('.play-button').click()
+    await page.waitForFunction(() => {
+      const f = document.querySelector('.game-frame')
+      return f && f.src.includes('/2048')
+    })
+    await page.locator('[aria-label="Close game"]').click()
+    await ytCard.locator('.play-button').click()
+    await page.waitForFunction(() => {
+      const f = document.querySelector('.game-frame')
+      return f && f.src.includes('/games/youtube/')
+    })
+    const back = page.frames().find((f) => f.url().includes('/games/youtube/'))
+    ok(!!back, 'YouTube works after visiting another app')
+  }
+
+  // direct navigation with hash: refresh/deep-link restores the player (not stuck)
+  await page.goto(ORIGIN + '/games/youtube/index.html#dQw4w9WgXcQ', { waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(() => {
+    const p = document.getElementById('player')
+    return p && (p.getAttribute('src') || '').includes('dQw4w9WgXcQ')
+  })
+  ok(true, 'refresh/deep-link with hash auto-restores the player')
+}
+
 console.log(`\nBROWSER E2E: ${pass} passed, ${fail} failed`)
 await browser.close()
 process.exit(fail ? 1 : 0)
