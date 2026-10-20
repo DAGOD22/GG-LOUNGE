@@ -129,3 +129,90 @@ production authentication/promotion remains a separate unresolved requirement.
 
 The new range/CORS cases bring the unit suite to 27 passing tests. No production
 push or deployment was performed.
+
+---
+
+## Real games, ad blocking and a tools section
+
+### Games: real builds, honestly labelled
+
+- **2048** now ships the genuine original by Gabriele Cirulli (MIT licensed),
+  cloned into `public/games/2048/` with its own `LICENSE.txt`. It runs offline.
+  A second catalogue entry, **2048 (online)**, streams the author's published
+  version at `play2048.co` through the proxy.
+- **Survival Race** had a stub that fetched a Unity build from a CDN, so it was
+  filtered out of the catalogue as unavailable. The complete WebGL build now
+  ships locally in `public/games/survival-race/Build/` (36 MB). Because the
+  WebAssembly payload is stored as two files, `Build/merge.js` reassembles them
+  into a single blob — typed `application/wasm` so Unity can stream-compile —
+  and hands the blob URL to the loader. No CDN is contacted.
+- **Geometry Dash** was an "assets missing" placeholder page. It is now a real,
+  playable rhythm platformer written for the lounge: three hand-built levels, a
+  procedural Web Audio soundtrack that follows each level's tempo, jumping pads
+  and orbs, practice mode with checkpoints, attempt counters, personal bests and
+  saved progress. It is **not** RobTop Games' Geometry Dash — that is a paid
+  PC/mobile release with no authorised web build, and none is bundled. The
+  catalogue entry says so.
+- **Block Blast** is a complete block-placement puzzle built for the lounge:
+  three shapes per turn, drag-and-drop onto an 8×8 board, row and column clears,
+  combo multipliers, undo and a persistent high score. It is labelled as an
+  independent browser build, not the official Hungry Studio mobile app.
+
+### Monkeytype: the real site, streamed through the lounge proxy
+
+Monkeytype is a live web application — its accounts, history and personal bests
+live on its own servers — so rebuilding it would only produce an imitation.
+Instead it is streamed: a new `/remote?url=…` route boots the lounge's existing
+Scramjet runtime and opens the genuine site in a frame, and the game appears in
+the catalogue like any other title. Accounts and sign-in are Monkeytype's own,
+so they work exactly as they do on the real site.
+
+Remote games are marked `hosted: 'remote'` and are deliberately exempt from the
+local asset audit: their availability is a property of the network, not of files
+in this repository. The destination is passed as an encoded parameter on the
+lounge's own route and validated as http(s) before use, so the route cannot be
+used as an open redirect.
+
+### Ad blocker
+
+A custom blocker runs in the proxy service worker (`public/adblock.js`). Because
+Scramjet encodes the real destination with `encodeURIComponent` after the
+`/browse/` prefix, the worker decodes the true target and drops requests to
+advertising, analytics, telemetry and tracking endpoints before they leave the
+browser — returning a correctly typed empty response (a 1×1 GIF for images,
+empty JS/CSS, 204 for media) so pages do not break. A cosmetic pass injects CSS
+and a MutationObserver into proxied HTML to collapse the empty boxes that
+blocked ads leave behind.
+
+It is off by default and toggled in **Customize → Ad blocker**, or from the
+button on the proxy bar. The setting is pushed to the worker with `postMessage`
+for instant effect and mirrored into a cookie so it survives worker restarts.
+Local games ship no ad-network calls of their own (the Unity builds' ad hooks
+are no-ops), so everything they would have requested is already absent.
+
+### Tools
+
+`/tools` adds eighteen utilities with lounge branding, all running locally with
+no uploads: calculator, notepad, percentage and tip calculators, unit converter,
+colour picker, QR code generator, word counter, text-case converter, JSON
+formatter, Base64/URL encoder, hash generator, password generator, dice roller,
+random picker, stopwatch, countdown and world clock. Notes and options persist
+in this browser; deep links such as `/tools?tool=json` work.
+
+### A Wisp fix that was breaking every proxied page
+
+`scripts/server.mjs` set `stream_limit_per_host`, and the pinned wisp server
+enforces that limit with `for (const s of connection.streams)` — but `streams`
+is a plain object, so the loop threw `connection.streams is not iterable` on
+*every* stream. Pages appeared to connect and then never loaded. The per-host
+limit is now left disabled (the working total-stream limit and the per-IP
+connection cap still apply) with a comment explaining why.
+
+### Tests
+
+The suite grows from 27 to 49 tests. New coverage drives the games in a real DOM
+(jsdom) the way a player would — 2048 merges tiles on arrow keys, the Geometry
+Dash cube advances and dies on obstacles (and survives when jumping), Block
+Blast places shapes and scores them, and the Survival Race wasm merge produces
+exactly the two parts joined — plus rule tests for the ad blocker and the
+calculator's expression parser.

@@ -1,3 +1,878 @@
-<!doctype html><html lang="en" data-gg-game-state="missing-assets"><head>
+<!doctype html>
+<!--
+  Geometry Dash — GG-Lounge build.
+
+  This is an original rhythm-platformer written for GG-Lounge: original level
+  layouts, original procedural soundtrack, original art. It is inspired by the
+  rhythm-platformer genre but it is not RobTop Games' Geometry Dash, is not
+  affiliated with it, and contains none of its levels, art or audio. The real
+  Geometry Dash is a paid release for PC and mobile; there is no authorised
+  web build, so none is bundled here.
+-->
+<html lang="en" data-gg-game-state="ready">
+<head>
 <script src="/customization-game.js"></script>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Geometry Dash — local files needed</title><style>body{max-width:620px;margin:12vh auto;padding:24px;font:17px/1.6 system-ui;background:#10131c;color:#f4f2ec}a{color:#d7f34a}code{overflow-wrap:anywhere}</style></head><body><h1>Geometry Dash needs its game files</h1><p>The old entry contained a CDN loader, not a local game. There is no Geometry Dash build installed in this repository.</p><p>An authorized HTML5/WebGL package (including its data, code, textures and audio) is needed before this title can be made playable. No iframe, clone or dead mirror is being substituted.</p><p><a href="/request-game">Request missing game files</a> · <a href="/">Back to the installed games</a></p></body></html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Geometry Dash — GG-Lounge</title>
+<style>
+  :root {
+    --gg-bg: #0b0d12;
+    --gg-panel: #141720;
+    --gg-accent: #d7f34a;
+    --gg-text: #f4f2ec;
+    --gg-muted: #9699a8;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: var(--gg-bg); color: var(--gg-text);
+    font-family: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    overflow: hidden; -webkit-user-select: none; user-select: none;
+    touch-action: manipulation;
+  }
+  #stage { position: fixed; inset: 0; }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(8, 10, 16, .82); backdrop-filter: blur(6px); z-index: 20;
+  }
+  .overlay[hidden] { display: none; }
+  .card {
+    width: min(560px, calc(100% - 32px)); background: var(--gg-panel);
+    border: 1px solid rgba(255,255,255,.09); border-radius: 18px; padding: 24px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.5); text-align: center;
+  }
+  .brand { font-size: 11px; letter-spacing: .22em; color: var(--gg-muted); margin: 0 0 6px; }
+  h1 { font-size: clamp(26px, 6vw, 40px); margin: 0 0 4px; letter-spacing: -.03em; }
+  h1 span { color: var(--gg-accent); }
+  .tagline { color: var(--gg-muted); font-size: 13px; margin: 0 0 18px; line-height: 1.55; }
+  .levels { display: grid; gap: 10px; margin-bottom: 16px; }
+  .level-btn {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1);
+    color: var(--gg-text); border-radius: 12px; padding: 12px 14px; cursor: pointer;
+    font: inherit; transition: border-color .15s, background .15s, transform .1s;
+  }
+  .level-btn:hover { border-color: var(--gg-accent); background: rgba(215,243,74,.07); }
+  .level-btn:active { transform: scale(.99); }
+  .level-btn .icon {
+    width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+    font-weight: 800; font-size: 15px; flex: 0 0 auto; color: #0b0d12;
+  }
+  .level-btn .meta { flex: 1; min-width: 0; }
+  .level-btn .name { font-weight: 700; font-size: 15px; }
+  .level-btn .sub { font-size: 12px; color: var(--gg-muted); margin-top: 2px; }
+  .level-btn .best { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--gg-accent); font-weight: 700; }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    background: var(--gg-accent); color: #0b0d12; font-weight: 800; font-size: 14px;
+    border: 0; border-radius: 999px; padding: 11px 22px; cursor: pointer; font-family: inherit;
+  }
+  .btn.ghost { background: transparent; color: var(--gg-text); border: 1px solid rgba(255,255,255,.18); }
+  .btn:hover { filter: brightness(1.07); }
+  .toggle { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--gg-muted); margin-bottom: 14px; cursor: pointer; }
+  .toggle input { accent-color: var(--gg-accent); width: 16px; height: 16px; }
+  .hint { font-size: 12px; color: var(--gg-muted); margin-top: 14px; line-height: 1.6; }
+  .hint kbd {
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
+    border-radius: 5px; padding: 1px 6px; font-size: 11px; font-family: ui-monospace, monospace;
+  }
+  #hud {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 18px; align-items: center; z-index: 10;
+    background: rgba(10,12,18,.72); border: 1px solid rgba(255,255,255,.09);
+    border-radius: 999px; padding: 8px 18px; font-variant-numeric: tabular-nums;
+  }
+  #hud[hidden] { display: none; }
+  #hud .pct { font-size: 22px; font-weight: 800; letter-spacing: -.02em; min-width: 74px; text-align: center; }
+  #hud .stat { font-size: 11px; color: var(--gg-muted); text-align: center; line-height: 1.25; }
+  #hud .stat b { display: block; font-size: 14px; color: var(--gg-text); }
+  #practice { color: #ffb077; }
+  #toast {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: clamp(28px, 8vw, 54px); font-weight: 900; letter-spacing: -.03em;
+    color: var(--gg-accent); text-shadow: 0 6px 30px rgba(0,0,0,.6);
+    z-index: 15; pointer-events: none; opacity: 0; transition: opacity .2s;
+  }
+  #toast.show { opacity: 1; }
+  .fineprint { font-size: 11px; color: #6b7280; margin-top: 16px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+
+  <div id="hud" hidden>
+    <div class="pct" id="hudPct">0%</div>
+    <div class="stat" id="hudAttemptsWrap">Attempts<b id="hudAttempts">1</b></div>
+    <div class="stat" id="hudBestWrap">Best<b id="hudBest">0%</b></div>
+    <div class="stat" id="practice" hidden>Practice<b>ON</b></div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div class="overlay" id="menu">
+    <div class="card">
+      <p class="brand">GG-LOUNGE ORIGINAL</p>
+      <h1>GEOMETRY <span>DASH</span></h1>
+      <p class="tagline">Three hand-built rhythm levels with an original procedural soundtrack. Tap or press space to jump — time it with the beat.</p>
+      <div class="levels" id="levelList"></div>
+      <label class="toggle"><input type="checkbox" id="practiceToggle"> Practice mode (checkpoints, progress not saved)</label>
+      <div class="row">
+        <button class="btn ghost" id="resetBtn">Reset progress</button>
+      </div>
+      <p class="hint">
+        <kbd>Space</kbd> / <kbd>Click</kbd> / <kbd>Tap</kbd> jump &nbsp;·&nbsp; <kbd>R</kbd> restart &nbsp;·&nbsp; <kbd>Esc</kbd> menu
+      </p>
+      <p class="fineprint">Original levels, art and audio made for GG-Lounge. Not affiliated with RobTop Games; the official Geometry Dash is a paid PC/mobile release with no web version.</p>
+    </div>
+  </div>
+
+  <div class="overlay" id="complete" hidden>
+    <div class="card">
+      <p class="brand">LEVEL COMPLETE</p>
+      <h1 id="completeTitle">LEVEL <span>CLEAR</span></h1>
+      <p class="tagline" id="completeStats"></p>
+      <div class="row">
+        <button class="btn" id="againBtn">Play again</button>
+        <button class="btn ghost" id="menuBtn">Level select</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="paused" hidden>
+    <div class="card">
+      <p class="brand">PAUSED</p>
+      <h1>TAKE A <span>BREATH</span></h1>
+      <div class="row">
+        <button class="btn" id="resumeBtn">Resume</button>
+        <button class="btn ghost" id="retryBtn">Restart level</button>
+        <button class="btn ghost" id="quitBtn">Level select</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------------------------------------------------------------- constants
+  const UNIT = 46;            // pixels per world unit at zoom 1
+  const SPEED = 9.0;          // world units per second
+  const GRAVITY = 34;
+  const JUMP_V = 12.2;
+  const PAD_V = 17.5;         // yellow jump pad
+  const ORB_V = 13.0;         // blue orb (air action)
+  const PLAYER = 0.86;        // player cube size in units
+  const GROUND_Y = 1.6;       // ground thickness in units
+  const STORE_KEY = 'ggl_gd_progress_v1';
+
+  // ------------------------------------------------------------------ levels
+  // One character per eighth-note step. Eight steps = one bar (4 beats).
+  //   .  empty          s  spike            b  block (1 high)
+  //   B  block (2 high) p  jump pad         o  orb (air jump)
+  //   =  floating platform (at height 3)
+  const LEVELS = [
+    {
+      id: 'l1', name: 'First Jump', color: '#5ad1ff', bpm: 128, difficulty: 'Easy',
+      bars: [
+        '..b..s..',
+        '..b..s..',
+        '..s.B...',
+        '..s.b.s.',
+        '..p...s.',
+        '..s..b..',
+        '..s.b.s.',
+        '..b..s..',
+        '.B.s..s.',
+        '..b..p..',
+        '..s.B.s.',
+        '..b..s..',
+        '..s..b..',
+        '..p.s.s.',
+        '..b.B...',
+        '........',
+      ],
+    },
+    {
+      id: 'l2', name: 'Rhythm Runner', color: '#d7f34a', bpm: 146, difficulty: 'Normal',
+      bars: [
+        '..s.s.s.',
+        '..b...s.',
+        '.o..s.B.',
+        '..s.s.s.',
+        '..p...b.',
+        '..s.B.s.',
+        '..b.s.o.',
+        '..s.s.B.',
+        '..B.b.s.',
+        '..s.p.s.',
+        '..b.s.s.',
+        '..s.B.b.',
+        '..p.s.o.',
+        '..s.s.B.',
+        '..b.B.s.',
+        '..s..p..',
+        '..s.s.b.',
+        '........',
+      ],
+    },
+    {
+      id: 'l3', name: 'Grumble Gauntlet', color: '#ff7ad9', bpm: 168, difficulty: 'Hard',
+      bars: [
+        '..s.s.s.',
+        '..B.b.s.',
+        '..s.o.s.',
+        '.p..B.b.',
+        '..s.s.s.',
+        '..b.B.o.',
+        '..s.s.B.',
+        '..p.b.s.',
+        '..s.s.o.',
+        '..B.b.s.',
+        '..s.p.B.',
+        '..b.s.s.',
+        '..o.B.b.',
+        '..s.s.p.',
+        '..B.b.s.',
+        '..s.o.B.',
+        '..p.s.s.',
+        '..b.B.o.',
+        '..s.s.b.',
+        '..p...s.',
+        '........',
+      ],
+    },
+  ];
+
+  // -------------------------------------------------------------------- state
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const el = {
+    menu: document.getElementById('menu'), hud: document.getElementById('hud'),
+    hudPct: document.getElementById('hudPct'), hudAttempts: document.getElementById('hudAttempts'),
+    hudBest: document.getElementById('hudBest'), practice: document.getElementById('practice'),
+    practiceToggle: document.getElementById('practiceToggle'), levelList: document.getElementById('levelList'),
+    complete: document.getElementById('complete'), completeTitle: document.getElementById('completeTitle'),
+    completeStats: document.getElementById('completeStats'), paused: document.getElementById('paused'),
+    toast: document.getElementById('toast'), resetBtn: document.getElementById('resetBtn'),
+  };
+
+  let W = 0, H = 0, DPR = 1, scale = 1;
+  let progress = loadProgress();
+
+  function loadProgress() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+      return { best: raw.best || {}, completed: raw.completed || {}, attempts: raw.attempts || {} };
+    } catch { return { best: {}, completed: {}, attempts: {} }; }
+  }
+  function saveProgress() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(progress)); } catch {}
+    try { localStorage.setItem('gd_attempts', String(totalAttempts())); } catch {}
+    try { localStorage.setItem('gd_levels_completed', String(Object.values(progress.completed).filter(Boolean).length)); } catch {}
+  }
+  function totalAttempts() {
+    return Object.values(progress.attempts).reduce((a, b) => a + b, 0);
+  }
+
+  // ------------------------------------------------------------------- audio
+  const Audio = (() => {
+    let actx = null, master = null, timer = null, nextBeat = 0, beat = 0, playing = false;
+    const CHORDS = [[0, 4, 7], [-3, 2, 5], [-5, 0, 4], [-1, 3, 7]];
+
+    function ensure() {
+      if (actx) return actx;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      actx = new AC();
+      master = actx.createGain();
+      master.gain.value = 0.5;
+      master.connect(actx.destination);
+      return actx;
+    }
+    function env(node, at, attack, decay, peak) {
+      const g = actx.createGain();
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(peak, at + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + attack + decay);
+      node.connect(g); g.connect(master);
+      return g;
+    }
+    function kick(at) {
+      const o = actx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(150, at);
+      o.frequency.exponentialRampToValueAtTime(45, at + 0.13);
+      env(o, at, 0.004, 0.16, 0.9);
+      o.start(at); o.stop(at + 0.22);
+    }
+    function snare(at) {
+      const len = Math.floor(actx.sampleRate * 0.14);
+      const buf = actx.createBuffer(1, len, actx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      const src = actx.createBufferSource(); src.buffer = buf;
+      const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1800;
+      src.connect(bp); env(bp, at, 0.003, 0.12, 0.5);
+      src.start(at); src.stop(at + 0.16);
+    }
+    function note(at, freq, dur, type, peak) {
+      const o = actx.createOscillator();
+      o.type = type; o.frequency.setValueAtTime(freq, at);
+      env(o, at, 0.008, dur, peak);
+      o.start(at); o.stop(at + dur + 0.05);
+    }
+    function scheduleBar(barIndex, bpm, at) {
+      const beatLen = 60 / bpm;
+      const chord = CHORDS[barIndex % CHORDS.length];
+      const root = 55; // A1-ish bass register
+      for (let b = 0; b < 4; b++) {
+        const t = at + b * beatLen;
+        kick(t);
+        if (b % 2 === 1) snare(t);
+        note(t, freq(root + chord[0] + 12), beatLen * 0.5, 'square', 0.16);
+        note(t + beatLen * 0.5, freq(root + chord[1] + 12), beatLen * 0.3, 'square', 0.1);
+        for (let e = 0; e < 2; e++) {
+          const deg = chord[(b + e) % 3];
+          note(t + e * beatLen * 0.5, freq(root + deg + 31), beatLen * 0.22, 'triangle', 0.07);
+        }
+      }
+    }
+    function freq(semi) { return 27.5 * Math.pow(2, semi / 12); }
+
+    return {
+      start(bpm) {
+        if (!ensure()) return;
+        if (actx.state === 'suspended') actx.resume();
+        this.stop();
+        playing = true; beat = 0;
+        nextBeat = actx.currentTime + 0.08;
+        const beatLen = 60 / bpm;
+        const barLen = beatLen * 4;
+        timer = setInterval(() => {
+          if (!playing) return;
+          while (nextBeat < actx.currentTime + 0.4) {
+            scheduleBar(Math.floor(beat / 4), bpm, nextBeat);
+            nextBeat += barLen; beat += 4;
+          }
+        }, 60);
+      },
+      stop() {
+        playing = false;
+        if (timer) { clearInterval(timer); timer = null; }
+        if (master && actx) master.gain.setTargetAtTime(0.5, actx.currentTime, 0.02);
+      },
+      blip(freqVal, dur, type, peak) {
+        if (!ensure()) return;
+        if (actx.state === 'suspended') actx.resume();
+        const t = actx.currentTime;
+        note(t, freqVal, dur || 0.09, type || 'square', peak || 0.18);
+      },
+      setMuted(muted) { if (master && actx) master.gain.setTargetAtTime(muted ? 0 : 0.5, actx.currentTime, 0.02); },
+    };
+  })();
+
+  // -------------------------------------------------------------- level build
+  function buildLevel(def) {
+    const beatLen = 60 / def.bpm;
+    const stepLen = SPEED * beatLen / 2;      // world units per eighth-note step
+    const obstacles = [];
+    const stepsPerBar = 8;
+    def.bars.forEach((bar, barIndex) => {
+      for (let i = 0; i < bar.length; i++) {
+        const ch = bar[i];
+        if (ch === '.') continue;
+        const x = (barIndex * stepsPerBar + i) * stepLen;
+        switch (ch) {
+          case 's': obstacles.push({ type: 'spike', x, y: 0, w: 0.9, h: 0.7 }); break;
+          case 'b': obstacles.push({ type: 'block', x, y: 0, w: 1, h: 1 }); break;
+          case 'B': obstacles.push({ type: 'block', x, y: 0, w: 1, h: 2 }); break;
+          case 'p': obstacles.push({ type: 'pad', x, y: 0, w: 1, h: 0.42 }); break;
+          case 'o': obstacles.push({ type: 'orb', x, y: 1.9, w: 0.8, h: 0.8 }); break;
+          case '=': obstacles.push({ type: 'block', x, y: 3, w: 3, h: 0.7 }); break;
+        }
+      }
+    });
+    const lengthUnits = def.bars.length * stepsPerBar * stepLen;
+    return { def, obstacles, lengthUnits, beatLen, stepLen };
+  }
+
+  // ------------------------------------------------------------------ runtime
+  const game = {
+    running: false, paused: false, level: null, index: 0, practice: false,
+    x: 0, y: 0, vy: 0, onGround: true, rotation: 0, dead: false, deadTimer: 0,
+    attempts: 0, time: 0, checkpoint: 0, particles: [], coins: 0, shake: 0,
+    hits: [], lastBeatIndex: -1,
+  };
+
+  function startLevel(index, fromCheckpoint) {
+    game.index = index;
+    const def = LEVELS[index];
+    game.level = buildLevel(def);
+    game.practice = el.practiceToggle.checked;
+    game.dead = false; game.deadTimer = 0;
+    game.particles = []; game.shake = 0;
+    game.vy = 0; game.rotation = 0; game.onGround = true;
+    game.time = 0; game.lastBeatIndex = -1;
+    const startX = fromCheckpoint ? game.checkpoint : -4;
+    game.x = startX; game.y = 0;
+    if (!fromCheckpoint) {
+      game.attempts += 1;
+      progress.attempts[def.id] = (progress.attempts[def.id] || 0) + 1;
+      saveProgress();
+    }
+    game.running = true; game.paused = false;
+    el.menu.hidden = true; el.complete.hidden = true; el.paused.hidden = true;
+    el.hud.hidden = false;
+    el.practice.hidden = !game.practice;
+    Audio.start(def.bpm);
+    updateHud();
+  }
+
+  function updateHud() {
+    const def = LEVELS[game.index];
+    el.hudPct.textContent = pct() + '%';
+    el.hudAttempts.textContent = String(game.attempts);
+    el.hudBest.textContent = (progress.best[def.id] || 0) + '%';
+  }
+  function pct() {
+    if (!game.level) return 0;
+    const p = Math.max(0, Math.min(100, (game.x / game.level.lengthUnits) * 100));
+    return Math.floor(p);
+  }
+
+  function die() {
+    if (game.dead) return;
+    game.dead = true; game.deadTimer = 0;
+    game.shake = 14;
+    Audio.stop();
+    Audio.blip(180, 0.22, 'sawtooth', 0.22);
+    for (let i = 0; i < 26; i++) {
+      game.particles.push({
+        x: game.x, y: game.y + PLAYER / 2, vx: (Math.random() - 0.5) * 9,
+        vy: Math.random() * 9 + 1, life: 1, color: LEVELS[game.index].color, size: 3 + Math.random() * 4,
+      });
+    }
+    const def = LEVELS[game.index];
+    const p = pct();
+    if (!game.practice && p > (progress.best[def.id] || 0)) { progress.best[def.id] = p; saveProgress(); }
+    updateHud();
+  }
+
+  function completeLevel() {
+    game.running = false;
+    Audio.stop();
+    Audio.blip(880, 0.14, 'square', 0.2);
+    setTimeout(() => Audio.blip(1320, 0.2, 'square', 0.18), 130);
+    const def = LEVELS[game.index];
+    const first = !progress.completed[def.id];
+    if (!game.practice) {
+      progress.completed[def.id] = true;
+      progress.best[def.id] = 100;
+      saveProgress();
+    }
+    el.completeTitle.innerHTML = first ? 'LEVEL <span>CLEAR</span>' : 'LEVEL <span>CLEAR</span>';
+    el.completeStats.textContent =
+      `${def.name} · ${game.attempts} attempt${game.attempts === 1 ? '' : 's'}${game.practice ? ' · practice run (not saved)' : ''}`;
+    el.complete.hidden = false;
+    el.hud.hidden = true;
+  }
+
+  function jump(fromOrb) {
+    if (fromOrb) { game.vy = ORB_V; Audio.blip(660, 0.1, 'triangle', 0.16); }
+    else { game.vy = JUMP_V; Audio.blip(520, 0.08, 'square', 0.13); }
+    game.onGround = false;
+    for (let i = 0; i < 6; i++) {
+      game.particles.push({
+        x: game.x, y: game.y, vx: (Math.random() - 0.5) * 3, vy: -Math.random() * 2,
+        life: 0.5, color: '#ffffff', size: 2 + Math.random() * 2,
+      });
+    }
+  }
+
+  function action() {
+    if (!game.running || game.paused) return;
+    if (game.dead) return;
+    Audio.setMuted(false);
+    if (game.onGround) { jump(false); return; }
+    // In the air: look for an orb we are overlapping.
+    for (const o of game.level.obstacles) {
+      if (o.type !== 'orb') continue;
+      if (Math.abs(o.x - game.x) < 1.0 && game.y + PLAYER > o.y && game.y < o.y + o.h + 0.6) {
+        jump(true); return;
+      }
+    }
+  }
+
+  // ------------------------------------------------------------------ physics
+  function step(dt) {
+    if (!game.running || game.paused) return;
+
+    if (game.dead) {
+      game.deadTimer += dt;
+      updateParticles(dt);
+      if (game.deadTimer > 0.85) {
+        if (game.practice) startLevel(game.index, true);
+        else startLevel(game.index, false);
+      }
+      return;
+    }
+
+    game.time += dt;
+    game.x += SPEED * dt;
+
+    // gravity
+    game.vy -= GRAVITY * dt;
+    game.y += game.vy * dt;
+    if (game.y <= 0) { game.y = 0; game.vy = 0; game.onGround = true; }
+    else game.onGround = false;
+
+    const px = game.x, py = game.y;
+    const half = PLAYER / 2;
+    let onTop = false;
+
+    for (const o of game.level.obstacles) {
+      const ox0 = o.x - o.w / 2, ox1 = o.x + o.w / 2;
+      const oy0 = o.y, oy1 = o.y + o.h;
+      const px0 = px - half, px1 = px + half;
+      const py0 = py, py1 = py + PLAYER;
+
+      if (px1 < ox0 || px0 > ox1) continue;         // not overlapping horizontally
+      if (py1 < oy0 || py0 > oy1) continue;         // not overlapping vertically
+
+      if (o.type === 'spike') { die(); return; }
+
+      if (o.type === 'pad') {
+        game.y = Math.max(game.y, o.h);
+        game.vy = PAD_V; game.onGround = false;
+        Audio.blip(760, 0.12, 'triangle', 0.18);
+        showToast('BOOST');
+        continue;
+      }
+      if (o.type === 'orb') continue;              // handled by action()
+
+      // block: landing on top is safe; hitting the side is fatal
+      const prevBottom = py - game.vy * dt + 0.0;   // approximate previous bottom
+      if (game.vy <= 0 && prevBottom >= oy1 - 0.35) {
+        game.y = oy1; game.vy = 0; game.onGround = true; onTop = true;
+      } else {
+        die(); return;
+      }
+    }
+
+    // falling into the void below a platform is impossible (ground spans level)
+    if (game.y < -2) { die(); return; }
+
+    // cube rotation while airborne
+    if (!game.onGround && !onTop) game.rotation -= dt * 8.2;
+    else {
+      // snap to nearest quarter turn
+      const target = Math.round(game.rotation / (Math.PI / 2)) * (Math.PI / 2);
+      game.rotation += (target - game.rotation) * Math.min(1, dt * 18);
+    }
+
+    // practice checkpoints
+    if (game.practice) {
+      const cp = Math.floor((game.x / game.level.lengthUnits) * 4) * (game.level.lengthUnits / 4);
+      if (cp > game.checkpoint + 0.5) {
+        game.checkpoint = cp;
+        showToast('CHECKPOINT');
+      }
+    }
+
+    updateParticles(dt);
+    if (game.shake > 0) game.shake = Math.max(0, game.shake - dt * 30);
+    if (game.x >= game.level.lengthUnits) { game.x = game.level.lengthUnits; completeLevel(); return; }
+    updateHud();
+  }
+
+  function updateParticles(dt) {
+    for (let i = game.particles.length - 1; i >= 0; i--) {
+      const p = game.particles[i];
+      p.life -= dt * 1.5;
+      if (p.life <= 0) { game.particles.splice(i, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy -= GRAVITY * 0.55 * dt;
+    }
+  }
+
+  // ------------------------------------------------------------------ drawing
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = Math.floor(W * DPR); canvas.height = Math.floor(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    scale = Math.max(0.65, Math.min(1.35, H / 620));
+  }
+  window.addEventListener('resize', resize);
+
+  function u2px(units) { return units * UNIT * scale; }
+
+  function draw() {
+    const def = LEVELS[game.index] || LEVELS[0];
+    const g = ctx;
+    g.fillStyle = '#0b0d12';
+    g.fillRect(0, 0, W, H);
+
+    const camX = game.x - 6;
+    const groundPx = () => H * 0.76;
+    const sx = (wx) => (wx - camX) * UNIT * scale;
+    const sy = (wy) => groundPx() - wy * UNIT * scale;
+
+    const shakeX = game.shake ? (Math.random() - 0.5) * game.shake : 0;
+    const shakeY = game.shake ? (Math.random() - 0.5) * game.shake : 0;
+    g.save();
+    g.translate(shakeX, shakeY);
+
+    // ---- background: parallax gradient + pulse rings on the beat
+    const beatLen = game.level ? game.level.beatLen : 0.5;
+    const beatPhase = game.level ? ((game.time % beatLen) / beatLen) : 0;
+    const pulse = 1 - beatPhase;
+
+    const grad = g.createLinearGradient(0, 0, 0, groundPx());
+    grad.addColorStop(0, '#0d1220');
+    grad.addColorStop(0.55, shade(def.color, -0.62));
+    grad.addColorStop(1, shade(def.color, -0.4));
+    g.fillStyle = grad;
+    g.fillRect(-100, -100, W + 200, groundPx() + 100);
+
+    g.save();
+    g.globalAlpha = 0.10 + pulse * 0.10;
+    g.strokeStyle = def.color; g.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      const r = ((pulse + i * 0.25) % 1) * Math.max(W, H) * 0.8;
+      g.beginPath(); g.arc(W * 0.5, groundPx() * 0.42, r, 0, Math.PI * 2); g.stroke();
+    }
+    g.restore();
+
+    // ---- ground
+    const gy = groundPx();
+    g.fillStyle = '#151a24';
+    g.fillRect(-100, gy, W + 200, H - gy + 100);
+    g.fillStyle = def.color;
+    g.fillRect(-100, gy, W + 200, Math.max(2, u2px(0.09)));
+
+    // ground grid lines (scroll)
+    const stepU = game.level ? game.level.stepLen : 2;
+    const startI = Math.floor((camX - 2) / stepU);
+    for (let i = startI; i < startI + 26; i++) {
+      const x = sx(i * stepU);
+      g.globalAlpha = i % 2 === 0 ? 0.16 : 0.08;
+      g.fillStyle = def.color;
+      g.fillRect(x, gy, Math.max(1, u2px(0.05)), u2px(GROUND_Y));
+    }
+    g.globalAlpha = 1;
+
+    // ---- obstacles
+    if (game.level) {
+      for (const o of game.level.obstacles) {
+        const x = sx(o.x), w = u2px(o.w), h = u2px(o.h);
+        if (x + w < -60 || x - w > W + 60) continue;
+        if (o.type === 'block') {
+          g.fillStyle = shade(def.color, -0.12);
+          g.fillRect(x - w / 2, sy(o.y + o.h), w, h);
+          g.fillStyle = 'rgba(255,255,255,.16)';
+          g.fillRect(x - w / 2, sy(o.y + o.h), w, Math.max(2, u2px(0.08)));
+          g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1;
+          g.strokeRect(x - w / 2, sy(o.y + o.h), w, h);
+        } else if (o.type === 'spike') {
+          const baseY = sy(0), topY = sy(o.h);
+          g.fillStyle = '#ff5d6c';
+          g.beginPath();
+          g.moveTo(x - w / 2, baseY);
+          g.lineTo(x, topY);
+          g.lineTo(x + w / 2, baseY);
+          g.closePath(); g.fill();
+          g.fillStyle = 'rgba(255,255,255,.35)';
+          g.beginPath();
+          g.moveTo(x - w / 2, baseY);
+          g.lineTo(x, topY);
+          g.lineTo(x - w * 0.12, baseY);
+          g.closePath(); g.fill();
+        } else if (o.type === 'pad') {
+          g.fillStyle = '#ffd54a';
+          roundRect(g, x - w / 2, sy(o.h), w, h, Math.min(6, h / 2));
+          g.fill();
+          g.fillStyle = 'rgba(0,0,0,.25)';
+          g.fillRect(x - w / 2, sy(o.h) + h - Math.max(2, u2px(0.06)), w, Math.max(2, u2px(0.06)));
+        } else if (o.type === 'orb') {
+          const cy = sy(o.y + o.h / 2);
+          const r = u2px(o.w / 2);
+          const glow = 0.55 + 0.45 * Math.sin(game.time * 6);
+          g.save();
+          g.globalAlpha = 0.35 * glow;
+          g.fillStyle = '#7ad1ff';
+          g.beginPath(); g.arc(x, cy, r * 2.1, 0, Math.PI * 2); g.fill();
+          g.restore();
+          g.fillStyle = '#7ad1ff';
+          g.beginPath(); g.arc(x, cy, r, 0, Math.PI * 2); g.fill();
+          g.fillStyle = 'rgba(255,255,255,.85)';
+          g.beginPath(); g.arc(x - r * 0.25, cy - r * 0.3, r * 0.28, 0, Math.PI * 2); g.fill();
+        }
+      }
+    }
+
+    // ---- particles
+    for (const p of game.particles) {
+      g.globalAlpha = Math.max(0, p.life);
+      g.fillStyle = p.color;
+      g.fillRect(sx(p.x), sy(p.y), p.size, p.size);
+    }
+    g.globalAlpha = 1;
+
+    // ---- player
+    if (!game.dead) {
+      const size = u2px(PLAYER);
+      const px = sx(game.x), py = sy(game.y + PLAYER);
+      g.save();
+      g.translate(px, py);
+      g.rotate(game.rotation);
+      g.fillStyle = def.color;
+      g.fillRect(-size / 2, -size / 2, size, size);
+      g.fillStyle = 'rgba(255,255,255,.85)';
+      g.fillRect(-size / 2, -size / 2, size, size * 0.22);
+      g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = 2;
+      g.strokeRect(-size / 2, -size / 2, size, size);
+      // eyes
+      g.fillStyle = '#0b0d12';
+      const e = size * 0.11;
+      g.fillRect(-size * 0.22, -size * 0.06, e, e);
+      g.fillRect(size * 0.09, -size * 0.06, e, e);
+      g.restore();
+    }
+
+    // ---- progress bar
+    if (game.level) {
+      const p = Math.max(0, Math.min(1, game.x / game.level.lengthUnits));
+      g.fillStyle = 'rgba(255,255,255,.10)';
+      g.fillRect(0, H - 8, W, 8);
+      g.fillStyle = def.color;
+      g.fillRect(0, H - 8, W * p, 8);
+      if (game.practice) {
+        const cp = game.level ? (game.checkpoint / game.level.lengthUnits) : 0;
+        g.fillStyle = '#ffb077';
+        g.fillRect(W * cp - 1, H - 14, 2, 14);
+      }
+    }
+
+    g.restore();
+  }
+
+  function roundRect(g, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.arcTo(x + w, y, x + w, y + h, r);
+    g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r);
+    g.arcTo(x, y, x + w, y, r);
+    g.closePath();
+  }
+  function shade(hex, amount) {
+    const m = hex.replace('#', '');
+    const num = parseInt(m.length === 3 ? m.split('').map(c => c + c).join('') : m, 16);
+    let r = (num >> 16) & 255, gg = (num >> 8) & 255, b = num & 255;
+    if (amount < 0) { r *= (1 + amount); gg *= (1 + amount); b *= (1 + amount); }
+    else { r += (255 - r) * amount; gg += (255 - gg) * amount; b += (255 - b) * amount; }
+    return `rgb(${Math.round(r)},${Math.round(gg)},${Math.round(b)})`;
+  }
+
+  let toastTimer = null;
+  function showToast(text) {
+    el.toast.textContent = text;
+    el.toast.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.toast.classList.remove('show'), 700);
+  }
+
+  // ------------------------------------------------------------------- menus
+  function renderMenu() {
+    el.levelList.innerHTML = '';
+    LEVELS.forEach((def, i) => {
+      const best = progress.best[def.id] || 0;
+      const done = !!progress.completed[def.id];
+      const btn = document.createElement('button');
+      btn.className = 'level-btn';
+      btn.type = 'button';
+      btn.innerHTML = `
+        <div class="icon" style="background:${def.color}">${i + 1}</div>
+        <div class="meta">
+          <div class="name">${def.name}</div>
+          <div class="sub">${def.difficulty} · ${def.bpm} BPM${done ? ' · completed' : ''}</div>
+        </div>
+        <div class="best">${best}%</div>`;
+      btn.addEventListener('click', () => {
+        game.attempts = 0; game.checkpoint = 0;
+        startLevel(i, false);
+      });
+      el.levelList.appendChild(btn);
+    });
+  }
+
+  // ------------------------------------------------------------------- input
+  function onPress(e) {
+    if (!el.menu.hidden || !el.complete.hidden) return;
+    action();
+    if (e && e.cancelable) e.preventDefault();
+  }
+  canvas.addEventListener('mousedown', onPress);
+  canvas.addEventListener('touchstart', (e) => { onPress(e); }, { passive: false });
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+      if (el.menu.hidden && el.complete.hidden && el.paused.hidden) { action(); e.preventDefault(); }
+      else if (!el.menu.hidden) { const b = el.levelList.querySelector('.level-btn'); if (b) b.click(); e.preventDefault(); }
+    }
+    if (e.code === 'KeyR') { if (game.running || game.dead) startLevel(game.index, false); }
+    if (e.code === 'Escape' || e.code === 'KeyP') {
+      if (!el.menu.hidden) return;
+      if (el.complete.hidden) {
+        if (el.paused.hidden) { el.paused.hidden = false; game.paused = true; Audio.setMuted(true); }
+        else { el.paused.hidden = true; game.paused = false; Audio.setMuted(false); }
+      }
+    }
+  });
+
+  document.getElementById('againBtn').addEventListener('click', () => { game.attempts = 0; startLevel(game.index, false); });
+  document.getElementById('menuBtn').addEventListener('click', () => toMenu());
+  document.getElementById('resumeBtn').addEventListener('click', () => { el.paused.hidden = true; game.paused = false; Audio.setMuted(false); });
+  document.getElementById('retryBtn').addEventListener('click', () => startLevel(game.index, false));
+  document.getElementById('quitBtn').addEventListener('click', () => { el.paused.hidden = true; toMenu(); });
+  el.resetBtn.addEventListener('click', () => {
+    progress = { best: {}, completed: {}, attempts: {} };
+    saveProgress(); renderMenu();
+  });
+
+  function toMenu() {
+    game.running = false; game.paused = false;
+    Audio.stop(); Audio.setMuted(false);
+    el.hud.hidden = true; el.complete.hidden = true; el.paused.hidden = true;
+    el.menu.hidden = false;
+    renderMenu();
+  }
+
+  // -------------------------------------------------------------------- loop
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    step(dt);
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  resize();
+  renderMenu();
+  game.level = buildLevel(LEVELS[0]);   // so the menu background has a level to draw
+  requestAnimationFrame(frame);
+
+  // Pause music when the tab is hidden.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { Audio.stop(); if (game.running) { game.paused = true; el.paused.hidden = false; } }
+  });
+})();
+</script>
+</body>
+</html>

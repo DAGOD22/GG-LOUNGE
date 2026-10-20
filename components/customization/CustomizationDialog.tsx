@@ -1,11 +1,11 @@
 'use client';
 import { CursorGallery } from './CursorGallery';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { X, Palette, Image as ImageIcon, MousePointer2, Keyboard, EyeOff, Upload, Check, RotateCcw, Sparkles } from 'lucide-react';
+import { X, Palette, Image as ImageIcon, MousePointer2, Keyboard, EyeOff, Upload, Check, RotateCcw, Sparkles, ShieldBan } from 'lucide-react';
 import { useCustomization } from './CustomizationProvider';
 import { THEMES, WALLPAPERS, RELEASE_NAME, bindingFromEvent, bindingLabel, iconHref, normalizeDestination, type Colors, type KeyBinding } from '@/lib/customization/settings';
 import { saveMedia, deleteMedia, imageData } from '@/lib/customization/media';
-const tabs=[{id:'tab',label:'Tab cloak',icon:EyeOff},{id:'panic',label:'Panic key',icon:Keyboard},{id:'theme',label:'Themes',icon:Palette},{id:'background',label:'Background',icon:ImageIcon},{id:'cursor',label:'Cursor',icon:MousePointer2},{id:'reactive',label:'Key effects',icon:Sparkles}];
+const tabs=[{id:'tab',label:'Tab cloak',icon:EyeOff},{id:'panic',label:'Panic key',icon:Keyboard},{id:'theme',label:'Themes',icon:Palette},{id:'background',label:'Background',icon:ImageIcon},{id:'cursor',label:'Cursor',icon:MousePointer2},{id:'reactive',label:'Key effects',icon:Sparkles},{id:'adblock',label:'Ad blocker',icon:ShieldBan}];
 function Toggle({label,description,checked,onChange}:{label:string;description?:string;checked:boolean;onChange:(v:boolean)=>void}){return <label className="gg-toggle"><span><strong>{label}</strong>{description&&<small>{description}</small>}</span><input type="checkbox" role="switch" checked={checked} onChange={e=>onChange(e.target.checked)}/></label>;}
 function Section({title,children,description}:{title:string;description?:string;children:ReactNode}){return <section className="gg-settings-section"><h3>{title}</h3>{description&&<p className="gg-help">{description}</p>}{children}</section>;}
 export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onClose:()=>void;onPlayVideo:()=>void}) {
@@ -97,6 +97,25 @@ export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onC
           <label className="gg-range">Intensity <output>{settings.reactive.intensity}%</output><input aria-label="Key effect intensity" type="range" min={10} max={100} value={settings.reactive.intensity} onChange={e=>update(s=>({...s,reactive:{...s.reactive,intensity:+e.target.value}}))}/></label>
           <Toggle label="Follow the pointer" description="Place keyboard pulses near your cursor instead of across the screen." checked={settings.reactive.pointer} onChange={pointer=>update(s=>({...s,reactive:{...s.reactive,pointer}}))}/>
           <p className="gg-help">Close this panel and press a key to try it. Effects ignore typing in text fields, stop in hidden tabs, and cap particles for smoother games. Reduced-motion settings take priority.</p>
+        </Section>
+      </>}
+      {tab==='adblock'&&<>
+        <Section title="Block ads, trackers and telemetry" description="Filters requests to advertising, analytics and tracking endpoints across everything that runs through the lounge proxy: the proxy page, Apps, and remote games such as Monkeytype. It also collapses the empty boxes those ads leave behind.">
+          <Toggle
+            label="Ad blocker"
+            description="On: ad, tracker and telemetry requests are dropped before they leave your browser. Off: pages load exactly as their authors sent them."
+            checked={settings.adblock.enabled}
+            onChange={enabled=>update(s=>({...s,adblock:{...s.adblock,enabled}}))}
+          />
+          <div className="gg-chip-row">
+            <button className="gg-chip" onClick={()=>update(s=>({...s,adblock:{...s.adblock,enabled:true}}))}>Block everything</button>
+            <button className="gg-chip" onClick={()=>update(s=>({...s,adblock:{...s.adblock,enabled:false}}))}>Allow everything</button>
+          </div>
+          <p className="gg-help">
+            Applies to proxied sites, Apps and streamed games. Games installed in the lounge ship no ad
+            network calls of their own, so there is nothing to strip there. Some sites detect blockers and
+            may show a “disable your ad blocker” notice; turn it off for those.
+          </p>
         </Section>
       </>}
       </div>

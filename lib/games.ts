@@ -1,6 +1,6 @@
 import assetAudit from "./game-assets.json";
 import { dedupeGames } from "./game-identity";
-export type Game = { id: string; title: string; subtitle: string; description: string; genre: string; tone: string; mark: string; color: string; path: string; icon?: string; featured?: boolean }
+export type Game = { id: string; title: string; subtitle: string; description: string; genre: string; tone: string; mark: string; color: string; path: string; icon?: string; featured?: boolean; remoteUrl?: string; hosted?: 'local' | 'remote' }
 // Icons: local 512x512 webp — generated via PIL, hash-distributed colors
 export function getGameIconUrl(id: string): string {
   // Prefer WebP (75% smaller: 8-45KB vs 200KB png), fallback to png via <img onError> in GameCard
@@ -25,13 +25,14 @@ export const catalogGames: Game[] = [
   { id: 'stickman-hook', title: 'Stickman Hook', subtitle: 'Swing into action.', description: "Hook, swing, and launch through a kinetic obstacle course.", genre: 'Arcade', tone: 'Momentum', mark: 'SH', color: 'twenty', path: '/games/stickman-hook/index.html', icon: getGameIconUrl('stickman-hook') },
   { id: 'ragdoll-archers', title: 'Ragdoll Archers', subtitle: 'Aim. Fire. Bounce.', description: "Take aim in a physics-packed archery arena full of ricochets.", genre: 'Arcade', tone: 'Physics', mark: 'RA', color: 'twenty', path: '/games/ragdoll-archers/index.html', icon: getGameIconUrl('ragdoll-archers') },
   { id: 'hextris', title: 'Hextris', subtitle: 'Spin. Match. Survive.', description: "A hypnotic hexagonal puzzle where every move tightens the pressure.", genre: 'Puzzle', tone: 'Flow state', mark: 'HX', color: 'devil', path: '/games/hextris/index.html', icon: getGameIconUrl('hextris') },
-  { id: '2048', title: '2048', subtitle: 'Join the numbers.', description: "Slide, merge, and think ahead in the classic number puzzle.", genre: 'Puzzle', tone: 'Strategy', mark: '20', color: 'mining', path: '/games/2048/index.html', icon: getGameIconUrl('2048') },
+  { id: '2048', title: '2048', subtitle: 'Join the numbers.', description: "The original 2048 by Gabriele Cirulli (MIT licensed), bundled with the lounge so it runs offline. Slide, merge, and think ahead in the classic number puzzle.", genre: 'Puzzle', tone: 'Strategy', mark: '20', color: 'mining', path: '/games/2048/index.html', icon: getGameIconUrl('2048') },
+  { id: 'block-blast', title: 'Block Blast', subtitle: 'Place. Clear. Survive.', description: "A GG-Lounge browser build of the block-placement puzzle: drag three shapes onto an 8×8 board, clear rows and columns, chain combos. Independent build — not the official Block Blast app by Hungry Studio, which is iOS/Android only.", genre: 'Puzzle', tone: 'Strategy', mark: 'BB', color: 'frost', path: '/games/block-blast/index.html', icon: getGameIconUrl('block-blast') },
   { id: 'solar-smash', title: 'Solar Smash', subtitle: 'Break the impossible.', description: "Unleash cosmic-scale destruction in a spectacular planetary sandbox.", genre: 'Simulation', tone: 'Cosmic', mark: 'SS', color: 'cookie', path: '/games/solar-smash/index.html', icon: getGameIconUrl('solar-smash') },
   { id: 'drift-boss', title: 'Drift Boss', subtitle: 'One road. No brakes.', description: "Hold the perfect line through an endless neon road and chase your best run.", genre: 'Racing', tone: 'Reflex', mark: 'DB', color: 'youtube', path: '/games/drift-boss/index.html', icon: getGameIconUrl('drift-boss') },
   { id: 'moto-x3m', title: 'Moto X3M', subtitle: 'Ride the impossible.', description: "Launch, flip, and land your way through explosive motorcycle stunt courses.", genre: 'Racing', tone: 'Stunts', mark: 'MX', color: 'drive', path: '/games/moto-x3m/index.html', icon: getGameIconUrl('moto-x3m') },
   { id: 'subway-surfers', title: 'Subway Surfers', subtitle: 'Run without limits.', description: "Dash through the city, dodge the tracks, and chase a higher score.", genre: 'Arcade', tone: 'Reflex', mark: 'S2', color: 'mining', path: '/games/subway-surfers/index.html', icon: getGameIconUrl('subway-surfers') },
-  { id: 'survival-race', title: 'Survival Race', subtitle: 'Race the danger.', description: "Keep your wheels steady and survive a relentless run of hazards.", genre: 'Racing', tone: 'Reflex', mark: 'SR', color: 'cookie', path: '/games/survival-race/index.html', icon: getGameIconUrl('survival-race') },
-  { id: 'geometry-dash', title: 'Geometry Dash', subtitle: 'Jump the rhythm.', description: "Sync your timing to the beat and clear a precision platforming gauntlet.", genre: 'Platformer', tone: 'Rhythm', mark: 'GD', color: 'coral', path: '/games/geometry-dash/index.html', icon: getGameIconUrl('geometry-dash') },
+  { id: 'survival-race', title: 'Survival Race', subtitle: 'Race the danger.', description: "The full Survival Race WebGL build, now hosted locally in the lounge (no CDN needed). Keep your wheels steady and survive a relentless run of hazards.", genre: 'Racing', tone: 'Reflex', mark: 'SR', color: 'cookie', path: '/games/survival-race/index.html', icon: getGameIconUrl('survival-race') },
+  { id: 'geometry-dash', title: 'Geometry Dash', subtitle: 'Jump the rhythm.', description: "Three original rhythm-platformer levels with a procedural soundtrack, built for GG-Lounge. Inspired by the genre but not RobTop Games' Geometry Dash — the official game is a paid PC/mobile release with no web version.", genre: 'Platformer', tone: 'Rhythm', mark: 'GD', color: 'coral', path: '/games/geometry-dash/index.html', icon: getGameIconUrl('geometry-dash') },
   { id: 'poki', title: 'Paper.io 2', subtitle: 'Claim it all.', description: "The real Paper.io 2 — loop out, capture territory, cut rival tails.", genre: 'Arcade', tone: 'Battle', mark: 'P2', color: 'coral', path: '/games/poki/index.html', icon: getGameIconUrl('poki') },
   { id: 'vex-8', title: 'Vex 8', subtitle: 'Run the gauntlet.', description: "Wall-jump, slide, and sprint through a sharp new platforming challenge.", genre: 'Platformer', tone: 'Precision', mark: 'V8', color: 'stack', path: '/games/vex-8/index.html', icon: getGameIconUrl('vex-8') },
   { id: 'eaglercraftx', title: 'EaglercraftX', subtitle: 'Minecraft in a tab.', description: "The bundled legacy EaglercraftX 1.8 client. This old build supports multiplayer only; server availability varies.", genre: 'Sandbox', tone: 'Blocky', mark: 'EX', color: 'twenty', path: '/games/eaglercraftx/index.html', icon: getGameIconUrl('eaglercraftx') },
@@ -164,9 +165,26 @@ export const catalogGames: Game[] = [
 const audited = assetAudit as Record<string, { available: boolean; issues: string[] }>;
 export const unavailableGames = dedupeGames(catalogGames).filter(game => !audited[game.id]?.available);
 export function getGameAssetIssues(id: string): string[] { return audited[id]?.issues || ['Game files have not been audited.']; }
-export const games: Game[] = dedupeGames(catalogGames).filter(game => audited[game.id]?.available);
 
-export const filters = ['All games', 'Idle', 'Arcade', 'Puzzle', 'Racing', 'Platformer', 'Simulation', 'Sandbox', 'Community', 'Battle', 'Favorites']
+/**
+ * Remote games: real third-party sites streamed through the lounge's own
+ * Scramjet proxy and catalogued as games. They have no local files, so the asset
+ * audit does not apply to them — availability depends on the proxy connection
+ * and on the site itself, not on files in this repository.
+ *
+ * Used where the genuine product only exists as a live web app: Monkeytype, for
+ * example, keeps its real accounts, history and personal bests on its own site,
+ * so running the real thing is strictly better than shipping a lookalike.
+ */
+export const proxyGames: Game[] = [
+  { id: 'monkeytype', title: 'Monkeytype', subtitle: 'The real typing test.', description: "The genuine Monkeytype website, streamed through the lounge proxy. Sign in or create an account on the site itself — your tests, personal bests and settings are stored on your own Monkeytype account, not in the lounge.", genre: 'Typing', tone: 'Focus', mark: 'MT', color: 'frost', path: '/remote?url=' + encodeURIComponent('https://monkeytype.com'), remoteUrl: 'https://monkeytype.com', hosted: 'remote', icon: getGameIconUrl('monkeytype'), featured: true },
+  { id: '2048-online', title: '2048 (online)', subtitle: 'Play the live original.', description: "The original 2048 as published by its author at play2048.co, streamed through the lounge proxy. The offline copy bundled with the lounge is also in the catalogue.", genre: 'Typing', tone: 'Strategy', mark: 'OL', color: 'mining', path: '/remote?url=' + encodeURIComponent('https://play2048.co/'), remoteUrl: 'https://play2048.co/', hosted: 'remote', icon: getGameIconUrl('2048') },
+];
+
+// Local games need audited files on disk; remote games need a working proxy.
+export const games: Game[] = [...dedupeGames(catalogGames).filter(game => audited[game.id]?.available), ...proxyGames];
+
+export const filters = ['All games', 'Idle', 'Arcade', 'Puzzle', 'Racing', 'Platformer', 'Simulation', 'Sandbox', 'Community', 'Battle', 'Typing', 'Favorites']
 export const pubColors = ['cookie', 'drive', 'mining', 'devil', 'stack', 'hextris', 'twenty', 'youtube', 'neon', 'frost', 'sunset', 'forest', 'midnight', 'coral', 'plasma', 'aqua']
 export const FEATURED_IDS = ['cookie-clicker','stack','drive-mad','moto-x3m','among-us','retro-bowl','hole-io']
 export const STAFF_PICKS = ['cookie-clicker','retro-bowl','among-us','stack','hole-io','moto-x3m','drive-mad']
@@ -181,6 +199,7 @@ export const CONTROLS_LEGEND: Record<string,string> = {
   Sandbox: 'WASD to move • Space to jump • E to interact',
   Battle: 'WASD to move • Mouse to aim • Space/Click to shoot',
   Community: 'WASD / Arrows • Space • Enter',
+  Typing: 'Just start typing • Esc for the command line • Tab to restart',
   default: 'Arrows / WASD • Space • Enter • R to restart'
 }
 export function hashDay(str:string){ let h=0; for(let i=0;i<str.length;i++) h=(h*31+str.charCodeAt(i))>>>0; return h }

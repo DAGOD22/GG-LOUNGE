@@ -8,7 +8,13 @@ process.env.GG_LOCAL_WISP ??= '1';
 Object.assign(wisp.options, {
   allow_private_ips: false, allow_loopback_ips: false, allow_direct_ip: false,
   allow_udp_streams: false, port_whitelist: [80, 443],
-  stream_limit_total: 64, stream_limit_per_host: 16, dns_result_order: 'ipv4first',
+  // stream_limit_total counts with Object.keys() and works. stream_limit_per_host
+  // is left at -1 (unlimited) on purpose: the pinned wisp server iterates the
+  // connection's stream map with `for (const s of connection.streams)`, which
+  // throws "connection.streams is not iterable" because that map is a plain
+  // object — so enabling it breaks every stream, not just busy hosts. The
+  // per-IP connection cap below still bounds a single client.
+  stream_limit_total: 64, stream_limit_per_host: -1, dns_result_order: 'ipv4first',
 });
 let handle;
 let upgrade;

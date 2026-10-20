@@ -1,256 +1,168 @@
 <!DOCTYPE html>
-
-
-<!-- Ultimate Game Stash file--> 
-<!-- For the regularly updating doc go to https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/ -->
-
-
-
-
-<html lang="en-us">
+<!--
+  Survival Race — local Unity WebGL build.
+  Game files ship with the lounge in /games/survival-race/Build/ so the game runs
+  without any external CDN. Provenance: the browser build of Survival Race as
+  distributed in the UGS-Assets public asset stash (bubbls/UGS-Assets,
+  "survival race v2"). The WebAssembly payload is stored as two parts (a hosting
+  limit on large files); Build/merge.js reassembles them into one blob at runtime.
+-->
+<html lang="en-us" data-gg-game-state="ready">
   <head>
 <script src="/customization-game.js"></script>
-
-    <script>
-/* GG Lounge CDN fallback: primary -> mirror -> mirror (for school networks that block a CDN) */
-(function(){
-  var SOURCES=[{base:"https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/survival%20race%20v2/",extra:"https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/merge.js",probe:"https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/merge.js"},{base:"https://cdn.statically.io/gh/bubbls/UGS-Assets/main/survival%20race%20v2/",extra:"https://cdn.statically.io/gh/bubbls/UGS-Assets/main/merge.js",probe:"https://cdn.statically.io/gh/bubbls/UGS-Assets/main/merge.js"},{base:"https://raw.githack.com/bubbls/UGS-Assets/main/survival%20race%20v2/",extra:"https://raw.githack.com/bubbls/UGS-Assets/main/merge.js",probe:"https://raw.githack.com/bubbls/UGS-Assets/main/merge.js"}];
-  var KEY="ggl_cdn_survival-race";
-  function pick(){
-    try{
-      var q=new URLSearchParams(window.location.search).get("cdn");
-      if(q!==null&&SOURCES[+q])return +q;
-      var s=window.localStorage.getItem(KEY);
-      if(s!==null&&SOURCES[+s])return +s;
-    }catch(e){}
-    return 0;
-  }
-  var idx=pick();
-  window.GGL_CDN=SOURCES;window.GGL_CDN_IDX=idx;window.GGL_CDN_KEY=KEY;
-  document.write('<base href="'+SOURCES[idx].base+'">');
-})();
-</script>
- <meta charset="utf-8">
-  <meta name="robots" content="noindex, nofollow">
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <title>Survival Race</title>
-  <style>
-    html,
-    body {
-      background: #000;
-      width: 100%;
-      height: 100%;
-      overflow: visible;
-      padding: 0;
-      margin: 0;
-    }
-
-    div#gameContainer {
-      background: transparent !important;
-      position: absolute;
-    }
-
-    div#gameContainer canvas {
-      position: absolute;
-    }
-
-    div#gameContainer canvas[data-pixel-art="true"] {
-      position: absolute;
-      image-rendering: optimizeSpeed;
-      image-rendering: -webkit-crisp-edges;
-      image-rendering: -moz-crisp-edges;
-      image-rendering: -o-crisp-edges;
-      image-rendering: crisp-edges;
-      image-rendering: -webkit-optimize-contrast;
-      image-rendering: optimize-contrast;
-      image-rendering: pixelated;
-      -ms-interpolation-mode: nearest-neighbor;
-    }
-  </style>
-  <script>
-    localStorage.setItem("savesData", JSON.stringify({}))
-  </script>
-</head>
-
-<body>
-  <div id="gameContainer" style="width: 1094px; height: 615px; top: 0px; left: 1px;">
-    <canvas id="unity-canvas" data-pixel-art="" width="1094" height="615" style="background: linear-gradient(to right, white, white 100%, transparent 100%, transparent) center center / 100% 1rem no-repeat; width: 1094px; height: 615px; cursor: default;"></canvas>
-      <script>
-      window.fileMergerConfig = {
-        files: [
-          { name: 'yandexBrotli.wasm.unityweb', parts: 2 },
-        ],
-        basePath: 'Build/',
-        debug: true
-      };
-    </script>
-    <script>document.write('<script src="'+window.GGL_CDN[window.GGL_CDN_IDX].extra+'"><\/script>');</script>
-    <script src="Build/yandexBrotli.loader.js"></script>
-    <script>
-      let myGameInstance = null;
-      let ysdk = null;
-      let player = null;
-      let leaderboard;
-      let payments = null;
-      let initGame = false;
-      let nowFullAdOpen = false;
-
-      function InitGame() {
-        console.log('Init Game Success');
-        initGame = true;
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex, nofollow">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Survival Race</title>
+    <style>
+      html, body {
+        background: #000;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        padding: 0;
+        margin: 0;
       }
+      div#gameContainer {
+        background: transparent !important;
+        position: absolute;
+      }
+      div#gameContainer canvas {
+        position: absolute;
+      }
+      div#gameContainer canvas[data-pixel-art="true"] {
+        image-rendering: pixelated;
+      }
+      /* Loading bar drawn on the canvas background until Unity takes over. */
+      #unity-canvas { background: #000; }
+      #gg-fallback {
+        position: fixed; inset: 0; display: none;
+        align-items: center; justify-content: center; text-align: center;
+        background: #0b0d12; color: #f4f2ec;
+        font: 16px/1.6 system-ui, sans-serif; padding: 24px; z-index: 99999;
+      }
+      #gg-fallback a { color: #d7f34a; }
+      #gg-fallback code { background: #191d28; padding: 2px 6px; border-radius: 4px; }
+    </style>
+  </head>
 
+  <body>
+    <div id="gameContainer" style="width: 100%; height: 100%; top: 0px; left: 0px;">
+      <canvas id="unity-canvas" data-pixel-art="" width="1094" height="615" style="width: 100%; height: 100%; cursor: default;"></canvas>
+    </div>
+
+    <div id="gg-fallback">
+      <div>
+        <h2 style="margin:0 0 8px">Survival Race could not start</h2>
+        <p id="gg-fallback-detail" style="max-width: 46ch; margin: 0 auto"></p>
+        <p style="font-size: 13px; opacity: .8">
+          This build needs WebAssembly. If your browser or network blocks it, try
+          another browser. Files live under <code>/games/survival-race/Build/</code>.
+        </p>
+      </div>
+    </div>
+
+    <script>
+      // Yandex Games SDK hooks. The build calls these for ads/payments/leaderboards.
+      // They are intentionally no-ops: the lounge does not serve ads or purchases.
+      // (The lounge's own ad blocker also strips remote ad requests in the proxy.)
+      var initGame = false, myGameInstance = null, ysdk = null, player = null;
+      var leaderboard, payments = null, nowFullAdOpen = false;
+      function InitGame() { initGame = true; }
       function FullAdShow() {}
-
       function RewardedShow(id) {}
-
       function StickyAdActivity(show) {}
-
       function InitPayments() {}
-
       function BuyPayments(id) {}
-      let callCount_GetPayments = 0;
-
       function GetPayments() {}
-
       function ConsumePurchase(id) {}
-
       function ConsumePurchases() {}
-
       function InitLeaderboard() {}
-
       function SetLeaderboardScores(_name, score) {}
-
-      function GetLeaderboardScores(nameLB, maxPlayers, quantityTop, quantityAround, photoSize, auth) {}
-
-      function EntriesLB(res, maxPlayers, photoSize) {
-        let LeaderboardEntriesText = 'no data';
-        let playersCount = 0;
-        let ranks = new Array(playersCount);
-        let photos = new Array(playersCount);
-        let mames = new Array(playersCount);
-        let scores = new Array(playersCount);
-        let uniqueIDs = new Array(playersCount);
-        let jsonPlayers = {
-          "entries": LeaderboardEntriesText,
-          "ranks": null,
-          "photos": photos,
-          "names": mames,
-          "scores": scores,
-          "uniqueIDs": uniqueIDs
-        };
-        return jsonPlayers;
+      function GetLeaderboardScores() {}
+      function EntriesLB() {
+        return { entries: 'no data', ranks: null, photos: [], names: [], scores: [], uniqueIDs: [] };
       }
-
       function Review() {}
-
       function PromptShow() {}
-
       function PaintRBT(rbt) {}
-
       function StaticRBTDeactivate() {}
       var cloudSaves = 'noData';
-
       function SaveCloud(jsonData, flush) {}
-
       function LoadCloud(sendback) {}
       var environmentData = 'null';
-
       function RequestingEnvironmentData(sendback) {}
       var playerData = 'noData';
-
       function InitPlayer(sendback) {}
-
       function NotAuthorized() {
-        let authJson = {
-          "playerAuth": "rejected",
-          "playerName": "unauthorized",
-          "playerId": "unauthorized",
-          "playerPhoto": "null"
-        };
-        return JSON.stringify(authJson);
+        return JSON.stringify({
+          playerAuth: 'rejected', playerName: 'unauthorized',
+          playerId: 'unauthorized', playerPhoto: 'null'
+        });
       }
-
       function OpenAuthDialog() {}
-      var canvas = document.querySelector("#unity-canvas");
-      var config = {
-        dataUrl: "Build/yandexBrotli.data.unityweb",
-        frameworkUrl: "Build/yandexBrotli.framework.js.unityweb",
-        codeUrl: "Build/yandexBrotli.wasm.unityweb",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "Survival",
-        productName: "Survival Race",
-        productVersion: "0.0.15",
-      };
-      var scaleToFit;
-      try {
-        scaleToFit = !!JSON.parse("true");
-      } catch (e) {
-        scaleToFit = true;
-      }
+
+      var canvas = document.querySelector('#unity-canvas');
 
       function progressHandler(progress) {
         var percent = progress * 100 + '%';
-        canvas.style.background = 'linear-gradient(to right, white, white ' + percent + ', transparent ' + percent + ', transparent) no-repeat center';
-        canvas.style.backgroundSize = '100% 1rem';
+        canvas.style.background =
+          'linear-gradient(to right, #d7f34a, #d7f34a ' + percent + ', transparent ' + percent + ', transparent) no-repeat center';
+        canvas.style.backgroundSize = '100% 0.5rem';
       }
 
       function onResize() {
+        var w = window.innerWidth;
+        var h = window.innerHeight;
         var container = canvas.parentElement;
-        var w;
-        var h;
-        if (scaleToFit) {
-          w = window.innerWidth;
-          h = window.innerHeight;
-          var r = 540 / 960;
-          if (w * r > window.innerHeight) {
-            w = Math.min(w, Math.ceil(h / r));
-          }
-          h = Math.floor(w * r);
-        } else {
-          w = 960;
-          h = 540;
-        }
-        container.style.width = canvas.style.width = w + "px";
-        container.style.height = canvas.style.height = h + "px";
-        container.style.top = Math.floor((window.innerHeight - h) / 2) + "px";
-        container.style.left = Math.floor((window.innerWidth - w) / 2) + "px";
+        container.style.width = canvas.style.width = w + 'px';
+        container.style.height = canvas.style.height = h + 'px';
+        container.style.top = '0px';
+        container.style.left = '0px';
       }
-      var gameInstance;
-      createUnityInstance(canvas, config, progressHandler).then(function(instance) {
-        canvas = instance.Module.canvas;
-        onResize();
-        gameInstance = instance;
-      });
       window.addEventListener('resize', onResize);
       onResize();
+
+      function fail(message) {
+        console.error('[survival-race]', message);
+        var box = document.getElementById('gg-fallback');
+        document.getElementById('gg-fallback-detail').textContent = message;
+        box.style.display = 'flex';
+      }
+
+      // ---- Reassemble the split WebAssembly payload, then boot Unity -----------
+      // Build/merge.js exposes window.GGMergeWasm(); Build/yandexBrotli.loader.js
+      // exposes createUnityInstance(). Both are loaded above this script.
+      function bootUnity() {
+        if (typeof createUnityInstance !== 'function') {
+          fail('The Unity loader did not load. Check that /games/survival-race/Build/yandexBrotli.loader.js is reachable.');
+          return;
+        }
+        window.GGMergeWasm('Build/yandexBrotli.wasm.unityweb', 2).then(function (wasmUrl) {
+          var config = {
+            dataUrl: 'Build/yandexBrotli.data.unityweb',
+            frameworkUrl: 'Build/yandexBrotli.framework.js.unityweb',
+            codeUrl: wasmUrl,
+            streamingAssetsUrl: 'StreamingAssets',
+            companyName: 'Survival',
+            productName: 'Survival Race',
+            productVersion: '0.0.15',
+          };
+          return createUnityInstance(canvas, config, progressHandler).then(function (instance) {
+            myGameInstance = instance;
+            canvas = instance.Module.canvas;
+            canvas.style.background = 'transparent';
+            onResize();
+            if (typeof InitGame === 'function') InitGame();
+          });
+        }).catch(function (error) {
+          fail('Could not load the game files: ' + (error && error.message ? error.message : error));
+        });
+      }
+      if (document.readyState === 'complete') bootUnity();
+      else window.addEventListener('load', bootUnity);
     </script>
-  </div>
-
-<script>
-(function(){
-  if(!window.GGL_CDN)return;
-  var S=window.GGL_CDN,KEY=window.GGL_CDN_KEY,idx=window.GGL_CDN_IDX;
-  var order=[idx];for(var k=0;k<S.length;k++){if(k!==idx)order.push(k);}
-  function fail(){
-    var d=document.createElement("div");
-    d.style.cssText="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0b0d12;color:#f4f2ec;font-family:Arial,sans-serif;z-index:99999;text-align:center;padding:24px";
-    d.innerHTML="<div><h2>Game files blocked on this network</h2><p>All download mirrors failed. Try again later or on another network.</p></div>";
-    document.body.appendChild(d);
-  }
-  function attempt(n){
-    if(n>=order.length){fail();return;}
-    var i=order[n];
-    fetch(S[i].probe,{method:"HEAD",mode:"cors",cache:"no-store"}).then(function(r){
-      if(r&&(r.ok||r.status===405||r.status===403)){
-        try{localStorage.setItem(KEY,String(i));}catch(e){}
-        if(i!==idx){var u=new URL(window.location.href);u.searchParams.set("cdn",String(i));window.location.replace(u.toString());}
-      }else{attempt(n+1);}
-    }).catch(function(){attempt(n+1);});
-  }
-  attempt(0);
-})();
-</script>
-</body>
-
+    <script src="Build/merge.js"></script>
+    <script src="Build/yandexBrotli.loader.js"></script>
+  </body>
 </html>

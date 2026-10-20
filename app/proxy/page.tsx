@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, ExternalLink, Globe, Home, RotateCw, Search } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ExternalLink, Globe, Home, RotateCw, Search, ShieldBan, ShieldOff } from 'lucide-react';
 import { bootProxy, normalizeProxyUrl, type ProxyRuntime, type ScramjetFrame } from '@/lib/proxy-client';
+import { useCustomization } from '@/components/customization/CustomizationProvider';
 
 const shortcuts = [
   ['YouTube', 'https://www.youtube.com/'], ['Bing', 'https://www.bing.com/'],
@@ -10,6 +11,8 @@ const shortcuts = [
   ['Roblox website', 'https://www.roblox.com/'], ['now.gg', 'https://now.gg/'],
 ];
 export default function ProxyPage() {
+  const { settings, update } = useCustomization();
+  const adblockOn = settings.adblock.enabled;
   const iframe = useRef<HTMLIFrameElement>(null);
   const controlledFrame = useRef<ScramjetFrame | null>(null);
   const runtime = useRef<ProxyRuntime | null>(null);
@@ -81,6 +84,22 @@ export default function ProxyPage() {
         <Search size={15} /><input aria-label="Website address or search" placeholder="Search or enter a website" value={address} onChange={event => setAddress(event.target.value)} />
         <button type="submit" disabled={!ready}>Go</button>
       </form>
+      <button
+        type="button"
+        onClick={() => update(s => ({ ...s, adblock: { ...s.adblock, enabled: !s.adblock.enabled } }))}
+        aria-pressed={adblockOn}
+        title={adblockOn ? 'Ad blocker is on — ads and trackers are being filtered' : 'Ad blocker is off'}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer',
+          padding: '5px 10px', borderRadius: 999, fontFamily: 'inherit',
+          border: `1px solid ${adblockOn ? 'rgba(215,243,74,.55)' : 'rgba(255,255,255,.16)'}`,
+          background: adblockOn ? 'rgba(215,243,74,.12)' : 'transparent',
+          color: adblockOn ? '#d7f34a' : '#b5c1cc',
+        }}
+      >
+        {adblockOn ? <ShieldBan size={14} /> : <ShieldOff size={14} />}
+        {adblockOn ? 'Ads blocked' : 'Ad blocker off'}
+      </button>
       <a href="/apps" style={{ fontSize: 13 }}>Apps</a>
     </header>
     <div role="status" aria-live="polite" style={{ padding: '8px 18px', background: 'var(--panel)', color: limited ? '#ffd18b' : '#b5c1cc', fontSize: 12 }}>

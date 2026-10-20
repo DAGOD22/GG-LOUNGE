@@ -1,9 +1,7 @@
 {
   "2048": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+    "available": true,
+    "issues": []
   },
   "suika": {
     "available": true,
@@ -43,6 +41,10 @@
       "Missing local index.html"
     ]
   },
+  "block-blast": {
+    "available": true,
+    "issues": []
+  },
   "solar-smash": {
     "available": false,
     "issues": [
@@ -66,17 +68,12 @@
     ]
   },
   "survival-race": {
-    "available": false,
-    "issues": [
-      "Remote CDN loader, not a local game",
-      "Missing runtime: /games/survival-race/Build/yandexBrotli.loader.js"
-    ]
+    "available": true,
+    "issues": []
   },
   "geometry-dash": {
-    "available": false,
-    "issues": [
-      "Authorized browser build not installed"
-    ]
+    "available": true,
+    "issues": []
   },
   "poki": {
     "available": true,
