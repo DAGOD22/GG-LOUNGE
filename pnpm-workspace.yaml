@@ -1,8 +1,25 @@
+# pnpm 12 build-script policy.
+#
+# These values MUST be booleans. pnpm treats any unapproved build script as
+# ERR_PNPM_IGNORED_BUILDS and exits non-zero, which fails `pnpm install
+# --frozen-lockfile` in CI and on Vercel before the build ever starts.
+#
+#   esbuild:            true  — its postinstall installs the platform binary.
+#                              `npm run prepare:customization` (a prebuild step)
+#                              shells out to `esbuild`, so the build breaks
+#                              without it.
+#   scramjet:           false — only enforces pnpm via a preinstall guard; the
+#                              runtime files we ship are fetched by
+#                              scripts/prepare-proxy.mjs.
+#   bufferutil:         false — optional ws performance native module; node-gyp
+#                              builds are slow and unnecessary here.
+#   unrs-resolver:      false — optional native resolver used by lint tooling;
+#                              lint is not part of the build.
 allowBuilds:
-  '@mercuryworkshop/scramjet': set this to true or false
-  bufferutil: set this to true or false
-  esbuild: set this to true or false
-  unrs-resolver: set this to true or false
+  '@mercuryworkshop/scramjet': false
+  bufferutil: false
+  esbuild: true
+  unrs-resolver: false
 minimumReleaseAgeExclude:
   - '@next/*'
   - next
