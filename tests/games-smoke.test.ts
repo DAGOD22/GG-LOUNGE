@@ -142,6 +142,18 @@ test('2048: real game boots, fills a board and merges on arrow keys', async () =
   window.close();
 });
 
+/* ------------------------------------------------------------------ hextris --- */
+test('hextris: real game boots locally with no third-party ad script', async () => {
+  const html = readFileSync(join(PUBLIC, '/games/hextris/index.html'), 'utf8');
+  assert.ok(!/googlesyndication|adsbygoogle|doubleclick/i.test(html), 'the upstream AdSense tag is removed');
+
+  const { window, document, errors } = await loadGame('/games/hextris/index.html');
+  assert.deepEqual(errors, [], 'the game should start without script errors');
+  assert.ok(document.querySelector('canvas'), 'the game renders a canvas');
+  assert.ok(existsSync(join(PUBLIC, '/games/hextris/LICENSE.md')), 'its licence ships with it');
+  window.close();
+});
+
 /* ---------------------------------------------------------- geometry dash ---- */
 test('geometry dash: level select starts a real run that ends on an obstacle', async () => {
   const { window, document, errors } = await loadGame('/games/geometry-dash/index.html');

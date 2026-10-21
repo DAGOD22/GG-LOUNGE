@@ -2,12 +2,11 @@
 <!--
   Geometry Dash — GG-Lounge build.
 
-  This is an original rhythm-platformer written for GG-Lounge: original level
-  layouts, original procedural soundtrack, original art. It is inspired by the
-  rhythm-platformer genre but it is not RobTop Games' Geometry Dash, is not
-  affiliated with it, and contains none of its levels, art or audio. The real
-  Geometry Dash is a paid release for PC and mobile; there is no authorised
-  web build, so none is bundled here.
+  An original rhythm-platformer written for GG-Lounge: original levels, art and
+  procedural soundtrack. Inspired by the rhythm-platformer genre but it is not
+  RobTop Games' Geometry Dash, is not affiliated with it, and contains none of
+  its levels, art or audio. The real Geometry Dash is a paid PC/mobile release
+  with no authorised web build, so none is bundled here.
 -->
 <html lang="en" data-gg-game-state="ready">
 <head>
@@ -17,11 +16,8 @@
 <title>Geometry Dash — GG-Lounge</title>
 <style>
   :root {
-    --gg-bg: #0b0d12;
-    --gg-panel: #141720;
-    --gg-accent: #d7f34a;
-    --gg-text: #f4f2ec;
-    --gg-muted: #9699a8;
+    --gg-bg: #0b0d12; --gg-panel: #141720; --gg-accent: #d7f34a;
+    --gg-text: #f4f2ec; --gg-muted: #9699a8;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -36,42 +32,46 @@
 
   .overlay {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    background: rgba(8, 10, 16, .82); backdrop-filter: blur(6px); z-index: 20;
+    background: rgba(6, 8, 14, .78); backdrop-filter: blur(8px); z-index: 20;
   }
   .overlay[hidden] { display: none; }
   .card {
-    width: min(560px, calc(100% - 32px)); background: var(--gg-panel);
-    border: 1px solid rgba(255,255,255,.09); border-radius: 18px; padding: 24px;
-    box-shadow: 0 24px 60px rgba(0,0,0,.5); text-align: center;
+    width: min(580px, calc(100% - 32px)); background: rgba(20,23,32,.92);
+    border: 1px solid rgba(255,255,255,.1); border-radius: 20px; padding: 26px;
+    box-shadow: 0 30px 70px rgba(0,0,0,.6); text-align: center;
   }
-  .brand { font-size: 11px; letter-spacing: .22em; color: var(--gg-muted); margin: 0 0 6px; }
-  h1 { font-size: clamp(26px, 6vw, 40px); margin: 0 0 4px; letter-spacing: -.03em; }
+  .brand { font-size: 10.5px; letter-spacing: .24em; color: var(--gg-muted); margin: 0 0 6px; font-weight: 800; }
+  h1 { font-size: clamp(28px, 6.5vw, 44px); margin: 0 0 4px; letter-spacing: -.035em; }
   h1 span { color: var(--gg-accent); }
   .tagline { color: var(--gg-muted); font-size: 13px; margin: 0 0 18px; line-height: 1.55; }
   .levels { display: grid; gap: 10px; margin-bottom: 16px; }
   .level-btn {
-    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    display: flex; align-items: center; gap: 13px; width: 100%; text-align: left;
     background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1);
-    color: var(--gg-text); border-radius: 12px; padding: 12px 14px; cursor: pointer;
+    color: var(--gg-text); border-radius: 14px; padding: 12px 14px; cursor: pointer;
     font: inherit; transition: border-color .15s, background .15s, transform .1s;
   }
-  .level-btn:hover { border-color: var(--gg-accent); background: rgba(215,243,74,.07); }
+  .level-btn:hover { border-color: var(--gg-accent); background: rgba(215,243,74,.08); }
   .level-btn:active { transform: scale(.99); }
   .level-btn .icon {
-    width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
-    font-weight: 800; font-size: 15px; flex: 0 0 auto; color: #0b0d12;
+    width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
+    font-weight: 900; font-size: 15px; flex: 0 0 auto; color: #0b0d12;
+    box-shadow: 0 4px 14px rgba(0,0,0,.4);
   }
   .level-btn .meta { flex: 1; min-width: 0; }
   .level-btn .name { font-weight: 700; font-size: 15px; }
   .level-btn .sub { font-size: 12px; color: var(--gg-muted); margin-top: 2px; }
-  .level-btn .best { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--gg-accent); font-weight: 700; }
+  .level-btn .best {
+    font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 800;
+    padding: 4px 9px; border-radius: 999px; background: rgba(255,255,255,.06);
+  }
   .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
   .btn {
     background: var(--gg-accent); color: #0b0d12; font-weight: 800; font-size: 14px;
     border: 0; border-radius: 999px; padding: 11px 22px; cursor: pointer; font-family: inherit;
   }
   .btn.ghost { background: transparent; color: var(--gg-text); border: 1px solid rgba(255,255,255,.18); }
-  .btn:hover { filter: brightness(1.07); }
+  .btn:hover { filter: brightness(1.08); }
   .toggle { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--gg-muted); margin-bottom: 14px; cursor: pointer; }
   .toggle input { accent-color: var(--gg-accent); width: 16px; height: 16px; }
   .hint { font-size: 12px; color: var(--gg-muted); margin-top: 14px; line-height: 1.6; }
@@ -82,19 +82,20 @@
   #hud {
     position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
     display: flex; gap: 18px; align-items: center; z-index: 10;
-    background: rgba(10,12,18,.72); border: 1px solid rgba(255,255,255,.09);
+    background: rgba(10,12,18,.7); border: 1px solid rgba(255,255,255,.1);
     border-radius: 999px; padding: 8px 18px; font-variant-numeric: tabular-nums;
+    backdrop-filter: blur(6px);
   }
   #hud[hidden] { display: none; }
-  #hud .pct { font-size: 22px; font-weight: 800; letter-spacing: -.02em; min-width: 74px; text-align: center; }
+  #hud .pct { font-size: 22px; font-weight: 800; letter-spacing: -.02em; min-width: 76px; text-align: center; }
   #hud .stat { font-size: 11px; color: var(--gg-muted); text-align: center; line-height: 1.25; }
   #hud .stat b { display: block; font-size: 14px; color: var(--gg-text); }
   #practice { color: #ffb077; }
   #toast {
-    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    font-size: clamp(28px, 8vw, 54px); font-weight: 900; letter-spacing: -.03em;
-    color: var(--gg-accent); text-shadow: 0 6px 30px rgba(0,0,0,.6);
-    z-index: 15; pointer-events: none; opacity: 0; transition: opacity .2s;
+    position: absolute; top: 46%; left: 50%; transform: translate(-50%, -50%);
+    font-size: clamp(26px, 7vw, 48px); font-weight: 900; letter-spacing: -.03em;
+    text-shadow: 0 6px 30px rgba(0,0,0,.7); z-index: 15; pointer-events: none;
+    opacity: 0; transition: opacity .18s;
   }
   #toast.show { opacity: 1; }
   .fineprint { font-size: 11px; color: #6b7280; margin-top: 16px; line-height: 1.5; }
@@ -120,9 +121,7 @@
       <p class="tagline">Three hand-built rhythm levels with an original procedural soundtrack. Tap or press space to jump — time it with the beat.</p>
       <div class="levels" id="levelList"></div>
       <label class="toggle"><input type="checkbox" id="practiceToggle"> Practice mode (checkpoints, progress not saved)</label>
-      <div class="row">
-        <button class="btn ghost" id="resetBtn">Reset progress</button>
-      </div>
+      <div class="row"><button class="btn ghost" id="resetBtn">Reset progress</button></div>
       <p class="hint">
         <kbd>Space</kbd> / <kbd>Click</kbd> / <kbd>Tap</kbd> jump &nbsp;·&nbsp; <kbd>R</kbd> restart &nbsp;·&nbsp; <kbd>Esc</kbd> menu
       </p>
@@ -133,7 +132,7 @@
   <div class="overlay" id="complete" hidden>
     <div class="card">
       <p class="brand">LEVEL COMPLETE</p>
-      <h1 id="completeTitle">LEVEL <span>CLEAR</span></h1>
+      <h1>LEVEL <span>CLEAR</span></h1>
       <p class="tagline" id="completeStats"></p>
       <div class="row">
         <button class="btn" id="againBtn">Play again</button>
@@ -167,7 +166,6 @@
   const PAD_V = 17.5;         // yellow jump pad
   const ORB_V = 13.0;         // blue orb (air action)
   const PLAYER = 0.86;        // player cube size in units
-  const GROUND_Y = 1.6;       // ground thickness in units
   const STORE_KEY = 'ggl_gd_progress_v1';
 
   // ------------------------------------------------------------------ levels
@@ -177,73 +175,37 @@
   //   =  floating platform (at height 3)
   const LEVELS = [
     {
-      id: 'l1', name: 'First Jump', color: '#5ad1ff', bpm: 128, difficulty: 'Easy',
+      id: 'l1', name: 'Neon Sunrise', color: '#5ad1ff', bpm: 128, difficulty: 'Easy',
+      scene: 'city',
+      sky: ['#1b2a4a', '#3f5f8f', '#e08a5a'],
+      ground: '#161d2c', accent: '#ffd166',
       bars: [
-        '..b..s..',
-        '..b..s..',
-        '..s.B...',
-        '..s.b.s.',
-        '..p...s.',
-        '..s..b..',
-        '..s.b.s.',
-        '..b..s..',
-        '.B.s..s.',
-        '..b..p..',
-        '..s.B.s.',
-        '..b..s..',
-        '..s..b..',
-        '..p.s.s.',
-        '..b.B...',
-        '........',
+        '..b..s..', '..b..s..', '..s.B...', '..s.b.s.', '..p...s.', '..s..b..',
+        '..s.b.s.', '..b..s..', '.B.s..s.', '..b..p..', '..s.B.s.', '..b..s..',
+        '..s..b..', '..p.s.s.', '..b.B...', '........',
       ],
     },
     {
       id: 'l2', name: 'Rhythm Runner', color: '#d7f34a', bpm: 146, difficulty: 'Normal',
+      scene: 'cave',
+      sky: ['#0d1b2a', '#123a4a', '#1f7a6a'],
+      ground: '#101a1c', accent: '#7cf5c8',
       bars: [
-        '..s.s.s.',
-        '..b...s.',
-        '.o..s.B.',
-        '..s.s.s.',
-        '..p...b.',
-        '..s.B.s.',
-        '..b.s.o.',
-        '..s.s.B.',
-        '..B.b.s.',
-        '..s.p.s.',
-        '..b.s.s.',
-        '..s.B.b.',
-        '..p.s.o.',
-        '..s.s.B.',
-        '..b.B.s.',
-        '..s..p..',
-        '..s.s.b.',
-        '........',
+        '..s.s.s.', '..b...s.', '.o..s.B.', '..s.s.s.', '..p...b.', '..s.B.s.',
+        '..b.s.o.', '..s.s.B.', '..B.b.s.', '..s.p.s.', '..b.s.s.', '..s.B.b.',
+        '..p.s.o.', '..s.s.B.', '..b.B.s.', '..s..p..', '..s.s.b.', '........',
       ],
     },
     {
       id: 'l3', name: 'Grumble Gauntlet', color: '#ff7ad9', bpm: 168, difficulty: 'Hard',
+      scene: 'space',
+      sky: ['#12061f', '#3a1150', '#7a1d6a'],
+      ground: '#180d22', accent: '#ffe066',
       bars: [
-        '..s.s.s.',
-        '..B.b.s.',
-        '..s.o.s.',
-        '.p..B.b.',
-        '..s.s.s.',
-        '..b.B.o.',
-        '..s.s.B.',
-        '..p.b.s.',
-        '..s.s.o.',
-        '..B.b.s.',
-        '..s.p.B.',
-        '..b.s.s.',
-        '..o.B.b.',
-        '..s.s.p.',
-        '..B.b.s.',
-        '..s.o.B.',
-        '..p.s.s.',
-        '..b.B.o.',
-        '..s.s.b.',
-        '..p...s.',
-        '........',
+        '..s.s.s.', '..B.b.s.', '..s.o.s.', '.p..B.b.', '..s.s.s.', '..b.B.o.',
+        '..s.s.B.', '..p.b.s.', '..s.s.o.', '..B.b.s.', '..s.p.B.', '..b.s.s.',
+        '..o.B.b.', '..s.s.p.', '..B.b.s.', '..s.o.B.', '..p.s.s.', '..b.B.o.',
+        '..s.s.b.', '..p...s.', '........',
       ],
     },
   ];
@@ -256,9 +218,9 @@
     hudPct: document.getElementById('hudPct'), hudAttempts: document.getElementById('hudAttempts'),
     hudBest: document.getElementById('hudBest'), practice: document.getElementById('practice'),
     practiceToggle: document.getElementById('practiceToggle'), levelList: document.getElementById('levelList'),
-    complete: document.getElementById('complete'), completeTitle: document.getElementById('completeTitle'),
-    completeStats: document.getElementById('completeStats'), paused: document.getElementById('paused'),
-    toast: document.getElementById('toast'), resetBtn: document.getElementById('resetBtn'),
+    complete: document.getElementById('complete'), completeStats: document.getElementById('completeStats'),
+    paused: document.getElementById('paused'), toast: document.getElementById('toast'),
+    resetBtn: document.getElementById('resetBtn'),
   };
 
   let W = 0, H = 0, DPR = 1, scale = 1;
@@ -275,15 +237,12 @@
     try { localStorage.setItem('gd_attempts', String(totalAttempts())); } catch {}
     try { localStorage.setItem('gd_levels_completed', String(Object.values(progress.completed).filter(Boolean).length)); } catch {}
   }
-  function totalAttempts() {
-    return Object.values(progress.attempts).reduce((a, b) => a + b, 0);
-  }
+  function totalAttempts() { return Object.values(progress.attempts).reduce((a, b) => a + b, 0); }
 
   // ------------------------------------------------------------------- audio
   const Audio = (() => {
     let actx = null, master = null, timer = null, nextBeat = 0, beat = 0, playing = false;
     const CHORDS = [[0, 4, 7], [-3, 2, 5], [-5, 0, 4], [-1, 3, 7]];
-
     function ensure() {
       if (actx) return actx;
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -326,10 +285,11 @@
       env(o, at, 0.008, dur, peak);
       o.start(at); o.stop(at + dur + 0.05);
     }
+    function freq(semi) { return 27.5 * Math.pow(2, semi / 12); }
     function scheduleBar(barIndex, bpm, at) {
       const beatLen = 60 / bpm;
       const chord = CHORDS[barIndex % CHORDS.length];
-      const root = 55; // A1-ish bass register
+      const root = 55;
       for (let b = 0; b < 4; b++) {
         const t = at + b * beatLen;
         kick(t);
@@ -342,8 +302,6 @@
         }
       }
     }
-    function freq(semi) { return 27.5 * Math.pow(2, semi / 12); }
-
     return {
       start(bpm) {
         if (!ensure()) return;
@@ -351,8 +309,7 @@
         this.stop();
         playing = true; beat = 0;
         nextBeat = actx.currentTime + 0.08;
-        const beatLen = 60 / bpm;
-        const barLen = beatLen * 4;
+        const barLen = (60 / bpm) * 4;
         timer = setInterval(() => {
           if (!playing) return;
           while (nextBeat < actx.currentTime + 0.4) {
@@ -369,8 +326,7 @@
       blip(freqVal, dur, type, peak) {
         if (!ensure()) return;
         if (actx.state === 'suspended') actx.resume();
-        const t = actx.currentTime;
-        note(t, freqVal, dur || 0.09, type || 'square', peak || 0.18);
+        note(actx.currentTime, freqVal, dur || 0.09, type || 'square', peak || 0.18);
       },
       setMuted(muted) { if (master && actx) master.gain.setTargetAtTime(muted ? 0 : 0.5, actx.currentTime, 0.02); },
     };
@@ -379,7 +335,7 @@
   // -------------------------------------------------------------- level build
   function buildLevel(def) {
     const beatLen = 60 / def.bpm;
-    const stepLen = SPEED * beatLen / 2;      // world units per eighth-note step
+    const stepLen = SPEED * beatLen / 2;
     const obstacles = [];
     const stepsPerBar = 8;
     def.bars.forEach((bar, barIndex) => {
@@ -397,16 +353,15 @@
         }
       }
     });
-    const lengthUnits = def.bars.length * stepsPerBar * stepLen;
-    return { def, obstacles, lengthUnits, beatLen, stepLen };
+    return { def, obstacles, lengthUnits: def.bars.length * stepsPerBar * stepLen, beatLen, stepLen };
   }
 
   // ------------------------------------------------------------------ runtime
   const game = {
     running: false, paused: false, level: null, index: 0, practice: false,
     x: 0, y: 0, vy: 0, onGround: true, rotation: 0, dead: false, deadTimer: 0,
-    attempts: 0, time: 0, checkpoint: 0, particles: [], coins: 0, shake: 0,
-    hits: [], lastBeatIndex: -1,
+    attempts: 0, time: 0, checkpoint: 0, particles: [], shake: 0, flash: 0,
+    trail: [], squash: 1,
   };
 
   function startLevel(index, fromCheckpoint) {
@@ -415,11 +370,11 @@
     game.level = buildLevel(def);
     game.practice = el.practiceToggle.checked;
     game.dead = false; game.deadTimer = 0;
-    game.particles = []; game.shake = 0;
-    game.vy = 0; game.rotation = 0; game.onGround = true;
-    game.time = 0; game.lastBeatIndex = -1;
-    const startX = fromCheckpoint ? game.checkpoint : -4;
-    game.x = startX; game.y = 0;
+    game.particles = []; game.trail = []; game.shake = 0; game.flash = 0;
+    game.vy = 0; game.rotation = 0; game.onGround = true; game.squash = 1;
+    game.time = 0;
+    game.x = fromCheckpoint ? game.checkpoint : -4;
+    game.y = 0;
     if (!fromCheckpoint) {
       game.attempts += 1;
       progress.attempts[def.id] = (progress.attempts[def.id] || 0) + 1;
@@ -441,23 +396,32 @@
   }
   function pct() {
     if (!game.level) return 0;
-    const p = Math.max(0, Math.min(100, (game.x / game.level.lengthUnits) * 100));
-    return Math.floor(p);
+    return Math.floor(Math.max(0, Math.min(100, (game.x / game.level.lengthUnits) * 100)));
+  }
+
+  function burst(x, y, count, color, spread, power) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = (0.4 + Math.random()) * (power || 9);
+      game.particles.push({
+        x, y, vx: Math.cos(angle) * speed * (spread || 1),
+        vy: Math.abs(Math.sin(angle)) * speed + 1,
+        life: 0.7 + Math.random() * 0.5, max: 1.2, color,
+        size: 2 + Math.random() * 4, spin: (Math.random() - 0.5) * 10,
+        rot: Math.random() * Math.PI,
+      });
+    }
   }
 
   function die() {
     if (game.dead) return;
     game.dead = true; game.deadTimer = 0;
-    game.shake = 14;
+    game.shake = 16; game.flash = 1;
     Audio.stop();
     Audio.blip(180, 0.22, 'sawtooth', 0.22);
-    for (let i = 0; i < 26; i++) {
-      game.particles.push({
-        x: game.x, y: game.y + PLAYER / 2, vx: (Math.random() - 0.5) * 9,
-        vy: Math.random() * 9 + 1, life: 1, color: LEVELS[game.index].color, size: 3 + Math.random() * 4,
-      });
-    }
     const def = LEVELS[game.index];
+    burst(game.x, game.y + PLAYER / 2, 30, def.color, 1.2, 11);
+    burst(game.x, game.y + PLAYER / 2, 14, '#ffffff', 1, 8);
     const p = pct();
     if (!game.practice && p > (progress.best[def.id] || 0)) { progress.best[def.id] = p; saveProgress(); }
     updateHud();
@@ -469,13 +433,12 @@
     Audio.blip(880, 0.14, 'square', 0.2);
     setTimeout(() => Audio.blip(1320, 0.2, 'square', 0.18), 130);
     const def = LEVELS[game.index];
-    const first = !progress.completed[def.id];
     if (!game.practice) {
       progress.completed[def.id] = true;
       progress.best[def.id] = 100;
       saveProgress();
     }
-    el.completeTitle.innerHTML = first ? 'LEVEL <span>CLEAR</span>' : 'LEVEL <span>CLEAR</span>';
+    burst(game.x, game.y + 1, 40, def.accent, 1.4, 12);
     el.completeStats.textContent =
       `${def.name} · ${game.attempts} attempt${game.attempts === 1 ? '' : 's'}${game.practice ? ' · practice run (not saved)' : ''}`;
     el.complete.hidden = false;
@@ -484,27 +447,18 @@
 
   function jump(fromOrb) {
     if (fromOrb) { game.vy = ORB_V; Audio.blip(660, 0.1, 'triangle', 0.16); }
-    else { game.vy = JUMP_V; Audio.blip(520, 0.08, 'square', 0.13); }
+    else { game.vy = JUMP_V; Audio.blip(520, 0.08, 'square', 0.13); game.squash = 0.72; }
     game.onGround = false;
-    for (let i = 0; i < 6; i++) {
-      game.particles.push({
-        x: game.x, y: game.y, vx: (Math.random() - 0.5) * 3, vy: -Math.random() * 2,
-        life: 0.5, color: '#ffffff', size: 2 + Math.random() * 2,
-      });
-    }
+    burst(game.x, game.y, fromOrb ? 10 : 7, '#ffffff', 0.7, 3.2);
   }
 
   function action() {
-    if (!game.running || game.paused) return;
-    if (game.dead) return;
+    if (!game.running || game.paused || game.dead) return;
     Audio.setMuted(false);
     if (game.onGround) { jump(false); return; }
-    // In the air: look for an orb we are overlapping.
     for (const o of game.level.obstacles) {
       if (o.type !== 'orb') continue;
-      if (Math.abs(o.x - game.x) < 1.0 && game.y + PLAYER > o.y && game.y < o.y + o.h + 0.6) {
-        jump(true); return;
-      }
+      if (Math.abs(o.x - game.x) < 1.0 && game.y + PLAYER > o.y && game.y < o.y + o.h + 0.6) { jump(true); return; }
     }
   }
 
@@ -515,21 +469,22 @@
     if (game.dead) {
       game.deadTimer += dt;
       updateParticles(dt);
-      if (game.deadTimer > 0.85) {
-        if (game.practice) startLevel(game.index, true);
-        else startLevel(game.index, false);
-      }
+      if (game.deadTimer > 0.85) startLevel(game.index, game.practice);
       return;
     }
 
     game.time += dt;
     game.x += SPEED * dt;
 
-    // gravity
     game.vy -= GRAVITY * dt;
     game.y += game.vy * dt;
-    if (game.y <= 0) { game.y = 0; game.vy = 0; game.onGround = true; }
-    else game.onGround = false;
+    if (game.y <= 0) {
+      if (!game.onGround && game.vy < -6) game.squash = 1.3;   // squash on landing
+      game.y = 0; game.vy = 0; game.onGround = true;
+    } else game.onGround = false;
+
+    // squash/stretch easing
+    game.squash += (1 - game.squash) * Math.min(1, dt * 12);
 
     const px = game.x, py = game.y;
     const half = PLAYER / 2;
@@ -540,52 +495,47 @@
       const oy0 = o.y, oy1 = o.y + o.h;
       const px0 = px - half, px1 = px + half;
       const py0 = py, py1 = py + PLAYER;
-
-      if (px1 < ox0 || px0 > ox1) continue;         // not overlapping horizontally
-      if (py1 < oy0 || py0 > oy1) continue;         // not overlapping vertically
+      if (px1 < ox0 || px0 > ox1) continue;
+      if (py1 < oy0 || py0 > oy1) continue;
 
       if (o.type === 'spike') { die(); return; }
-
       if (o.type === 'pad') {
         game.y = Math.max(game.y, o.h);
-        game.vy = PAD_V; game.onGround = false;
+        game.vy = PAD_V; game.onGround = false; game.squash = 0.7;
         Audio.blip(760, 0.12, 'triangle', 0.18);
+        burst(game.x, game.y + 0.3, 12, '#ffd54a', 0.8, 6);
         showToast('BOOST');
         continue;
       }
-      if (o.type === 'orb') continue;              // handled by action()
-
-      // block: landing on top is safe; hitting the side is fatal
-      const prevBottom = py - game.vy * dt + 0.0;   // approximate previous bottom
+      if (o.type === 'orb') continue;
+      const prevBottom = py - game.vy * dt;
       if (game.vy <= 0 && prevBottom >= oy1 - 0.35) {
         game.y = oy1; game.vy = 0; game.onGround = true; onTop = true;
-      } else {
-        die(); return;
-      }
+        if (game.squash < 1.1) game.squash = 1.2;
+      } else { die(); return; }
     }
 
-    // falling into the void below a platform is impossible (ground spans level)
     if (game.y < -2) { die(); return; }
 
-    // cube rotation while airborne
     if (!game.onGround && !onTop) game.rotation -= dt * 8.2;
     else {
-      // snap to nearest quarter turn
       const target = Math.round(game.rotation / (Math.PI / 2)) * (Math.PI / 2);
       game.rotation += (target - game.rotation) * Math.min(1, dt * 18);
     }
 
-    // practice checkpoints
+    // motion trail
+    game.trail.push({ x: game.x, y: game.y, life: 1 });
+    if (game.trail.length > 16) game.trail.shift();
+    for (const t of game.trail) t.life -= dt * 3.4;
+
     if (game.practice) {
       const cp = Math.floor((game.x / game.level.lengthUnits) * 4) * (game.level.lengthUnits / 4);
-      if (cp > game.checkpoint + 0.5) {
-        game.checkpoint = cp;
-        showToast('CHECKPOINT');
-      }
+      if (cp > game.checkpoint + 0.5) { game.checkpoint = cp; showToast('CHECKPOINT'); }
     }
 
     updateParticles(dt);
     if (game.shake > 0) game.shake = Math.max(0, game.shake - dt * 30);
+    if (game.flash > 0) game.flash = Math.max(0, game.flash - dt * 3);
     if (game.x >= game.level.lengthUnits) { game.x = game.level.lengthUnits; completeLevel(); return; }
     updateHud();
   }
@@ -595,7 +545,7 @@
       const p = game.particles[i];
       p.life -= dt * 1.5;
       if (p.life <= 0) { game.particles.splice(i, 1); continue; }
-      p.x += p.vx * dt; p.y += p.vy * dt; p.vy -= GRAVITY * 0.55 * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy -= GRAVITY * 0.55 * dt; p.rot += p.spin * dt;
     }
   }
 
@@ -610,159 +560,8 @@
   window.addEventListener('resize', resize);
 
   function u2px(units) { return units * UNIT * scale; }
-
-  function draw() {
-    const def = LEVELS[game.index] || LEVELS[0];
-    const g = ctx;
-    g.fillStyle = '#0b0d12';
-    g.fillRect(0, 0, W, H);
-
-    const camX = game.x - 6;
-    const groundPx = () => H * 0.76;
-    const sx = (wx) => (wx - camX) * UNIT * scale;
-    const sy = (wy) => groundPx() - wy * UNIT * scale;
-
-    const shakeX = game.shake ? (Math.random() - 0.5) * game.shake : 0;
-    const shakeY = game.shake ? (Math.random() - 0.5) * game.shake : 0;
-    g.save();
-    g.translate(shakeX, shakeY);
-
-    // ---- background: parallax gradient + pulse rings on the beat
-    const beatLen = game.level ? game.level.beatLen : 0.5;
-    const beatPhase = game.level ? ((game.time % beatLen) / beatLen) : 0;
-    const pulse = 1 - beatPhase;
-
-    const grad = g.createLinearGradient(0, 0, 0, groundPx());
-    grad.addColorStop(0, '#0d1220');
-    grad.addColorStop(0.55, shade(def.color, -0.62));
-    grad.addColorStop(1, shade(def.color, -0.4));
-    g.fillStyle = grad;
-    g.fillRect(-100, -100, W + 200, groundPx() + 100);
-
-    g.save();
-    g.globalAlpha = 0.10 + pulse * 0.10;
-    g.strokeStyle = def.color; g.lineWidth = 2;
-    for (let i = 0; i < 4; i++) {
-      const r = ((pulse + i * 0.25) % 1) * Math.max(W, H) * 0.8;
-      g.beginPath(); g.arc(W * 0.5, groundPx() * 0.42, r, 0, Math.PI * 2); g.stroke();
-    }
-    g.restore();
-
-    // ---- ground
-    const gy = groundPx();
-    g.fillStyle = '#151a24';
-    g.fillRect(-100, gy, W + 200, H - gy + 100);
-    g.fillStyle = def.color;
-    g.fillRect(-100, gy, W + 200, Math.max(2, u2px(0.09)));
-
-    // ground grid lines (scroll)
-    const stepU = game.level ? game.level.stepLen : 2;
-    const startI = Math.floor((camX - 2) / stepU);
-    for (let i = startI; i < startI + 26; i++) {
-      const x = sx(i * stepU);
-      g.globalAlpha = i % 2 === 0 ? 0.16 : 0.08;
-      g.fillStyle = def.color;
-      g.fillRect(x, gy, Math.max(1, u2px(0.05)), u2px(GROUND_Y));
-    }
-    g.globalAlpha = 1;
-
-    // ---- obstacles
-    if (game.level) {
-      for (const o of game.level.obstacles) {
-        const x = sx(o.x), w = u2px(o.w), h = u2px(o.h);
-        if (x + w < -60 || x - w > W + 60) continue;
-        if (o.type === 'block') {
-          g.fillStyle = shade(def.color, -0.12);
-          g.fillRect(x - w / 2, sy(o.y + o.h), w, h);
-          g.fillStyle = 'rgba(255,255,255,.16)';
-          g.fillRect(x - w / 2, sy(o.y + o.h), w, Math.max(2, u2px(0.08)));
-          g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1;
-          g.strokeRect(x - w / 2, sy(o.y + o.h), w, h);
-        } else if (o.type === 'spike') {
-          const baseY = sy(0), topY = sy(o.h);
-          g.fillStyle = '#ff5d6c';
-          g.beginPath();
-          g.moveTo(x - w / 2, baseY);
-          g.lineTo(x, topY);
-          g.lineTo(x + w / 2, baseY);
-          g.closePath(); g.fill();
-          g.fillStyle = 'rgba(255,255,255,.35)';
-          g.beginPath();
-          g.moveTo(x - w / 2, baseY);
-          g.lineTo(x, topY);
-          g.lineTo(x - w * 0.12, baseY);
-          g.closePath(); g.fill();
-        } else if (o.type === 'pad') {
-          g.fillStyle = '#ffd54a';
-          roundRect(g, x - w / 2, sy(o.h), w, h, Math.min(6, h / 2));
-          g.fill();
-          g.fillStyle = 'rgba(0,0,0,.25)';
-          g.fillRect(x - w / 2, sy(o.h) + h - Math.max(2, u2px(0.06)), w, Math.max(2, u2px(0.06)));
-        } else if (o.type === 'orb') {
-          const cy = sy(o.y + o.h / 2);
-          const r = u2px(o.w / 2);
-          const glow = 0.55 + 0.45 * Math.sin(game.time * 6);
-          g.save();
-          g.globalAlpha = 0.35 * glow;
-          g.fillStyle = '#7ad1ff';
-          g.beginPath(); g.arc(x, cy, r * 2.1, 0, Math.PI * 2); g.fill();
-          g.restore();
-          g.fillStyle = '#7ad1ff';
-          g.beginPath(); g.arc(x, cy, r, 0, Math.PI * 2); g.fill();
-          g.fillStyle = 'rgba(255,255,255,.85)';
-          g.beginPath(); g.arc(x - r * 0.25, cy - r * 0.3, r * 0.28, 0, Math.PI * 2); g.fill();
-        }
-      }
-    }
-
-    // ---- particles
-    for (const p of game.particles) {
-      g.globalAlpha = Math.max(0, p.life);
-      g.fillStyle = p.color;
-      g.fillRect(sx(p.x), sy(p.y), p.size, p.size);
-    }
-    g.globalAlpha = 1;
-
-    // ---- player
-    if (!game.dead) {
-      const size = u2px(PLAYER);
-      const px = sx(game.x), py = sy(game.y + PLAYER);
-      g.save();
-      g.translate(px, py);
-      g.rotate(game.rotation);
-      g.fillStyle = def.color;
-      g.fillRect(-size / 2, -size / 2, size, size);
-      g.fillStyle = 'rgba(255,255,255,.85)';
-      g.fillRect(-size / 2, -size / 2, size, size * 0.22);
-      g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = 2;
-      g.strokeRect(-size / 2, -size / 2, size, size);
-      // eyes
-      g.fillStyle = '#0b0d12';
-      const e = size * 0.11;
-      g.fillRect(-size * 0.22, -size * 0.06, e, e);
-      g.fillRect(size * 0.09, -size * 0.06, e, e);
-      g.restore();
-    }
-
-    // ---- progress bar
-    if (game.level) {
-      const p = Math.max(0, Math.min(1, game.x / game.level.lengthUnits));
-      g.fillStyle = 'rgba(255,255,255,.10)';
-      g.fillRect(0, H - 8, W, 8);
-      g.fillStyle = def.color;
-      g.fillRect(0, H - 8, W * p, 8);
-      if (game.practice) {
-        const cp = game.level ? (game.checkpoint / game.level.lengthUnits) : 0;
-        g.fillStyle = '#ffb077';
-        g.fillRect(W * cp - 1, H - 14, 2, 14);
-      }
-    }
-
-    g.restore();
-  }
-
   function roundRect(g, x, y, w, h, r) {
-    r = Math.min(r, w / 2, h / 2);
+    r = Math.max(0, Math.min(r, w / 2, h / 2));
     g.beginPath();
     g.moveTo(x + r, y);
     g.arcTo(x + w, y, x + w, y + h, r);
@@ -779,10 +578,422 @@
     else { r += (255 - r) * amount; gg += (255 - gg) * amount; b += (255 - b) * amount; }
     return `rgb(${Math.round(r)},${Math.round(gg)},${Math.round(b)})`;
   }
+  function rgba(hex, alpha) {
+    const m = hex.replace('#', '');
+    const num = parseInt(m.length === 3 ? m.split('').map(c => c + c).join('') : m, 16);
+    return `rgba(${(num >> 16) & 255},${(num >> 8) & 255},${num & 255},${alpha})`;
+  }
+
+  /** Deterministic pseudo-random so scenery does not shimmer between frames. */
+  function hash(n) { const s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s); }
+
+  function drawScene(def, camX, gy) {
+    const g = ctx;
+
+    // ---- sky gradient
+    const sky = g.createLinearGradient(0, 0, 0, gy);
+    sky.addColorStop(0, def.sky[0]);
+    sky.addColorStop(0.55, def.sky[1]);
+    sky.addColorStop(1, def.sky[2]);
+    g.fillStyle = sky;
+    g.fillRect(0, 0, W, gy);
+
+    // ---- beat-synced glow behind the horizon
+    const beatLen = game.level ? game.level.beatLen : 0.5;
+    const pulse = 1 - ((game.time % beatLen) / beatLen);
+    const glow = g.createRadialGradient(W * 0.5, gy, 0, W * 0.5, gy, Math.max(W, H) * 0.7);
+    glow.addColorStop(0, rgba(def.color, 0.20 + pulse * 0.16));
+    glow.addColorStop(1, rgba(def.color, 0));
+    g.fillStyle = glow;
+    g.fillRect(0, 0, W, gy);
+
+    if (def.scene === 'space') {
+      // stars, twinkling, parallax
+      for (let i = 0; i < 70; i++) {
+        const sx = ((hash(i) * 2400) - camX * 3) % (W + 80);
+        const x = sx < 0 ? sx + W + 80 : sx;
+        const y = hash(i + 500) * gy * 0.92;
+        const tw = 0.35 + 0.65 * Math.abs(Math.sin(game.time * 1.6 + i));
+        g.fillStyle = `rgba(255,255,255,${0.25 + tw * 0.6})`;
+        const r = hash(i + 90) * 1.6 + 0.5;
+        g.fillRect(x, y, r, r);
+      }
+      // distant planet
+      const px = W * 0.78 - camX * 2 % (W * 1.6);
+      g.save();
+      g.globalAlpha = 0.5;
+      const planet = g.createRadialGradient(px, gy * 0.3, 8, px, gy * 0.3, 70);
+      planet.addColorStop(0, shade(def.accent, 0.2));
+      planet.addColorStop(1, rgba(def.accent, 0));
+      g.fillStyle = planet;
+      g.beginPath(); g.arc(px, gy * 0.3, 70, 0, Math.PI * 2); g.fill();
+      g.restore();
+    } else if (def.scene === 'city') {
+      // two layers of skyline silhouettes
+      for (let layer = 0; layer < 2; layer++) {
+        const speed = layer === 0 ? 6 : 14;
+        const top = gy - (layer === 0 ? 190 : 120) * scale;
+        const h2 = (layer === 0 ? 200 : 140) * scale;
+        g.fillStyle = layer === 0 ? rgba(def.sky[0], 0.55) : rgba(def.sky[0], 0.8);
+        for (let i = -2; i < 26; i++) {
+          const seed = Math.floor((i * 137 + layer * 91));
+          const w = 44 + hash(seed) * 54;
+          const bh = h2 * (0.35 + hash(seed + 7) * 0.65);
+          const x = ((i * 78 - camX * speed) % (26 * 78) + 26 * 78) % (26 * 78) - 78;
+          g.fillRect(x, top + (h2 - bh), w, bh + 40);
+          // lit windows
+          if (layer === 1) {
+            g.fillStyle = rgba(def.accent, 0.5);
+            for (let wy = 0; wy < bh - 12; wy += 18) {
+              for (let wx = 0; wx < w - 10; wx += 16) {
+                if (hash(seed + wy * 3 + wx) > 0.62) g.fillRect(x + 7 + wx, top + (h2 - bh) + 8 + wy, 6, 8);
+              }
+            }
+            g.fillStyle = rgba(def.sky[0], 0.8);
+          }
+        }
+      }
+      // sun
+      const sunY = gy - 150 * scale;
+      const sun = g.createRadialGradient(W * 0.24, sunY, 6, W * 0.24, sunY, 96);
+      sun.addColorStop(0, 'rgba(255,225,150,.95)');
+      sun.addColorStop(0.4, rgba(def.accent, 0.5));
+      sun.addColorStop(1, rgba(def.accent, 0));
+      g.fillStyle = sun;
+      g.beginPath(); g.arc(W * 0.24, sunY, 96, 0, Math.PI * 2); g.fill();
+    } else {
+      // cave: layered jagged rock silhouettes + drifting motes
+      for (let layer = 0; layer < 2; layer++) {
+        const speed = layer === 0 ? 8 : 18;
+        g.fillStyle = layer === 0 ? rgba(def.sky[0], 0.5) : rgba(def.sky[0], 0.85);
+        g.beginPath();
+        g.moveTo(0, gy);
+        for (let i = 0; i <= 30; i++) {
+          const baseX = i * (W / 26);
+          const x = baseX - ((camX * speed) % (W / 26));
+          const hgt = (layer === 0 ? 120 : 70) * scale * (0.4 + hash(i * 3 + layer * 31) * 0.8);
+          g.lineTo(x, gy - hgt);
+          g.lineTo(x + W / 52, gy - hgt * 0.55);
+        }
+        g.lineTo(W, gy);
+        g.closePath();
+        g.fill();
+      }
+      for (let i = 0; i < 26; i++) {
+        const mx = ((hash(i) * 1800 - camX * 22) % (W + 60) + W + 60) % (W + 60) - 30;
+        const my = (hash(i + 300) * gy * 0.8) + Math.sin(game.time * 0.8 + i) * 12;
+        g.fillStyle = rgba(def.accent, 0.28);
+        g.beginPath(); g.arc(mx, my, 1.6 + hash(i + 11) * 2, 0, Math.PI * 2); g.fill();
+      }
+    }
+  }
+
+  function drawGround(def, camX, gy) {
+    const g = ctx;
+    const grad = g.createLinearGradient(0, gy, 0, H);
+    grad.addColorStop(0, shade(def.ground, 0.18));
+    grad.addColorStop(1, shade(def.ground, -0.45));
+    g.fillStyle = grad;
+    g.fillRect(0, gy, W, H - gy);
+
+    // scrolling grid on the ground plane
+    const stepU = game.level ? game.level.stepLen : 2;
+    const startI = Math.floor((camX - 2) / stepU);
+    const sx = wx => (wx - camX + 6) * UNIT * scale;
+    g.save();
+    for (let i = startI; i < startI + 30; i++) {
+      const x = sx(i * stepU) - 6 * UNIT * scale + 6 * UNIT * scale - 6 * UNIT * scale;
+      g.globalAlpha = i % 2 === 0 ? 0.14 : 0.07;
+      g.fillStyle = def.color;
+      g.fillRect(x, gy, Math.max(1, u2px(0.05)), H - gy);
+    }
+    g.restore();
+
+    // glowing horizon edge
+    g.save();
+    g.shadowColor = def.color;
+    g.shadowBlur = 18;
+    g.fillStyle = def.color;
+    g.fillRect(0, gy - 1, W, Math.max(2, u2px(0.1)));
+    g.restore();
+
+    // top highlight
+    g.fillStyle = rgba(def.accent, 0.35);
+    g.fillRect(0, gy, W, 1);
+  }
+
+  function draw() {
+    const def = LEVELS[game.index] || LEVELS[0];
+    const g = ctx;
+    g.fillStyle = '#0b0d12';
+    g.fillRect(0, 0, W, H);
+
+    const camX = game.x - 6;
+    const gy = Math.round(H * 0.76);
+    const sx = wx => (wx - camX) * UNIT * scale;
+    const sy = wy => gy - wy * UNIT * scale;
+
+    const shakeX = game.shake ? (Math.random() - 0.5) * game.shake : 0;
+    const shakeY = game.shake ? (Math.random() - 0.5) * game.shake : 0;
+    g.save();
+    g.translate(shakeX, shakeY);
+
+    drawScene(def, camX, gy);
+    drawGround(def, camX, gy);
+
+    // ---- obstacles
+    if (game.level) {
+      for (const o of game.level.obstacles) {
+        const x = sx(o.x), w = u2px(o.w), h = u2px(o.h);
+        if (x + w < -80 || x - w > W + 80) continue;
+
+        if (o.type === 'block') {
+          const top = sy(o.y + o.h);
+          const grad = g.createLinearGradient(x - w / 2, top, x - w / 2, top + h);
+          grad.addColorStop(0, shade(def.color, 0.28));
+          grad.addColorStop(0.5, def.color);
+          grad.addColorStop(1, shade(def.color, -0.45));
+          g.save();
+          g.shadowColor = rgba(def.color, 0.5);
+          g.shadowBlur = 16;
+          g.fillStyle = grad;
+          roundRect(g, x - w / 2, top, w, h, Math.min(6, w * 0.16));
+          g.fill();
+          g.restore();
+          // top face highlight + inner border
+          g.fillStyle = 'rgba(255,255,255,.28)';
+          roundRect(g, x - w / 2 + 2, top + 2, w - 4, Math.max(2, h * 0.16), 3);
+          g.fill();
+          g.strokeStyle = 'rgba(0,0,0,.4)';
+          g.lineWidth = 1.5;
+          roundRect(g, x - w / 2, top, w, h, Math.min(6, w * 0.16));
+          g.stroke();
+          // grid pattern
+          g.strokeStyle = 'rgba(0,0,0,.16)';
+          g.lineWidth = 1;
+          g.beginPath();
+          g.moveTo(x - w / 2, top + h * 0.5); g.lineTo(x + w / 2, top + h * 0.5);
+          g.moveTo(x, top); g.lineTo(x, top + h);
+          g.stroke();
+
+        } else if (o.type === 'spike') {
+          const baseY = sy(0), topY = sy(o.h);
+          const grad = g.createLinearGradient(x, topY, x, baseY);
+          grad.addColorStop(0, '#ffd9dd');
+          grad.addColorStop(0.28, '#ff5d6c');
+          grad.addColorStop(1, '#8e1f2c');
+          g.save();
+          g.shadowColor = 'rgba(255,60,80,.75)';
+          g.shadowBlur = 14;
+          g.fillStyle = grad;
+          g.beginPath();
+          g.moveTo(x - w / 2, baseY);
+          g.lineTo(x, topY);
+          g.lineTo(x + w / 2, baseY);
+          g.closePath();
+          g.fill();
+          g.restore();
+          // specular edge
+          g.fillStyle = 'rgba(255,255,255,.45)';
+          g.beginPath();
+          g.moveTo(x - w / 2, baseY);
+          g.lineTo(x, topY);
+          g.lineTo(x - w * 0.04, baseY);
+          g.closePath();
+          g.fill();
+
+        } else if (o.type === 'pad') {
+          const top = sy(o.h);
+          const bounce = 0.5 + 0.5 * Math.abs(Math.sin(game.time * 7));
+          g.save();
+          g.shadowColor = 'rgba(255,213,74,.9)';
+          g.shadowBlur = 12 + bounce * 16;
+          const grad = g.createLinearGradient(x - w / 2, top, x - w / 2, top + h);
+          grad.addColorStop(0, '#fff3b0');
+          grad.addColorStop(1, '#f2a413');
+          g.fillStyle = grad;
+          roundRect(g, x - w / 2, top, w, h, Math.min(6, h / 2));
+          g.fill();
+          g.restore();
+          // rising chevrons
+          g.save();
+          g.globalAlpha = 0.55 + bounce * 0.35;
+          g.strokeStyle = '#fff9e0';
+          g.lineWidth = Math.max(2, u2px(0.05));
+          for (let i = 0; i < 2; i++) {
+            const offset = ((game.time * 60 + i * 14) % 28);
+            const cy = top - offset * scale;
+            g.beginPath();
+            g.moveTo(x - w * 0.22, cy + 6 * scale);
+            g.lineTo(x, cy);
+            g.lineTo(x + w * 0.22, cy + 6 * scale);
+            g.stroke();
+          }
+          g.restore();
+
+        } else if (o.type === 'orb') {
+          const cy = sy(o.y + o.h / 2);
+          const r = u2px(o.w / 2);
+          const spin = game.time * 2.2;
+          g.save();
+          const glow = g.createRadialGradient(x, cy, r * 0.2, x, cy, r * 2.4);
+          glow.addColorStop(0, 'rgba(122,209,255,.55)');
+          glow.addColorStop(1, 'rgba(122,209,255,0)');
+          g.fillStyle = glow;
+          g.beginPath(); g.arc(x, cy, r * 2.4, 0, Math.PI * 2); g.fill();
+          // orbiting ring
+          g.strokeStyle = 'rgba(180,235,255,.85)';
+          g.lineWidth = Math.max(1.5, r * 0.12);
+          g.beginPath();
+          g.ellipse(x, cy, r * 1.45, r * 1.45 * Math.abs(Math.cos(spin)), 0, 0, Math.PI * 2);
+          g.stroke();
+          // core
+          const core = g.createRadialGradient(x - r * 0.3, cy - r * 0.35, r * 0.1, x, cy, r);
+          core.addColorStop(0, '#ffffff');
+          core.addColorStop(0.45, '#8fdcff');
+          core.addColorStop(1, '#1f7fb5');
+          g.fillStyle = core;
+          g.beginPath(); g.arc(x, cy, r * 0.82, 0, Math.PI * 2); g.fill();
+          g.restore();
+        }
+      }
+    }
+
+    // ---- motion trail
+    for (const t of game.trail) {
+      if (t.life <= 0) continue;
+      const size = u2px(PLAYER) * (0.35 + t.life * 0.5);
+      g.save();
+      g.globalAlpha = t.life * 0.3;
+      g.fillStyle = def.color;
+      const tx = sx(t.x), ty = sy(t.y + PLAYER);
+      g.translate(tx, ty);
+      g.rotate(game.rotation * 0.3);
+      roundRect(g, -size / 2, -size / 2, size, size, size * 0.2);
+      g.fill();
+      g.restore();
+    }
+
+    // ---- particles (rotating shards)
+    for (const p of game.particles) {
+      g.save();
+      g.globalAlpha = Math.max(0, Math.min(1, p.life / 1.2));
+      g.translate(sx(p.x), sy(p.y));
+      g.rotate(p.rot);
+      g.fillStyle = p.color;
+      g.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+      g.restore();
+    }
+
+    // ---- player cube
+    if (!game.dead) {
+      const size = u2px(PLAYER);
+      const px = sx(game.x), py = sy(game.y + PLAYER);
+      const sq = game.squash;
+      g.save();
+      g.translate(px, py);
+      g.rotate(game.rotation);
+      g.scale(2 - sq, sq);                       // squash & stretch
+
+      // soft glow
+      g.save();
+      g.shadowColor = def.color;
+      g.shadowBlur = 22;
+      const body = g.createLinearGradient(-size / 2, -size / 2, size / 2, size / 2);
+      body.addColorStop(0, shade(def.color, 0.45));
+      body.addColorStop(0.5, def.color);
+      body.addColorStop(1, shade(def.color, -0.35));
+      g.fillStyle = body;
+      roundRect(g, -size / 2, -size / 2, size, size, size * 0.18);
+      g.fill();
+      g.restore();
+
+      // inner bevel + border
+      g.strokeStyle = 'rgba(255,255,255,.55)';
+      g.lineWidth = Math.max(1.5, size * 0.05);
+      roundRect(g, -size / 2 + 2, -size / 2 + 2, size - 4, size - 4, size * 0.14);
+      g.stroke();
+      g.fillStyle = 'rgba(255,255,255,.22)';
+      roundRect(g, -size / 2 + 3, -size / 2 + 3, size - 6, size * 0.2, size * 0.1);
+      g.fill();
+
+      // face: eyes that widen in the air
+      const eyeW = size * 0.13 * (game.onGround ? 1 : 1.25);
+      const eyeH = size * 0.15 * (game.onGround ? 1 : 1.3);
+      g.fillStyle = '#0b0d12';
+      roundRect(g, -size * 0.24 - eyeW / 2, -size * 0.04 - eyeH / 2, eyeW, eyeH, eyeW * 0.3);
+      g.fill();
+      roundRect(g, size * 0.1 - eyeW / 2, -size * 0.04 - eyeH / 2, eyeW, eyeH, eyeW * 0.3);
+      g.fill();
+      g.fillStyle = 'rgba(255,255,255,.9)';
+      const spark = size * 0.035;
+      g.fillRect(-size * 0.26, -size * 0.07, spark, spark);
+      g.fillRect(size * 0.08, -size * 0.07, spark, spark);
+
+      // mouth: determined line, open when falling fast
+      g.strokeStyle = 'rgba(11,13,18,.85)';
+      g.lineWidth = Math.max(1.5, size * 0.045);
+      g.beginPath();
+      if (game.vy < -8) { g.arc(0, size * 0.2, size * 0.1, 0, Math.PI); }
+      else { g.moveTo(-size * 0.12, size * 0.18); g.lineTo(size * 0.12, size * 0.18); }
+      g.stroke();
+      g.restore();
+    }
+
+    // ---- speed lines while airborne
+    if (!game.dead && !game.onGround) {
+      g.save();
+      g.globalAlpha = 0.28;
+      g.strokeStyle = '#ffffff';
+      g.lineWidth = 1.5;
+      for (let i = 0; i < 5; i++) {
+        const y = ((game.time * 900 + i * 137) % (gy + 200)) ;
+        const len = 30 + hash(i) * 50;
+        g.beginPath();
+        g.moveTo(W - 40 - hash(i * 3) * 200, y - 100);
+        g.lineTo(W - 40 - hash(i * 3) * 200 - len, y - 100);
+        g.stroke();
+      }
+      g.restore();
+    }
+
+    // ---- progress bar
+    if (game.level) {
+      const p = Math.max(0, Math.min(1, game.x / game.level.lengthUnits));
+      g.fillStyle = 'rgba(255,255,255,.10)';
+      g.fillRect(0, H - 8, W, 8);
+      const bar = g.createLinearGradient(0, 0, W, 0);
+      bar.addColorStop(0, def.color);
+      bar.addColorStop(1, def.accent);
+      g.fillStyle = bar;
+      g.fillRect(0, H - 8, W * p, 8);
+      if (game.practice && game.level.lengthUnits) {
+        const cp = game.checkpoint / game.level.lengthUnits;
+        g.fillStyle = '#ffb077';
+        g.fillRect(W * cp - 1, H - 15, 2, 15);
+      }
+    }
+
+    g.restore();
+
+    // ---- death flash
+    if (game.flash > 0) {
+      g.fillStyle = `rgba(255,255,255,${game.flash * 0.35})`;
+      g.fillRect(0, 0, W, H);
+    }
+
+    // ---- vignette
+    const vig = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(0,0,0,.45)');
+    g.fillStyle = vig;
+    g.fillRect(0, 0, W, H);
+  }
 
   let toastTimer = null;
   function showToast(text) {
     el.toast.textContent = text;
+    el.toast.style.color = LEVELS[game.index] ? LEVELS[game.index].accent : '#d7f34a';
     el.toast.classList.add('show');
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.toast.classList.remove('show'), 700);
@@ -797,30 +1008,23 @@
       const btn = document.createElement('button');
       btn.className = 'level-btn';
       btn.type = 'button';
+      const preview = `linear-gradient(135deg, ${def.sky[0]}, ${def.sky[1]} 55%, ${def.sky[2]})`;
       btn.innerHTML = `
-        <div class="icon" style="background:${def.color}">${i + 1}</div>
+        <div class="icon" style="background:${preview};color:${def.accent};border:1px solid ${def.color}55">${i + 1}</div>
         <div class="meta">
           <div class="name">${def.name}</div>
           <div class="sub">${def.difficulty} · ${def.bpm} BPM${done ? ' · completed' : ''}</div>
         </div>
-        <div class="best">${best}%</div>`;
-      btn.addEventListener('click', () => {
-        game.attempts = 0; game.checkpoint = 0;
-        startLevel(i, false);
-      });
+        <div class="best" style="color:${def.accent}">${best}%</div>`;
+      btn.addEventListener('click', () => { game.attempts = 0; game.checkpoint = 0; startLevel(i, false); });
       el.levelList.appendChild(btn);
     });
   }
 
   // ------------------------------------------------------------------- input
-  function onPress(e) {
-    if (!el.menu.hidden || !el.complete.hidden) return;
-    action();
-    if (e && e.cancelable) e.preventDefault();
-  }
-  canvas.addEventListener('mousedown', onPress);
-  canvas.addEventListener('touchstart', (e) => { onPress(e); }, { passive: false });
-  window.addEventListener('keydown', (e) => {
+  canvas.addEventListener('mousedown', e => { if (el.menu.hidden && el.complete.hidden) { action(); if (e.cancelable) e.preventDefault(); } });
+  canvas.addEventListener('touchstart', e => { if (el.menu.hidden && el.complete.hidden) { action(); if (e.cancelable) e.preventDefault(); } }, { passive: false });
+  window.addEventListener('keydown', e => {
     if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
       if (el.menu.hidden && el.complete.hidden && el.paused.hidden) { action(); e.preventDefault(); }
       else if (!el.menu.hidden) { const b = el.levelList.querySelector('.level-btn'); if (b) b.click(); e.preventDefault(); }
@@ -840,10 +1044,7 @@
   document.getElementById('resumeBtn').addEventListener('click', () => { el.paused.hidden = true; game.paused = false; Audio.setMuted(false); });
   document.getElementById('retryBtn').addEventListener('click', () => startLevel(game.index, false));
   document.getElementById('quitBtn').addEventListener('click', () => { el.paused.hidden = true; toMenu(); });
-  el.resetBtn.addEventListener('click', () => {
-    progress = { best: {}, completed: {}, attempts: {} };
-    saveProgress(); renderMenu();
-  });
+  el.resetBtn.addEventListener('click', () => { progress = { best: {}, completed: {}, attempts: {} }; saveProgress(); renderMenu(); });
 
   function toMenu() {
     game.running = false; game.paused = false;
@@ -865,10 +1066,9 @@
 
   resize();
   renderMenu();
-  game.level = buildLevel(LEVELS[0]);   // so the menu background has a level to draw
+  game.level = buildLevel(LEVELS[0]);
   requestAnimationFrame(frame);
 
-  // Pause music when the tab is hidden.
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { Audio.stop(); if (game.running) { game.paused = true; el.paused.hidden = false; } }
   });

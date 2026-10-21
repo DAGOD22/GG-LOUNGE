@@ -36,10 +36,8 @@
     "issues": []
   },
   "hextris": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+    "available": true,
+    "issues": []
   },
   "block-blast": {
     "available": true,
@@ -362,54 +360,6 @@
     "issues": []
   },
   "hole-io": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "1v1-lol": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "krunker": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "smashkarts": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "ev-io": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "shell-shockers": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "agar-io": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "slither-io": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "paper-io-2-3d": {
     "available": false,
     "issues": [
       "Missing local index.html"
