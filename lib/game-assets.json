@@ -359,17 +359,53 @@
     "available": true,
     "issues": []
   },
-  "hole-io": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+  "pacman": {
+    "available": true,
+    "issues": []
   },
-  "stumble-guys": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+  "space-invaders": {
+    "available": true,
+    "issues": []
+  },
+  "snake": {
+    "available": true,
+    "issues": []
+  },
+  "pong": {
+    "available": true,
+    "issues": []
+  },
+  "star-battle": {
+    "available": true,
+    "issues": []
+  },
+  "radius-raid": {
+    "available": true,
+    "issues": []
+  },
+  "bounce-back": {
+    "available": true,
+    "issues": []
+  },
+  "space-huggers": {
+    "available": true,
+    "issues": []
+  },
+  "tiny-platformer": {
+    "available": true,
+    "issues": []
+  },
+  "sokoban": {
+    "available": true,
+    "issues": []
+  },
+  "emoji-minesweeper": {
+    "available": true,
+    "issues": []
+  },
+  "quantum-game": {
+    "available": true,
+    "issues": []
   },
   "baseball-bros": {
     "available": false,
@@ -467,12 +503,6 @@
       "Missing local index.html"
     ]
   },
-  "helix-jump": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
   "ninja-parkour": {
     "available": false,
     "issues": [
@@ -498,18 +528,6 @@
     ]
   },
   "bad-simulator": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "a-small-world-cup": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "bitlife-simulator": {
     "available": false,
     "issues": [
       "Missing local index.html"
@@ -575,18 +593,6 @@
       "Missing local index.html"
     ]
   },
-  "fall-guys": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "grindcraft-remastered": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
   "stick-archers-battle": {
     "available": false,
     "issues": [
@@ -604,42 +610,6 @@
     ]
   },
   "pixel-shooter": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "qwop": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "the-final-earth-2": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "uno": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "sonic-the-hedgehog": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "there-is-no-game": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "run-rabbit-run": {
     "available": false,
     "issues": [
       "Missing local index.html"

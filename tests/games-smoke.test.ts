@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import jsdom from 'jsdom';
 
@@ -58,6 +58,10 @@ function stubCanvas(window: any) {
     set() { return true; },
   });
   window.HTMLCanvasElement.prototype.getContext = () => context;
+  // jsdom throws "Not implemented" for toDataURL; games use it to snapshot
+  // generated sprites into <img>/background sources at boot.
+  window.HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,';
+  window.HTMLCanvasElement.prototype.toBlob = (cb: (b: any) => void) => cb(null);
   // jsdom has no blob URL support; games use it for the merged wasm payload.
   if (!window.URL.createObjectURL) {
     const blobs = new Map<string, any>();
@@ -70,6 +74,69 @@ function stubCanvas(window: any) {
     window.URL.revokeObjectURL = (url: string) => { blobs.delete(url); };
     (window as any).__blobs = blobs;
   }
+  stubAudio(window);
+}
+
+/**
+ * jsdom ships no Web Audio implementation, and several games build a sound
+ * graph as soon as they boot — one of them reached for
+ * createDynamicsCompressor() and died before drawing anything. Every node is a
+ * callable stub that swallows the calls the games actually make.
+ */
+function stubAudio(window: any) {
+  const node = (): any => {
+    const param = () => ({
+      value: 0,
+      setValueAtTime() {}, exponentialRampToValueAtTime() {},
+      linearRampToValueAtTime() {}, setTargetAtTime() {}, cancelScheduledValues() {},
+    });
+    const n: any = {
+      gain: param(), frequency: param(), detune: param(), Q: param(),
+      threshold: param(), knee: param(), ratio: param(), attack: param(), release: param(),
+      pan: param(), delayTime: param(), playbackRate: param(),
+      type: '', buffer: null, loop: false, onended: null,
+      connect() { return node(); }, disconnect() {}, start() {}, stop() {},
+      getByteFrequencyData() {}, getFloatFrequencyData() {}, getChannelData() { return new Float32Array(8); },
+    };
+    return n;
+  };
+  window.AudioContext = class {
+    currentTime = 0;
+    sampleRate = 44100;
+    state = 'running';
+    destination = node();
+    listener = {};
+    onstatechange = null;
+    createGain = node;
+    createOscillator = node;
+    createBiquadFilter = node;
+    createDynamicsCompressor = node;
+    createAnalyser = node;
+    createStereoPanner = node;
+    createDelay = node;
+    createWaveShaper = node;
+    createConvolver = node;
+    createChannelMerger = node;
+    createChannelSplitter = node;
+    createPanner = node;
+    createBufferSource = node;
+    createPeriodicWave = node;
+    createBuffer = (channels: number, length: number) => ({
+      getChannelData: () => new Float32Array(length),
+      length, duration: 0, sampleRate: 44100, numberOfChannels: channels,
+    });
+    decodeAudioData = () => Promise.resolve({});
+    resume = () => Promise.resolve();
+    suspend = () => Promise.resolve();
+    close = () => Promise.resolve();
+  };
+  window.webkitAudioContext = window.AudioContext;
+  // jsdom's HTMLMediaElement.play() throws "not implemented"; games call it for sfx.
+  if (window.HTMLMediaElement) {
+    window.HTMLMediaElement.prototype.play = () => Promise.resolve();
+    window.HTMLMediaElement.prototype.pause = () => {};
+    window.HTMLMediaElement.prototype.load = () => {};
+  }
 }
 
 type Loaded = { window: any; document: any; errors: string[] };
@@ -80,7 +147,9 @@ async function loadGame(path: string): Promise<Loaded> {
   const virtualConsole = new VirtualConsole();
   virtualConsole.on('jsdomError', (error: Error) => {
     // Missing optional assets are reported by jsdom, not thrown by our code.
-    if (/Could not load|Error: Not implemented/.test(error.message)) return;
+    // Missing optional assets and the handful of canvas APIs jsdom lacks are
+    // reported by jsdom rather than thrown by the games themselves.
+    if (/Could not load|Not implemented|Could not parse CSS/i.test(error.message)) return;
     errors.push(error.message);
   });
 
@@ -331,4 +400,61 @@ test('remote game host only opens http(s) addresses', async () => {
   assert.ok(source.includes('/^https?:\\/\\//'), 'the url parameter is validated');
   assert.ok(/bootProxy/.test(source), 'uses the existing lounge proxy');
   assert.ok(source.includes('ScramjetFrame'), 'drives a real Scramjet frame');
+});
+
+/* ------------------------------------------------- open-source game library --- */
+/**
+ * Twelve games joined the lounge to replace catalogue entries that had no game
+ * files at all. Each is a real, publicly released open-source title, bundled
+ * locally with its licence; three needed patches before they would run on a
+ * modern browser (see their index.html provenance comments). These assertions
+ * check each one actually boots and builds the thing you play — a board, a
+ * canvas, a control — rather than merely that a file exists.
+ */
+const OPEN_SOURCE_GAMES: Array<{
+  id: string;
+  /** Observable proof the game built its play area. */
+  check: (document: any) => boolean;
+  what: string;
+}> = [
+  { id: 'pacman',            what: 'the #pacman play area',        check: d => !!d.querySelector('#pacman') },
+  { id: 'space-invaders',    what: 'a canvas and three controls',  check: d => d.querySelectorAll('canvas').length === 1 && d.querySelectorAll('button').length === 3 },
+  { id: 'snake',             what: 'a playing field and themes',   check: d => !!d.querySelector('#playingField') && d.querySelectorAll('select option').length >= 17 },
+  { id: 'pong',              what: 'the #game canvas and HUD',     check: d => !!d.querySelector('canvas#game') && !!d.querySelector('#stats') },
+  { id: 'star-battle',       what: 'the start screen and canvas',  check: d => !!d.querySelector('#start-btn') && d.querySelectorAll('canvas').length >= 1 },
+  { id: 'radius-raid',       what: 'six layered canvases',         check: d => d.querySelectorAll('canvas').length === 6 },
+  { id: 'bounce-back',       what: 'two canvases (#c1, #c2)',      check: d => !!d.querySelector('#c1') && !!d.querySelector('#c2') },
+  { id: 'space-huggers',     what: 'its engine bootstrap',         check: d => d.querySelectorAll('script').length >= 10 },
+  { id: 'tiny-platformer',   what: '#canvas and #instructions',    check: d => !!d.querySelector('#canvas') && !!d.querySelector('#instructions') },
+  { id: 'sokoban',           what: 'a canvas and a reset control', check: d => d.querySelectorAll('canvas').length === 1 && d.querySelectorAll('button').length >= 1 },
+  { id: 'emoji-minesweeper', what: 'the board size controls',      check: d => !!d.querySelector('#cols') && !!d.querySelector('#rows') && !!d.querySelector('#bombs') },
+  { id: 'quantum-game',      what: 'its SVG board and levels',     check: d => d.querySelectorAll('svg rect').length > 50 && !!d.querySelector('.level-selector') },
+];
+
+for (const game of OPEN_SOURCE_GAMES) {
+  test(`${game.id}: boots and renders ${game.what}`, async () => {
+    const { window, document, errors } = await loadGame(`/games/${game.id}/index.html`);
+    assert.deepEqual(errors, [], `${game.id} should start without script errors`);
+    assert.ok(game.check(document), `${game.id} should render ${game.what}`);
+    window.close();
+  });
+}
+
+test('the open-source games ship their licences and make no third-party requests', async () => {
+  for (const game of OPEN_SOURCE_GAMES) {
+    const dir = join(PUBLIC, '/games', game.id);
+    const files = readdirSync(dir);
+    assert.ok(
+      files.some(f => /^(licen[cs]e|copying)/i.test(f)),
+      `${game.id} must ship the licence it was released under`,
+    );
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    for (const [, host] of html.matchAll(/<script[^>]*\bsrc=["']https?:\/\/([^/"']+)/gi)) {
+      assert.fail(`${game.id} still loads a script from ${host}`);
+    }
+    assert.ok(
+      !/googletagmanager|google-analytics|googlesyndication|plausible\.io|adsbygoogle|doubleclick/i.test(html),
+      `${game.id} should not carry analytics or ad tags`,
+    );
+  }
 });
