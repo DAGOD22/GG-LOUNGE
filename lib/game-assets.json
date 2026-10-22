@@ -407,6 +407,42 @@
     "available": true,
     "issues": []
   },
+  "tetris": {
+    "available": true,
+    "issues": []
+  },
+  "word-search": {
+    "available": true,
+    "issues": []
+  },
+  "memory-match": {
+    "available": true,
+    "issues": []
+  },
+  "breakout": {
+    "available": true,
+    "issues": []
+  },
+  "hexgl": {
+    "available": true,
+    "issues": []
+  },
+  "trust": {
+    "available": true,
+    "issues": []
+  },
+  "elevator-saga": {
+    "available": true,
+    "issues": []
+  },
+  "isocity": {
+    "available": true,
+    "issues": []
+  },
+  "a-dark-room": {
+    "available": true,
+    "issues": []
+  },
   "baseball-bros": {
     "available": false,
     "issues": [
@@ -437,25 +473,7 @@
       "Missing local index.html"
     ]
   },
-  "sandbox": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "crazy-crash-landing": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
   "monster-truck": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "cyber-cars": {
     "available": false,
     "issues": [
       "Missing local index.html"
@@ -485,18 +503,6 @@
       "Missing local index.html"
     ]
   },
-  "extreme-racing": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "monster-survival": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
   "obby-shooter": {
     "available": false,
     "issues": [
@@ -509,25 +515,7 @@
       "Missing local index.html"
     ]
   },
-  "red-vs-blue": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "build-defend": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
   "basket-bros": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "bad-simulator": {
     "available": false,
     "issues": [
       "Missing local index.html"
@@ -604,12 +592,6 @@
     "issues": []
   },
   "wheelie-bike": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "pixel-shooter": {
     "available": false,
     "issues": [
       "Missing local index.html"

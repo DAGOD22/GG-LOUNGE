@@ -46,6 +46,12 @@ function diskInterceptor(request: any) {
 /** A no-op 2D context: games draw, we only care that drawing never throws. */
 function stubCanvas(window: any) {
   const gradient = { addColorStop() {} };
+  // CodeMirror uses Range geometry during editor setup; jsdom exposes Range but
+  // does not implement these two layout methods.
+  if (window.Range?.prototype && !window.Range.prototype.getBoundingClientRect)
+    window.Range.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 });
+  if (window.Range?.prototype && !window.Range.prototype.getClientRects)
+    window.Range.prototype.getClientRects = () => [];
   const context: any = new Proxy({}, {
     get(_target, property) {
       if (property === 'canvas') return null;
@@ -141,7 +147,7 @@ function stubAudio(window: any) {
 
 type Loaded = { window: any; document: any; errors: string[] };
 
-async function loadGame(path: string): Promise<Loaded> {
+async function loadGame(path: string, setup?: (window: any) => void): Promise<Loaded> {
   const html = readFileSync(join(PUBLIC, path), 'utf8');
   const errors: string[] = [];
   const virtualConsole = new VirtualConsole();
@@ -159,7 +165,7 @@ async function loadGame(path: string): Promise<Loaded> {
     resources: { interceptors: [requestInterceptor(diskInterceptor)] },
     pretendToBeVisual: true,          // gives us requestAnimationFrame
     virtualConsole,
-    beforeParse(window: any) { stubCanvas(window); },
+    beforeParse(window: any) { stubCanvas(window); setup?.(window); },
   });
 
   await new Promise(done => {
@@ -404,18 +410,19 @@ test('remote game host only opens http(s) addresses', async () => {
 
 /* ------------------------------------------------- open-source game library --- */
 /**
- * Twelve games joined the lounge to replace catalogue entries that had no game
- * files at all. Each is a real, publicly released open-source title, bundled
- * locally with its licence; three needed patches before they would run on a
- * modern browser (see their index.html provenance comments). These assertions
- * check each one actually boots and builds the thing you play — a board, a
- * canvas, a control — rather than merely that a file exists.
+ * Twenty-one games joined the lounge to replace catalogue entries that had no
+ * game files at all. Each is a publicly released open-source title, bundled
+ * locally with its licence; several needed small compatibility/analytics
+ * patches (see their index.html provenance comments). These assertions check
+ * that each initializes its real play area or game engine, not merely that an
+ * HTML file exists.
  */
 const OPEN_SOURCE_GAMES: Array<{
   id: string;
   /** Observable proof the game built its play area. */
-  check: (document: any) => boolean;
+  check: (document: any, window: any) => boolean;
   what: string;
+  setup?: (window: any) => void;
 }> = [
   { id: 'pacman',            what: 'the #pacman play area',        check: d => !!d.querySelector('#pacman') },
   { id: 'space-invaders',    what: 'a canvas and three controls',  check: d => d.querySelectorAll('canvas').length === 1 && d.querySelectorAll('button').length === 3 },
@@ -429,13 +436,22 @@ const OPEN_SOURCE_GAMES: Array<{
   { id: 'sokoban',           what: 'a canvas and a reset control', check: d => d.querySelectorAll('canvas').length === 1 && d.querySelectorAll('button').length >= 1 },
   { id: 'emoji-minesweeper', what: 'the board size controls',      check: d => !!d.querySelector('#cols') && !!d.querySelector('#rows') && !!d.querySelector('#bombs') },
   { id: 'quantum-game',      what: 'its SVG board and levels',     check: d => d.querySelectorAll('svg rect').length > 50 && !!d.querySelector('.level-selector') },
+  { id: 'tetris',            what: 'a started 20-row playfield',   check: (d, w) => { const button = d.getElementById('playbutton'); if (!button) return false; click(w, button); return button.disabled && Array.isArray(w.board) && w.board.length === 20; } },
+  { id: 'word-search',       what: 'a generated word grid',        check: d => d.querySelectorAll('#ws-area canvas.ws-col').length >= 10 && d.querySelectorAll('.ws-word').length >= 5 },
+  { id: 'memory-match',      what: 'a started 12-card board',      check: (d, w) => { const button = d.getElementById('memory--settings-reset'); if (!button) return false; click(w, button); return d.querySelectorAll('#memory--cards .flip-container').length === 12; } },
+  { id: 'breakout',          what: 'the running canvas game engine', check: (d, w) => !!d.querySelector('canvas#canvas') && !!w.Game?.current },
+  { id: 'hexgl',             what: 'the WebGL racer start screen', check: (d, w) => !!d.querySelector('#start') && typeof w.bkcore?.hexgl?.HexGL === 'function' },
+  { id: 'trust',             what: 'its loaded scenario engine',   check: (d, w) => !!w.Loader && Object.keys(w.SLIDES ?? {}).length >= 30 },
+  { id: 'elevator-saga',     what: 'the challenge editor and controls', check: (d, w) => !!d.querySelector('#code') && !!d.querySelector('#button_apply') && !!w.CodeMirror },
+  { id: 'isocity',           what: 'the two-layer city canvas',    check: d => !!d.querySelector('canvas#bg') && !!d.querySelector('canvas#fg') && !!d.querySelector('#tools') },
+  { id: 'a-dark-room',       what: 'the live firewood controls',   setup: w => { w.Request = class { url: string; constructor(input: any) { this.url = String(input); } }; w.fetch = () => Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(4)) }); }, check: d => !!d.querySelector('#stokeButton') && /firewood/i.test(d.body.textContent ?? '') },
 ];
 
 for (const game of OPEN_SOURCE_GAMES) {
   test(`${game.id}: boots and renders ${game.what}`, async () => {
-    const { window, document, errors } = await loadGame(`/games/${game.id}/index.html`);
+    const { window, document, errors } = await loadGame(`/games/${game.id}/index.html`, game.setup);
     assert.deepEqual(errors, [], `${game.id} should start without script errors`);
-    assert.ok(game.check(document), `${game.id} should render ${game.what}`);
+    assert.ok(game.check(document, window), `${game.id} should render ${game.what}`);
     window.close();
   });
 }
