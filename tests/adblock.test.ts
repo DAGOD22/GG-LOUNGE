@@ -80,6 +80,19 @@ test('never blocks the site the user actually asked for', () => {
   }
 });
 
+test('keeps YouTube search and player RPCs available when ad blocking is enabled', () => {
+  A.setEnabled(true);
+  try {
+    for (const target of [
+      'https://youtubei.googleapis.com/youtubei/v1/search?prettyPrint=false',
+      'https://youtubei.googleapis.com/youtubei/v1/player?key=fixture',
+      'https://youtubei.googleapis.com/youtubei/v1/log?event=ad',
+    ]) assert.equal(A.isAd(proxied(target)), false, `must not block ${target}`);
+  } finally {
+    A.setEnabled(false);
+  }
+});
+
 test('ignores requests that are not proxied through /browse/', () => {
   for (const path of ['/games/cookie-clicker/index.html', '/api/health', '/proxy-runtime/scramjet/scramjet.all.js', '/tools', '/remote?url=https%3A%2F%2Fmonkeytype.com'])
     assert.equal(A.isAd('http://lounge.test' + path), false, path);

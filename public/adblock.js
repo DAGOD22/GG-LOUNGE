@@ -92,6 +92,11 @@
   var hostSet = Object.create(null);
   for (var i = 0; i < HOSTS.length; i++) hostSet[HOSTS[i].replace(/^\./, '')] = true;
 
+  // Core YouTube RPCs carry search, player, account and session state on this
+  // Google API host. Keep it out of generic path/query ad heuristics: a false
+  // positive here makes the real YouTube site report that it is offline.
+  var COMPATIBILITY_ALLOW_HOSTS = ['youtubei.googleapis.com'];
+
   // ------------------------------------------------------------- url helpers
   function decodeTarget(url) {
     try {
@@ -129,6 +134,7 @@
       host = target;
       path = target;
     }
+    if (COMPATIBILITY_ALLOW_HOSTS.indexOf(host.toLowerCase()) !== -1) return false;
     if (hostMatches(host)) return true;
     for (var i = 0; i < PATH_PATTERNS.length; i++) if (PATH_PATTERNS[i].test(path)) return true;
     for (var j = 0; j < QUERY_PATTERNS.length; j++) if (QUERY_PATTERNS[j].test(path)) return true;

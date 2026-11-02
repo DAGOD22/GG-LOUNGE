@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeProxyUrl, waitForActivation } from '../lib/proxy-client';
+import { normalizeProxyUrl, normalizeWispUrl, selectProxyTransport, waitForActivation } from '../lib/proxy-client';
 import { assertPublicTarget, isPublicAddress, publicLookup } from '../lib/network-target';
 import { createBareHandler } from '../lib/bare-adapter';
 
@@ -12,6 +12,52 @@ test('normalizes addresses and search; rejects executable/credential URLs', () =
   assert.throws(()=>normalizeProxyUrl('https://name:secret@example.com'));
   assert.throws(()=>normalizeProxyUrl(''));
 });
+test('normalizes Wisp URLs and rejects insecure or credential-bearing endpoints', () => {
+  assert.equal(normalizeWispUrl('/wisp', 'http://localhost:3000/proxy').href, 'ws://localhost:3000/wisp/');
+  assert.equal(normalizeWispUrl('wss://proxy.example/wisp', 'https://lounge.example/proxy').href, 'wss://proxy.example/wisp/');
+  assert.throws(() => normalizeWispUrl('ws://proxy.example/wisp', 'https://lounge.example/proxy'), /secure WebSockets/);
+  assert.throws(() => normalizeWispUrl('wss://name:secret@proxy.example/wisp', 'https://lounge.example/proxy'));
+  assert.throws(() => normalizeWispUrl('wss://proxy.example/wisp#fragment', 'https://lounge.example/proxy'));
+});
+
+test('chooses Wisp only after a successful protocol handshake', async () => {
+  const configured: Array<{ path: string; options: unknown[] }> = [];
+  const mux = { async setTransport(path: string, options: unknown[]) { configured.push({ path, options }); } };
+  const result = await selectProxyTransport(mux, { wisp: '/wisp/' }, 'http://lounge.example/proxy', {
+    probeWisp: async endpoint => { assert.equal(endpoint, 'ws://lounge.example/wisp/'); },
+    fetcher: async () => { throw new Error('HTTP fallback should not run'); },
+  });
+  assert.equal(result.transport, 'wisp');
+  assert.equal(configured[0].path, '/proxy-runtime/libcurl/index.mjs');
+  assert.deepEqual(configured[0].options, [{ wisp: 'ws://lounge.example/wisp/' }]);
+});
+
+test('falls back to the existing Bare HTTP transport when Wisp fails', async () => {
+  const configured: Array<{ path: string; options: unknown[] }> = [];
+  const mux = { async setTransport(path: string, options: unknown[]) { configured.push({ path, options }); } };
+  const result = await selectProxyTransport(mux, { wisp: '/wisp' }, 'http://lounge.example/proxy', {
+    probeWisp: async () => { throw new Error('secret endpoint detail must not be reported'); },
+    fetcher: async input => {
+      assert.equal(String(input), 'http://lounge.example/api/bare/');
+      return new Response(JSON.stringify({ versions: ['v3'] }), { status: 200 });
+    },
+  });
+  assert.equal(result.transport, 'http');
+  assert.match(result.notice, /HTTP fallback/);
+  assert.equal(configured[0].path, '/proxy-runtime/bare/index.mjs');
+  assert.deepEqual(configured[0].options, ['http://lounge.example/api/bare/']);
+});
+
+test('does not report HTTP transport as ready when Bare v3 is unavailable', async () => {
+  const mux = { async setTransport() { throw new Error('must not set a broken transport'); } };
+  await assert.rejects(
+    selectProxyTransport(mux, { wisp: null }, 'https://lounge.example/proxy', {
+      fetcher: async () => new Response('{}', { status: 503 }),
+    }),
+    /HTTP 503/,
+  );
+});
+
 test('blocks local, metadata and IPv4-mapped IPv6 proxy targets', () => {
   for (const value of ['127.0.0.1','10.0.0.1','169.254.169.254','192.168.1.1','172.16.0.1','::1','::ffff:127.0.0.1','fc00::1']) assert.equal(isPublicAddress(value),false,value);
   for(const value of ['http://localhost','http://127.0.0.1','http://[::1]','https://example.com:22','file:///etc/passwd']) assert.throws(()=>assertPublicTarget(new URL(value)),value);
@@ -43,7 +89,9 @@ test('Bare HEAD has no body and cross-origin misuse is rejected', async()=>{
   const response=await handle(new Request('https://lounge.example/api/bare/',{method:'HEAD'}));assert.equal(response.body,null);assert.equal(response.headers.get('x-test'),'ok');
   assert.equal((await handle(new Request('https://lounge.example/api/bare/',{headers:{origin:'https://other.example'}}))).status,403);
 });
-test('Bare returns a real error when upstream fails, never a blank 200', async()=>{
-  const handle=createBareHandler({async routeRequest(){throw new Error('fail');}});
-  const response=await handle(new Request('https://lounge.example/api/bare/v3/'));assert.equal(response.status,502);assert.match(await response.text(),/PROXY_ERROR/);
+test('Bare returns a real error when upstream fails without reflecting exception details', async()=>{
+  const handle=createBareHandler({async routeRequest(){throw new Error('private-token=fixture-secret');}});
+  const response=await handle(new Request('https://lounge.example/api/bare/v3/'));
+  const body=await response.text();
+  assert.equal(response.status,502);assert.match(body,/PROXY_ERROR/);assert.doesNotMatch(body,/fixture-secret|private-token/);
 });

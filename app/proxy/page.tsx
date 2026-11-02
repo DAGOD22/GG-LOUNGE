@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, ExternalLink, Globe, Home, RotateCw, Search, ShieldBan, ShieldOff } from 'lucide-react';
 import { bootProxy, normalizeProxyUrl, type ProxyRuntime, type ScramjetFrame } from '@/lib/proxy-client';
 import { useCustomization } from '@/components/customization/CustomizationProvider';
+import { proxyDiagnostic, safeProxyErrorCode } from '@/lib/proxy-diagnostics';
 
 const shortcuts = [
   ['YouTube', 'https://www.youtube.com/'], ['Bing', 'https://www.bing.com/'],
@@ -31,14 +32,38 @@ export default function ProxyPage() {
       if (!controlledFrame.current) throw new Error('Wait for the proxy to connect first.');
       const url = normalizeProxyUrl(input);
       setError(''); setLoading(true); setAddress(url); setCurrent(url);
+      proxyDiagnostic('navigation.started', { transport: runtime.current?.transport ?? 'scramjet', outcome: 'started' });
       controlledFrame.current.go(url);
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => { setLoading(false); setStatus('Upstream response timed out.'); setError('No page response after 35 seconds. Check the Wisp backend and its outbound internet access, or retry. The destination or your network may be blocking it.'); }, 35000);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not open this address.'); }
+      timer.current = setTimeout(() => {
+        proxyDiagnostic('navigation.timeout', { transport: runtime.current?.transport ?? 'scramjet', outcome: 'timeout', code: 'TimeoutError' });
+        setLoading(false); setStatus('Upstream response timed out.');
+        setError('No page response after 35 seconds. Check the lounge transport and its outbound internet access, or retry. The destination or your network may be blocking it.');
+      }, 35000);
+    } catch (cause) {
+      proxyDiagnostic('navigation.rejected', { outcome: 'failed', code: safeProxyErrorCode(cause) });
+      setError(cause instanceof Error ? cause.message : 'Could not open this address.');
+    }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
+    const onWorkerDiagnostic = (event: MessageEvent) => {
+      const data = event.data;
+      const stages = new Set(['request.blocked', 'response.http-error', 'request.failed', 'worker.error', 'worker.unhandled-rejection']);
+      if (!data || data.ggLounge !== 'proxy-diagnostic' || data.source !== 'service-worker' || !stages.has(data.stage)) return;
+      proxyDiagnostic(data.stage, {
+        source: 'service-worker',
+        outcome: ['ok', 'failed', 'blocked'].includes(data.outcome) ? data.outcome : undefined,
+        transport: ['scramjet', 'wisp', 'http'].includes(data.transport) ? data.transport : undefined,
+        status: Number.isInteger(data.status) ? data.status : undefined,
+        requestId: Number.isInteger(data.requestId) ? data.requestId : undefined,
+        code: typeof data.code === 'string' ? data.code : undefined,
+        method: typeof data.method === 'string' ? data.method : undefined,
+        requestType: typeof data.requestType === 'string' ? data.requestType : undefined,
+      });
+    };
+    navigator.serviceWorker?.addEventListener('message', onWorkerDiagnostic);
     setReady(false); setError(''); setStatus('Starting Scramjet…');
     bootProxy().then(result => {
       if (cancelled || !iframe.current) return;
@@ -52,9 +77,15 @@ export default function ProxyPage() {
       const requested = new URLSearchParams(location.search).get('url');
       if (requested) navigate(requested);
     }).catch(cause => {
+      proxyDiagnostic('page.boot.failed', { outcome: 'failed', code: safeProxyErrorCode(cause) });
       if (!cancelled) { setStatus('Not connected'); setError(cause instanceof Error ? cause.message : 'Proxy startup failed.'); }
     });
-    return () => { cancelled = true; controlledFrame.current = null; if (timer.current) clearTimeout(timer.current); };
+    return () => {
+      cancelled = true;
+      navigator.serviceWorker?.removeEventListener('message', onWorkerDiagnostic);
+      controlledFrame.current = null;
+      if (timer.current) clearTimeout(timer.current);
+    };
   }, [attempt, navigate]);
 
   function onLoad() {
@@ -64,9 +95,12 @@ export default function ProxyPage() {
     // iframe.onload also fires for HTTP 404/502. Inspect our own error document.
     try {
       const doc = iframe.current?.contentDocument;
-      if (doc?.title === 'Proxy connection failed' || doc?.title?.startsWith('Scramjet')) {
+      if (doc?.title === 'Proxy connection failed') {
         const detail = doc.body?.innerText?.slice(0, 450);
-        if (detail && /failed|error|unreachable/i.test(detail)) setError(detail);
+        if (detail && /failed|error|unreachable/i.test(detail)) {
+          proxyDiagnostic('navigation.response-failed', { outcome: 'failed', status: 502, transport: runtime.current?.transport ?? 'scramjet' });
+          setError(detail);
+        }
       }
     } catch { /* destination isolation prevents inspection; do not call it a failure */ }
     if (runtime.current) setStatus(runtime.current.notice);
@@ -117,7 +151,7 @@ export default function ProxyPage() {
       <p style={{ maxWidth: 620, margin: '24px auto', fontSize: 13 }}>Roblox experiences need the Roblox app or a compatible cloud gaming service. Browsing its website is not the same as running the game. Video and realtime apps need a reachable Wisp backend.</p>
     </section>}
     {current && /(?:roblox\.com|now\.gg)/i.test(current) && <p style={{ margin: 0, padding: '8px 18px', fontSize: 12, color: '#ffd18b' }}>Cloud gaming availability, accounts and WebRTC are controlled by the provider. This launcher does not supply a Roblox game server.</p>}
-    <iframe ref={iframe} src="about:blank" title="Scramjet browser" className="proxy-frame" allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" allowFullScreen onLoad={onLoad} onError={() => { setLoading(false); setError('The proxied page failed to load.'); }} style={{ display: current ? 'block' : 'none', width: '100%', flex: 1, minHeight: 'calc(100dvh - 108px)', border: 0, background: 'white' }} />
+    <iframe ref={iframe} src="about:blank" title="Scramjet browser" className="proxy-frame" allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" allowFullScreen onLoad={onLoad} onError={() => { proxyDiagnostic('navigation.iframe-error', { outcome: 'failed', code: 'NetworkError', transport: runtime.current?.transport ?? 'scramjet' }); setLoading(false); setError('The proxied page failed to load.'); }} style={{ display: current ? 'block' : 'none', width: '100%', flex: 1, minHeight: 'calc(100dvh - 108px)', border: 0, background: 'white' }} />
     {current && <a href={current} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, padding: '6px 18px' }}><ExternalLink size={12} style={{ display: 'inline' }} /> Open original site outside the proxy</a>}
   </main>;
 }

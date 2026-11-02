@@ -14,7 +14,7 @@ return async function handle(req: Request): Promise<Response> {
   // texture/audio request.
   const cors = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': '*',
     'Access-Control-Expose-Headers': 'Content-Range, Content-Length, Content-Type, Accept-Ranges, ETag, Last-Modified',
   };
@@ -62,6 +62,20 @@ return async function handle(req: Request): Promise<Response> {
           responseHeaders.delete('content-length');
           responseHeaders.set('Cache-Control', 'no-store');
           for (const [key, value] of Object.entries(cors)) responseHeaders.set(key, value);
+          // Bare's own protocol errors can contain upstream exception messages
+          // and stacks. Upstream HTTP status is carried separately in
+          // x-bare-status, so a raw 4xx/5xx without that marker is safe to mask.
+          if (status >= 400 && !responseHeaders.has('x-bare-status')) {
+            const safeStatus = status >= 500 ? 502 : status;
+            const safeMessage = status === 404 ? 'The Bare route was not found.' : 'The Bare HTTP proxy rejected the request.';
+            responseHeaders.set('Content-Type', 'application/json; charset=utf-8');
+            const body = JSON.stringify({ code: 'PROXY_ERROR', id: 'bare.transport', message: safeMessage });
+            const webResponse = new Response(body, { status: safeStatus, headers: responseHeaders });
+            resolved = true;
+            resolve(webResponse);
+            outgoing.resume();
+            return response;
+          }
           const bodyless = req.method === 'HEAD' || [204, 205, 304].includes(status);
           const body = bodyless ? null : Readable.toWeb(outgoing) as ReadableStream<Uint8Array>;
           if (bodyless) outgoing.resume();
@@ -72,7 +86,7 @@ return async function handle(req: Request): Promise<Response> {
       },
     });
     outgoing.once('finish', () => { if (!resolved) fail(502, 'The upstream ended without a response.'); else cleanup(); });
-    outgoing.once('error', error => fail(502, error.message));
+    outgoing.once('error', () => fail(502, 'The upstream proxy stream failed.'));
     req.signal.addEventListener('abort', abort, { once: true });
     if (req.signal.aborted) { abort(); return; }
     bare.routeRequest(incoming as unknown as IncomingMessage, response as unknown as ServerResponse).catch(() => fail(502, 'The upstream proxy request failed.'));
