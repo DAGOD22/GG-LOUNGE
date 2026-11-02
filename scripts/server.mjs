@@ -38,7 +38,22 @@ server.on('upgrade', (req, socket, head) => {
     return;
   }
   let sameOrigin = false;
-  try { sameOrigin = new URL(req.headers.origin).host === req.headers.host; } catch {}
+  try {
+    const origin = new URL(req.headers.origin);
+    // Reverse proxies commonly preserve the browser's origin but set Host to
+    // an internal listener. Prefer their forwarded host/proto when present;
+    // WISP_ALLOWED_ORIGINS remains the explicit fallback for hosts that strip
+    // these headers. In production, only trust them on Vercel or after explicit
+    // opt-in for a front proxy that sanitizes client-supplied forwarding headers.
+    const first = value => String(value || '').split(',')[0].trim();
+    const trustProxyHeaders = dev || process.env.VERCEL === '1' || process.env.TRUST_PROXY_HEADERS === '1';
+    const forwardedHost = trustProxyHeaders ? first(req.headers['x-forwarded-host']) : '';
+    const requestHost = forwardedHost || first(req.headers.host);
+    const forwardedProto = trustProxyHeaders ? first(req.headers['x-forwarded-proto']).toLowerCase() : '';
+    sameOrigin = origin.host.toLowerCase() === requestHost.toLowerCase()
+      && ['http:', 'https:'].includes(origin.protocol)
+      && (!forwardedProto || origin.protocol === `${forwardedProto}:`);
+  } catch {}
   if (!sameOrigin && !allowed.has(req.headers.origin)) { socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return; }
   const ip = socket.remoteAddress;
   const count = connections.get(ip) || 0;

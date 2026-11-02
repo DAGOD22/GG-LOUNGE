@@ -166,8 +166,8 @@ export async function selectProxyTransport(
   return {
     transport: 'http',
     notice: wispFailed
-      ? 'Scramjet · HTTP fallback. Wisp could not complete its handshake; WebSockets, live video and realtime apps may be unavailable.'
-      : 'Scramjet · HTTP only. Configure WISP_URL for WebSockets, streaming and cloud apps.',
+      ? 'Scramjet · HTTP fallback. Wisp handshake failed; the backend still needs outbound access to each destination. WebSockets and realtime apps may be unavailable.'
+      : 'Scramjet · HTTP only. The backend needs outbound access to destinations; configure WISP_URL for WebSockets, streaming and cloud apps.',
   };
 }
 

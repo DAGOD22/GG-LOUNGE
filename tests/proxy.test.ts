@@ -89,9 +89,15 @@ test('Bare HEAD has no body and cross-origin misuse is rejected', async()=>{
   const response=await handle(new Request('https://lounge.example/api/bare/',{method:'HEAD'}));assert.equal(response.body,null);assert.equal(response.headers.get('x-test'),'ok');
   assert.equal((await handle(new Request('https://lounge.example/api/bare/',{headers:{origin:'https://other.example'}}))).status,403);
 });
-test('Bare returns a real error when upstream fails without reflecting exception details', async()=>{
+test('Bare encodes transport failures in v3 metadata, avoiding outer gateway HTML errors', async()=>{
   const handle=createBareHandler({async routeRequest(){throw new Error('private-token=fixture-secret');}});
   const response=await handle(new Request('https://lounge.example/api/bare/v3/'));
   const body=await response.text();
-  assert.equal(response.status,502);assert.match(body,/PROXY_ERROR/);assert.doesNotMatch(body,/fixture-secret|private-token/);
+  assert.equal(response.status,200);
+  assert.equal(response.headers.get('x-bare-status'),'502');
+  assert.equal(response.headers.get('x-bare-status-text'),'Bad Gateway');
+  assert.deepEqual(JSON.parse(response.headers.get('x-bare-headers') || '{}'),{
+    'content-type':'text/plain; charset=utf-8','cache-control':'no-store',
+  });
+  assert.match(body,/proxy request failed/i);assert.doesNotMatch(body,/fixture-secret|private-token/);
 });

@@ -80,6 +80,43 @@ function isHtml(response) {
   return /text\/html/i.test(type);
 }
 
+async function isScramjetErrorResponse(response) {
+  if (!response || response.status !== 500 || !isHtml(response)) return false;
+  const contentLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(contentLength) && contentLength > 64 * 1024) return false;
+  const reader = response.clone().body?.getReader();
+  if (!reader) return false;
+  const chunks = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > 64 * 1024) {
+        await reader.cancel();
+        return false;
+      }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    const html = new TextDecoder().decode(bytes);
+    return html.includes('id="errorTrace"') && html.includes('id="fetchedURL"');
+  } catch {
+    return false;
+  }
+}
+
+function proxyFailurePage(requestId) {
+  const reference = `SJ-${requestId}`;
+  return new Response(
+    `<!doctype html><html><head><meta charset="utf-8"><title>Proxy connection failed</title></head><body style="font:16px system-ui;padding:32px;background:#111;color:#eee"><h1>Proxy connection failed</h1><p>Scramjet could not complete this request (HTTP 502). Reference ${reference}.</p><p>Check the lounge transport status and backend outbound internet access. A Wisp backend is required for WebSockets and realtime traffic; a school network or destination can still block access.</p><button onclick="location.reload()">Retry</button></body></html>`,
+    { status: 502, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } },
+  );
+}
+
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (!url.pathname.startsWith('/browse/')) return;
@@ -102,6 +139,14 @@ self.addEventListener('fetch', event => {
         await reportDiagnostic(event, 'response.http-error', {
           outcome: 'failed', status: response.status, method: event.request.method, requestType: requestType(event.request),
         });
+      }
+      if (await isScramjetErrorResponse(response)) {
+        const requestId = ++failureSequence;
+        await reportDiagnostic(event, 'request.failed', {
+          outcome: 'failed', status: 502, requestId, code: 'Error',
+          method: event.request.method, requestType: requestType(event.request),
+        });
+        return proxyFailurePage(requestId);
       }
 
       /* Cosmetic pass: collapse the empty boxes that blocked ads leave behind. */
@@ -126,11 +171,7 @@ self.addEventListener('fetch', event => {
         outcome: 'failed', status: 502, requestId, code: safeErrorCode(error),
         method: event.request.method, requestType: requestType(event.request),
       });
-      const reference = `SJ-${requestId}`;
-      return new Response(
-        `<!doctype html><html><head><meta charset="utf-8"><title>Proxy connection failed</title></head><body style="font:16px system-ui;padding:32px;background:#111;color:#eee"><h1>Proxy connection failed</h1><p>Scramjet could not complete this request (HTTP 502). Reference ${reference}.</p><p>Check the lounge transport status and browser console. A Wisp backend is required for WebSockets and realtime traffic; a school network or destination can still block access.</p><button onclick="location.reload()">Retry</button></body></html>`,
-        { status: 502, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } },
-      );
+      return proxyFailurePage(requestId);
     }
   })());
 });

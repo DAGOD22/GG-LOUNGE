@@ -62,6 +62,9 @@ export default function ProxyPage() {
         method: typeof data.method === 'string' ? data.method : undefined,
         requestType: typeof data.requestType === 'string' ? data.requestType : undefined,
       });
+      if (data.stage === 'response.http-error' && Number.isInteger(data.status) && data.status >= 500) {
+        setError(`The proxy received HTTP ${data.status} before a usable page loaded. This may indicate that the backend cannot reach the destination. Check backend outbound access, or open the original site.`);
+      }
     };
     navigator.serviceWorker?.addEventListener('message', onWorkerDiagnostic);
     setReady(false); setError(''); setStatus('Starting Scramjet…');

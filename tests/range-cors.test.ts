@@ -2,16 +2,92 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBareHandler } from '../lib/bare-adapter';
 
-test('Bare masks its own protocol stack details but preserves the failure status', async () => {
+test('Bare masks its own protocol stack and keeps failures inside a valid v3 envelope', async () => {
   const handle = createBareHandler({ async routeRequest(_req, res) {
     res.writeHead(500, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ code: 'UNKNOWN', message: 'private-token=fixture-secret', stack: 'fixture-secret stack' }));
   }});
   const response = await handle(new Request('https://lounge.example/api/bare/v3/'));
   const body = await response.text();
-  assert.equal(response.status, 502);
-  assert.match(body, /PROXY_ERROR/);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('x-bare-status'), '502');
+  assert.equal(response.headers.get('x-bare-status-text'), 'Bad Gateway');
+  assert.match(body, /could not complete this request/i);
   assert.doesNotMatch(body, /fixture-secret|stack/);
+});
+
+test('Bare keeps upstream HTTP errors in x-bare metadata without returning an outer error status', async () => {
+  const upstreamBody = '<!doctype html><title>Upstream Bad Gateway</title>';
+  const handle = createBareHandler({ async routeRequest(_req, res) {
+    res.writeHead(502, {
+      'x-bare-status': '502',
+      'x-bare-status-text': 'Bad Gateway',
+      'x-bare-headers': JSON.stringify({ 'content-type': 'text/html; charset=utf-8' }),
+    });
+    res.end(upstreamBody);
+  }});
+  const response = await handle(new Request('https://lounge.example/api/bare/v3/'));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('x-bare-status'), '502');
+  assert.equal(await response.text(), upstreamBody);
+});
+
+test('Bare accepts same-origin requests through forwarded hosts and local HTTP hosts', async () => {
+  const handle = createBareHandler({ async routeRequest(_req, res) {
+    res.writeHead(200, { 'x-bare-status': '200', 'x-bare-headers': '{}' });
+    res.end('ok');
+  }});
+  const forwarded = await handle(new Request('http://internal/api/bare/v3/', {
+    headers: {
+      Origin: 'https://lounge.example',
+      Host: 'internal',
+      'X-Forwarded-Host': 'lounge.example',
+      'X-Forwarded-Proto': 'https',
+    },
+  }));
+  assert.equal(forwarded.status, 200);
+
+  const local = await handle(new Request('http://localhost:3000/api/bare/v3/', {
+    headers: { Origin: 'http://127.0.0.1:3000', Host: '127.0.0.1:3000' },
+  }));
+  assert.equal(local.status, 200);
+});
+
+test('Bare trusts forwarded origin headers in production only when explicitly configured', async () => {
+  const previous = {
+    NODE_ENV: process.env.NODE_ENV,
+    VERCEL: process.env.VERCEL,
+    TRUST_PROXY_HEADERS: process.env.TRUST_PROXY_HEADERS,
+  };
+  Reflect.set(process.env, 'NODE_ENV', 'production');
+  Reflect.deleteProperty(process.env, 'VERCEL');
+  Reflect.deleteProperty(process.env, 'TRUST_PROXY_HEADERS');
+  try {
+    const handle = createBareHandler({ async routeRequest(_req, res) {
+      res.writeHead(200, { 'x-bare-status': '200', 'x-bare-headers': '{}' });
+      res.end('ok');
+    }});
+    const request = () => new Request('http://internal/api/bare/v3/', {
+      headers: {
+        Origin: 'https://lounge.example',
+        Host: 'internal',
+        'X-Forwarded-Host': 'lounge.example',
+        'X-Forwarded-Proto': 'https',
+      },
+    });
+
+    const untrusted = await handle(request());
+    assert.equal(untrusted.status, 403);
+
+    Reflect.set(process.env, 'TRUST_PROXY_HEADERS', '1');
+    const trusted = await handle(request());
+    assert.equal(trusted.status, 200);
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) Reflect.deleteProperty(process.env, key);
+      else Reflect.set(process.env, key, value);
+    }
+  }
 });
 
 test('Bare forwards Range and preserves a 206 response with Content-Range', async () => {

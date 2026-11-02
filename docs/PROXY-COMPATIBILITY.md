@@ -10,7 +10,8 @@
 - **Wisp readiness check and fallback:** startup now completes a Wisp protocol handshake with the already-installed Wisp client instead of treating a generic WebSocket upgrade as proof of a working Wisp endpoint. If the handshake or transport setup fails, the launcher tries the existing Bare HTTP transport. The UI labels that mode as degraded because proxied WebSockets/realtime traffic may still fail.
 - **YouTube filtering regression guard:** `youtubei.googleapis.com` is explicitly excluded from generic ad/path filtering. Unit coverage checks YouTube search, player, and logging RPC-style URLs with ad blocking enabled. This verifies the local filter decision only; it does not prove that Google's live API is reachable.
 - **HTTP request/response compatibility:** the Bare adapter's preflight method list now matches the methods it serves (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`). Tests exercise a PATCH JSON body, query parameters, authorization/CSRF/cookie headers, redirect metadata, repeated `Set-Cookie` values, and a subsequent cookie-bearing request. They also cover streaming, Range/206, bodyless responses and CORS preflight.
-- **Safer failures:** first-party proxy diagnostics and error pages use status/reference codes rather than echoing exception text, target URLs, query strings, request headers, cookies or bodies.
+- **Safer failures:** Bare transport errors are now returned as valid Bare v3 envelopes (outer HTTP 200 with the real failure in `x-bare-status`), so a hosting gateway cannot replace them with HTML that causes BareClient's `Unexpected token '<'` JSON parse failure. Internal stacks are masked. Scramjet's own error template is replaced by a sanitized reference page.
+- **Reverse-proxy origin handling:** same-origin checks accept `X-Forwarded-Host`/`X-Forwarded-Proto` only in dev, on Vercel, or when `TRUST_PROXY_HEADERS=1` is explicitly configured for a trusted front proxy. Exact `WISP_ALLOWED_ORIGINS` remains available if the host strips those headers.
 - **Service-worker/CSP routing:** the proxy worker is registered only for `/browse/`, and the local route returns `Service-Worker-Allowed: /browse/`. The app does not set a blanket CSP header on `/proxy` or `/browse/`; this repair did not relax or add a site-wide CSP. Destination response handling remains with the existing Scramjet runtime.
 - **Input contrast:** the proxy address field now uses high-contrast text and a lime caret on the dark chrome, with a light-theme override. Focus receives a visible outline.
 - **Diagnostics:** development diagnostics are enabled by default. Production diagnostics are off unless `?proxyDebug=1` is present or `localStorage.setItem('ggl-proxy-diagnostics', '1')` is set. Events cover startup stages, Wisp handshake/fallback, Bare health status, service-worker failures, HTTP error statuses and failed proxied requests. Console records are local to the browser and omit URL/headers/cookies/body/message data.
@@ -26,20 +27,27 @@ The sandbox did not perform authenticated requests to YouTube, Google OAuth, Rob
 
 The adapter tests prove forwarding and preservation at the local Bare boundary; they do not substitute for a real browser session with the destination. No search results or authentication responses are fabricated.
 
+## Reproduced hosting blocker
+
+- The screenshot's request was identifiable from the Bare cache key as `https://www.youtube.com/`. The local Bare route returned an outer 502 before this follow-up; direct Node fetch to YouTube in this Arena sandbox also fails with `ECONNRESET`.
+- The Bare envelope fix prevents that gateway failure from becoming a Scramjet JSON-parse stack page, but it cannot make the destination load when the host blocks outbound traffic. This restriction affects destinations generally, not just YouTube. It needs an outbound-enabled proxy host; it cannot be overridden safely in page code.
+- Wisp could not be confirmed through the public Arena preview. The local server now honors forwarded host/protocol metadata, but a front proxy that blocks WebSocket upgrades still requires a separate persistent Wisp service.
+
 ## Deployment and remaining constraints
 
 - **Vercel:** the existing Node Bare route provides the HTTP fallback. A Vercel serverless function is not a persistent WebSocket server, so Wisp must run on a separate persistent Node host for WebSockets and realtime features. Without `WISP_URL`, the config deliberately selects HTTP-only mode.
-- **Separate Wisp backend:** run `PORT=3001 WISP_ALLOWED_ORIGINS=https://your-gg-lounge.vercel.app node scripts/server.mjs --wisp-only` on a persistent Node host. Terminate TLS in front of it, forward WebSocket upgrades for `/wisp/`, and set the Vercel environment variable to `WISP_URL=wss://your-proxy-backend.example/wisp/`. `WISP_ALLOWED_ORIGINS` must contain the exact app origin (scheme + host, no path). The backend blocks private destinations and restricts destination ports to 80/443; UDP is disabled.
+- **Separate Wisp backend:** run `PORT=3001 WISP_ALLOWED_ORIGINS=https://your-gg-lounge.vercel.app node scripts/server.mjs --wisp-only` on a persistent Node host. Terminate TLS in front of it, forward WebSocket upgrades for `/wisp/`, and set the Vercel environment variable to `WISP_URL=wss://your-proxy-backend.example/wisp/`. Configure the front proxy to overwrite/sanitize forwarded host/protocol values, or use exact `WISP_ALLOWED_ORIGINS` values (scheme + host, no path); set `TRUST_PROXY_HEADERS=1` only when the backend is reachable solely through that trusted proxy. The backend blocks private destinations and restricts destination ports to 80/443; UDP is disabled.
 - A successful Wisp handshake confirms the Wisp control protocol only; it does **not** guarantee outbound reachability to every site. When Wisp fails, HTTP fallback can keep ordinary page/search requests available, but cannot provide WebSocket transport.
 - The proxy does not bypass destination login, CAPTCHA/MFA, DRM, anti-bot controls, school/network filters, cookie restrictions, or provider terms. Open the original site directly when an external site's policy requires it.
 
 ## Verification record
 
-- `corepack pnpm test`: **89 tests passed**, including the existing game regression suite and new proxy/ad-block/config/privacy cases.
+- Targeted proxy/ad-block/config/privacy suite: **42 passed, 0 failed**.
+- Full `corepack pnpm test`: **93 passed, 0 failed**.
 - `corepack pnpm typecheck`: **passed**.
 - `corepack pnpm build`: **passed** with Next.js 16.3.3 and generated Scramjet/Bare runtime assets.
-- Local HTTP smoke checks: `/api/proxy/config` returned `/wisp/`; `/api/bare/` advertised Bare v1/v2/v3; `/proxy/sw.js` returned `Service-Worker-Allowed: /browse/`; the self-hosted Scramjet runtime asset returned HTTP 200.
-- Manual local WebSocket smoke check completed a **Wisp v2 protocol handshake** against the repository's Node server. This checked the local control-plane handshake, not outbound connectivity to YouTube/Roblox or any other site.
-- Playwright browser tests were attempted. The HTTP-only deep-link route test passed, but the browser-based tests could not start because the sandbox has no installed Chromium executable; installing one would require a download host unavailable in this environment. The address-field CSS is also covered by a static unit test.
+- Local HTTP smoke checks: `/api/proxy/config` returned `/wisp/`; `/api/bare/` advertised Bare v1/v2/v3; `/proxy/sw.js` returned `Service-Worker-Allowed: /browse/`; the self-hosted Scramjet runtime asset returned HTTP 200. A destination request that cannot leave this sandbox now returns outer HTTP 200 with `x-bare-status: 502` and a sanitized message, keeping the Bare v3 response parseable.
+- Manual Wisp v2 handshake passed both directly and with simulated `X-Forwarded-Host`/`X-Forwarded-Proto`. This verifies the local server and origin check, not WebSocket passage through the public Arena preview or outbound reachability to external sites.
+- Earlier Playwright browser tests: the HTTP-only deep-link route passed, but the browser-based tests could not start because Chromium is absent. The address-field CSS is covered by a static unit test.
 - `corepack pnpm lint` could not run: the repository's ESLint 10.11.0 / config combination throws a circular-structure error while validating the existing configuration, before linting any files.
 - Live external-site search, login and cookie continuity are intentionally **not claimed**.
