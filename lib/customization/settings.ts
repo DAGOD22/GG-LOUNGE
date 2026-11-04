@@ -29,6 +29,7 @@ export type Settings = {
   background: { preset: string; mediaId: string; mediaKind: 'image' | 'video'; mediaName: string; dim: number; blur: number; fit: 'cover' | 'contain'; respectMotion: boolean };
   cursor: { preset: string; image: string; size: number; trail: boolean; speed: number; glow: boolean };
   reactive: { enabled: boolean; style: 'ripples' | 'particles' | 'constellation'; intensity: number; pointer: boolean };
+  adblock: { enabled: boolean };
 };
 export function defaults(): Settings { return {
   version:1,
@@ -38,6 +39,7 @@ export function defaults(): Settings { return {
   background:{preset:'none',mediaId:'',mediaKind:'image',mediaName:'',dim:38,blur:0,fit:'cover',respectMotion:true},
   cursor:{preset:'system',image:'',size:40,trail:false,speed:0.6,glow:true},
   reactive:{enabled:false,style:'ripples',intensity:50,pointer:true},
+  adblock:{enabled:false},
 }; }
 const text=(v:unknown,fallback:string,max=200)=> typeof v==='string' ? v.slice(0,max) : fallback;
 const bool=(v:unknown,fallback:boolean)=>typeof v==='boolean'?v:fallback;
@@ -65,7 +67,7 @@ export function iconHref(input:string,base='https://gg-lounge.vercel.app'):strin
 const LEGACY_CURSOR_MAP: Record<string, string> = { crosshair: 'sonar', dot: 'lounge', ring: 'halo' };
 
 export function sanitizeSettings(input:unknown):Settings {
-  const d=defaults(),v=obj(input),c=obj(v.cloak),p=obj(v.panic),b=obj(p.binding),t=obj(v.theme),bg=obj(v.background),cu=obj(v.cursor),r=obj(v.reactive);
+  const d=defaults(),v=obj(input),c=obj(v.cloak),p=obj(v.panic),b=obj(p.binding),t=obj(v.theme),bg=obj(v.background),cu=obj(v.cursor),r=obj(v.reactive),ab=obj(v.adblock);
   const colors={...d.theme.colors};const supplied=obj(t.colors);
   for(const k of Object.keys(colors) as (keyof Colors)[])if(typeof supplied[k]==='string'&&/^#[0-9a-f]{6}$/i.test(supplied[k]))colors[k]=supplied[k];
   let icon=text(c.icon,d.cloak.icon,180000);try{iconHref(icon)}catch{icon=d.cloak.icon;}
@@ -78,6 +80,7 @@ export function sanitizeSettings(input:unknown):Settings {
     background:{preset:oneOf(bg.preset,[...WALLPAPERS.map(x=>x.id),'upload'],'none'),mediaId:text(bg.mediaId,'',80),mediaKind:oneOf(bg.mediaKind,['image','video'],'image'),mediaName:text(bg.mediaName,'',160),dim:num(bg.dim,38,0,90),blur:num(bg.blur,0,0,24),fit:oneOf(bg.fit,['cover','contain'],'cover'),respectMotion:bool(bg.respectMotion,true)},
     cursor:{preset:oneOf(LEGACY_CURSOR_MAP[cu.preset as string] ?? cu.preset,['system','custom',...ANIMATED_CURSOR_IDS],'system'),image:/^data:image\/png;base64,[a-z\d+/=]+$/i.test(text(cu.image,'',180000))?cu.image:'',size:num(cu.size,40,16,64),trail:bool(cu.trail,false),speed:num(cu.speed,0.6,0,1),glow:bool(cu.glow,true)},
     reactive:{enabled:bool(r.enabled,false),style:oneOf(r.style,['ripples','particles','constellation'],'ripples'),intensity:num(r.intensity,50,10,100),pointer:bool(r.pointer,true)},
+    adblock:{enabled:bool(ab.enabled,false)},
   };
 }
 export function bindingFromEvent(e:Pick<KeyboardEvent,'code'|'key'|'ctrlKey'|'altKey'|'shiftKey'|'metaKey'>):KeyBinding {

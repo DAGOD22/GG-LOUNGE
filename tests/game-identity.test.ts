@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { canonicalGameTitle, dedupeGames, mergeDuplicateRequests } from '../lib/game-identity';
-import { catalogGames, games, unavailableGames } from '../lib/games';
+import { catalogGames, games, proxyGames, unavailableGames } from '../lib/games';
 import { existsSync } from 'node:fs';
 
 test('normalizes requested duplicates and explicit aliases', () => {
@@ -25,9 +25,38 @@ test('merges Cat Pizza votes, keeps oldest stable ID and does not mutate source 
   assert.equal(output.length,2);assert.equal(output[0].id,'a');assert.equal(output[0].votes,4);assert.equal(rows[1].votes,2);
 });
 test('playable catalog never advertises a missing entry point or duplicates', () => {
-  for(const game of games) assert.ok(existsSync('public'+game.path),game.id);
+  // Locally hosted games must have a real entry point on disk. Games hosted on
+  // a remote site through the proxy (hosted:'remote') deliberately have none —
+  // their availability is a network property, not a file property.
+  for(const game of games) if(game.hosted!=='remote') assert.ok(existsSync('public'+game.path),game.id);
   assert.equal(dedupeGames(games).length,games.length);
-  assert.equal(games.length+unavailableGames.length,dedupeGames(catalogGames).length);
-  assert.ok(unavailableGames.some(game=>game.id==='geometry-dash'));
+  const local=dedupeGames(catalogGames);
+  assert.equal(games.filter(g=>g.hosted!=='remote').length+unavailableGames.length,local.length);
   assert.ok(games.some(game=>game.id==='minecraft-classic'));
+});
+
+test('remote games are real sites streamed through the proxy, never local fakes', () => {
+  assert.ok(proxyGames.length>0);
+  for(const game of proxyGames){
+    assert.equal(game.hosted,'remote',game.id);
+    assert.ok(game.remoteUrl && /^https:\/\//.test(game.remoteUrl), game.id);
+    // The launch path must point at the lounge's own remote host, with the
+    // destination passed as an encoded parameter rather than an open redirect.
+    assert.match(game.path,/^\/remote\?url=/,game.id);
+    const encoded=new URLSearchParams(game.path.split('?')[1]).get('url');
+    assert.equal(encoded,game.remoteUrl,game.id);
+    // And it must never be counted as an installed local game.
+    assert.ok(!catalogGames.some(local=>local.id===game.id),game.id);
+  }
+  const monkeytype=proxyGames.find(g=>g.id==='monkeytype');
+  assert.ok(monkeytype);
+  assert.equal(new URL(monkeytype.remoteUrl!).hostname,'monkeytype.com');
+});
+
+test('every advertised game is either audited locally or explicitly remote-hosted', () => {
+  for(const game of games){
+    const local=catalogGames.find(entry=>entry.id===game.id);
+    if(local) assert.ok(existsSync('public'+local.path),game.id);
+    else assert.equal(game.hosted,'remote',game.id);
+  }
 });

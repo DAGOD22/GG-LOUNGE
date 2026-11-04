@@ -5,6 +5,7 @@ import { AnimatedCursor } from './AnimatedCursor';
 import { defaults, sanitizeSettings, SETTINGS_KEY, THEMES, WALLPAPERS, iconHref, normalizeDestination, matchesBinding, isTypingTarget, accentInk, cursorValue, type Settings } from '@/lib/customization/settings';
 import { getMedia } from '@/lib/customization/media';
 import { watchFrameEvents } from '@/lib/customization/frame-events';
+import { pushAdblockState } from '@/lib/adblock-client';
 import { ReactiveBackdrop, REACTIVE_EVENT } from './ReactiveBackdrop';
 import { CustomizationDialog } from './CustomizationDialog';
 
@@ -23,6 +24,8 @@ export function CustomizationProvider({children}:{children:ReactNode}) {
     const storage=(e:StorageEvent)=>{if(e.key!==SETTINGS_KEY)return;try{setSettings(e.newValue?sanitizeSettings(JSON.parse(e.newValue)):defaults());}catch{}};window.addEventListener('storage',storage);return()=>window.removeEventListener('storage',storage);
   },[]);
   useEffect(()=>{if(!ready)return;try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));localStorage.setItem('ggl_theme',settings.theme.mode);setSaveError('');}catch{setSaveError('Preferences could not be saved. Browser storage may be disabled or full.');}},[settings,ready]);
+  // Keep the proxy service worker's filter in step with the ad-blocker setting.
+  useEffect(()=>{if(!ready)return;void pushAdblockState(settings.adblock.enabled);},[ready,settings.adblock.enabled]);
   useEffect(()=>{const query=matchMedia('(prefers-reduced-motion: reduce)');const change=()=>setSystemReduced(query.matches);change();query.addEventListener('change',change);return()=>query.removeEventListener('change',change);},[]);
   const reduced=settings.background.respectMotion&&systemReduced;
 

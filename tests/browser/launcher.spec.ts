@@ -10,6 +10,14 @@ test('Scramjet starts a worker scoped to /browse/, with no game interception', a
   const scopes=await page.evaluate(async()=> (await navigator.serviceWorker.getRegistrations()).map(r=>r.scope));
   expect(scopes).toContain(origin+'/browse/');expect(scopes).not.toContain(origin+'/');
 });
+test('proxy address input stays readable against the dark browser chrome', async ({ page }) => {
+  await page.goto('/proxy');
+  const input = page.getByRole('textbox', { name: 'Website address or search' });
+  await expect(input).toBeVisible();
+  await expect(input).toHaveCSS('color', 'rgb(244, 242, 236)');
+  await expect(input).toHaveCSS('caret-color', 'rgb(215, 243, 74)');
+});
+
 test('workerless proxy deep links redirect to boot instead of 404', async ({ request }) => {
   const response=await request.get('/browse/'+encodeURIComponent('https://example.com/'),{maxRedirects:0});
   expect(response.status()).toBe(307);expect(response.headers().location).toContain('/proxy?url=');

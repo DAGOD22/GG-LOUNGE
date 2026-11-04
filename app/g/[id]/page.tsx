@@ -5,8 +5,9 @@ import Link from 'next/link'
 export function generateStaticParams(){
   return games.map(g=> ({ id: g.id }))
 }
-export function generateMetadata({params}:{params:{id:string}}): Metadata {
-  const g = games.find(x=> x.id===params.id)
+export async function generateMetadata({params}:{params:Promise<{id:string}>}): Promise<Metadata> {
+  const { id } = await params
+  const g = games.find(x=> x.id===id)
   if(!g) return { title: 'Game not found — GG Lounge' }
   const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://gg-lounge.vercel.app'
   return {
@@ -22,8 +23,9 @@ export function generateMetadata({params}:{params:{id:string}}): Metadata {
     twitter: { card: 'summary_large_image', title: g.title, description: g.description, images: [base + (g.icon||'')] }
   }
 }
-export default function Page({params}:{params:{id:string}}){
-  const g = games.find(x=> x.id===params.id)
+export default async function Page({params}:{params:Promise<{id:string}>}){
+  const { id } = await params
+  const g = games.find(x=> x.id===id)
   if(!g) return <main style={{padding:40}}>Not found — <Link href="/">Go home</Link></main>
   const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://gg-lounge.vercel.app'
   const jsonLd = {

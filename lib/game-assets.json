@@ -1,9 +1,7 @@
 {
   "2048": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+    "available": true,
+    "issues": []
   },
   "suika": {
     "available": true,
@@ -38,10 +36,12 @@
     "issues": []
   },
   "hextris": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+    "available": true,
+    "issues": []
+  },
+  "block-blast": {
+    "available": true,
+    "issues": []
   },
   "solar-smash": {
     "available": false,
@@ -66,17 +66,12 @@
     ]
   },
   "survival-race": {
-    "available": false,
-    "issues": [
-      "Remote CDN loader, not a local game",
-      "Missing runtime: /games/survival-race/Build/yandexBrotli.loader.js"
-    ]
+    "available": true,
+    "issues": []
   },
   "geometry-dash": {
-    "available": false,
-    "issues": [
-      "Authorized browser build not installed"
-    ]
+    "available": true,
+    "issues": []
   },
   "poki": {
     "available": true,
@@ -364,65 +359,89 @@
     "available": true,
     "issues": []
   },
-  "hole-io": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+  "pacman": {
+    "available": true,
+    "issues": []
   },
-  "1v1-lol": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+  "space-invaders": {
+    "available": true,
+    "issues": []
   },
-  "krunker": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+  "snake": {
+    "available": true,
+    "issues": []
   },
-  "smashkarts": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+  "pong": {
+    "available": true,
+    "issues": []
   },
-  "ev-io": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+  "star-battle": {
+    "available": true,
+    "issues": []
   },
-  "shell-shockers": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+  "radius-raid": {
+    "available": true,
+    "issues": []
   },
-  "agar-io": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+  "bounce-back": {
+    "available": true,
+    "issues": []
   },
-  "slither-io": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+  "space-huggers": {
+    "available": true,
+    "issues": []
   },
-  "paper-io-2-3d": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+  "tiny-platformer": {
+    "available": true,
+    "issues": []
   },
-  "stumble-guys": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+  "sokoban": {
+    "available": true,
+    "issues": []
+  },
+  "emoji-minesweeper": {
+    "available": true,
+    "issues": []
+  },
+  "quantum-game": {
+    "available": true,
+    "issues": []
+  },
+  "tetris": {
+    "available": true,
+    "issues": []
+  },
+  "word-search": {
+    "available": true,
+    "issues": []
+  },
+  "memory-match": {
+    "available": true,
+    "issues": []
+  },
+  "breakout": {
+    "available": true,
+    "issues": []
+  },
+  "hexgl": {
+    "available": true,
+    "issues": []
+  },
+  "trust": {
+    "available": true,
+    "issues": []
+  },
+  "elevator-saga": {
+    "available": true,
+    "issues": []
+  },
+  "isocity": {
+    "available": true,
+    "issues": []
+  },
+  "a-dark-room": {
+    "available": true,
+    "issues": []
   },
   "baseball-bros": {
     "available": false,
@@ -454,25 +473,7 @@
       "Missing local index.html"
     ]
   },
-  "sandbox": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "crazy-crash-landing": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
   "monster-truck": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "cyber-cars": {
     "available": false,
     "issues": [
       "Missing local index.html"
@@ -502,25 +503,7 @@
       "Missing local index.html"
     ]
   },
-  "extreme-racing": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "monster-survival": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
   "obby-shooter": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "helix-jump": {
     "available": false,
     "issues": [
       "Missing local index.html"
@@ -532,37 +515,7 @@
       "Missing local index.html"
     ]
   },
-  "red-vs-blue": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "build-defend": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
   "basket-bros": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "bad-simulator": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "a-small-world-cup": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "bitlife-simulator": {
     "available": false,
     "issues": [
       "Missing local index.html"
@@ -628,18 +581,6 @@
       "Missing local index.html"
     ]
   },
-  "fall-guys": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "grindcraft-remastered": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
   "stick-archers-battle": {
     "available": false,
     "issues": [
@@ -651,48 +592,6 @@
     "issues": []
   },
   "wheelie-bike": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "pixel-shooter": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "qwop": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "the-final-earth-2": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "uno": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "sonic-the-hedgehog": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "there-is-no-game": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "run-rabbit-run": {
     "available": false,
     "issues": [
       "Missing local index.html"

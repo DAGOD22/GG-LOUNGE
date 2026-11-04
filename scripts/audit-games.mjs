@@ -36,6 +36,14 @@ for (const game of rows) {
       if (url.origin !== 'https://local.invalid') { issues.push('External runtime script: ' + url.hostname); continue; }
       const target = resolve(publicRoot, '.' + decodeURIComponent(url.pathname));
       if (!target.startsWith(publicRoot + '/')) { issues.push('Invalid script path'); continue; }
+      // A legacy page may document.write a localized script from a runtime
+      // prefix such as "lang/" + lang + "/strings.js". The HTML regex sees
+      // only the prefix; validate that directory exists, then leave the
+      // interpolated filename to the game-specific runtime smoke test.
+      if (url.pathname.endsWith('/')) {
+        if (!await exists(target)) issues.push('Missing runtime directory: ' + url.pathname);
+        continue;
+      }
       if (!await exists(target)) issues.push('Missing runtime: ' + url.pathname);
       else if (/^\s*<(?:!doctype|html)/i.test((await readFile(target,'utf8')).slice(0,200))) issues.push('Runtime contains an HTML error page: ' + url.pathname);
     }
