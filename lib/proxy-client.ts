@@ -12,7 +12,9 @@ type RuntimeWindow = Window & {
   $scramjetLoadController: () => { ScramjetController: new (config: object) => ScramjetController };
   BareMux: { BareMuxConnection: new (worker: string) => BareMuxConnection };
 };
-export type ProxyRuntime = { controller: ScramjetController; transport: 'wisp' | 'http'; notice: string };
+export type WispStatus = 'connected' | 'not-configured' | 'failed';
+export type ProxyTransportSelection = { transport: 'wisp' | 'http'; notice: string; wispStatus: WispStatus };
+export type ProxyRuntime = ProxyTransportSelection & { controller: ScramjetController; serviceWorker: ServiceWorker };
 const scripts = new Map<string, Promise<void>>();
 let bootPromise: Promise<ProxyRuntime> | undefined;
 
@@ -106,7 +108,7 @@ export async function selectProxyTransport(
   config: { wisp?: string | null },
   baseUrl: string,
   dependencies: TransportDependencies = {},
-): Promise<{ transport: 'wisp' | 'http'; notice: string }> {
+): Promise<ProxyTransportSelection> {
   const fetcher = dependencies.fetcher ?? fetch;
   const configuredWisp = typeof config.wisp === 'string' ? config.wisp.trim() : '';
   let wispFailed = false;
@@ -125,6 +127,7 @@ export async function selectProxyTransport(
       return {
         transport: 'wisp',
         notice: 'Scramjet · Wisp handshake completed. Destination and network restrictions still apply.',
+        wispStatus: 'connected',
       };
     } catch (error) {
       wispFailed = true;
@@ -165,9 +168,10 @@ export async function selectProxyTransport(
   });
   return {
     transport: 'http',
+    wispStatus: configuredWisp ? 'failed' : 'not-configured',
     notice: wispFailed
-      ? 'Scramjet · HTTP fallback. Wisp handshake failed; the backend still needs outbound access to each destination. WebSockets and realtime apps may be unavailable.'
-      : 'Scramjet · HTTP only. The backend needs outbound access to destinations; configure WISP_URL for WebSockets, streaming and cloud apps.',
+      ? 'Scramjet · HTTP fallback. Wisp handshake failed; ordinary requests still depend on backend outbound access. WebSockets and realtime apps are unavailable.'
+      : 'Scramjet · HTTP only. Destination access is not yet verified; configure a real WISP_URL for WebSockets and realtime apps.',
   };
 }
 
@@ -232,13 +236,11 @@ export function bootProxy(): Promise<ProxyRuntime> {
     const selected = await selectProxyTransport(mux, config, location.href);
     const registration = await navigator.serviceWorker.register('/proxy/sw.js', { scope: '/browse/', updateViaCache: 'none' });
     await waitForActivation(registration);
-    setProxyWorkerDiagnostics(
-      registration.active || registration.waiting || registration.installing,
-      proxyDiagnosticsEnabled(),
-      selected.transport,
-    );
+    const worker = registration.active || registration.waiting || registration.installing;
+    if (!worker) throw new Error('The proxy service worker is not available after activation.');
+    setProxyWorkerDiagnostics(worker, proxyDiagnosticsEnabled(), selected.transport);
     proxyDiagnostic('service-worker.activated', { transport: 'scramjet', outcome: 'ok' });
-    return { controller, ...selected };
+    return { controller, ...selected, serviceWorker: worker };
   })().catch(error => {
     proxyDiagnostic('boot.failed', { transport: 'scramjet', outcome: 'failed', code: safeProxyErrorCode(error) });
     bootPromise = undefined;

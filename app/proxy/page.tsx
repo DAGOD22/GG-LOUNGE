@@ -1,9 +1,9 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, ExternalLink, Globe, Home, RotateCw, Search, ShieldBan, ShieldOff } from 'lucide-react';
+import { Activity, ArrowLeft, ArrowRight, ExternalLink, Globe, Home, RotateCw, Search, ShieldBan, ShieldOff } from 'lucide-react';
 import { bootProxy, normalizeProxyUrl, type ProxyRuntime, type ScramjetFrame } from '@/lib/proxy-client';
 import { useCustomization } from '@/components/customization/CustomizationProvider';
-import { proxyDiagnostic, safeProxyErrorCode } from '@/lib/proxy-diagnostics';
+import { proxyDiagnosticsEnabled, proxyDiagnostic, safeProxyErrorCode, setProxyWorkerDiagnostics } from '@/lib/proxy-diagnostics';
 
 const shortcuts = [
   ['YouTube', 'https://www.youtube.com/'], ['Bing', 'https://www.bing.com/'],
@@ -11,6 +11,15 @@ const shortcuts = [
   ['Discord', 'https://discord.com/app'], ['Reddit', 'https://www.reddit.com/'],
   ['Roblox website', 'https://www.roblox.com/'], ['now.gg', 'https://now.gg/'],
 ];
+const HEALTH_TARGETS = ['youtube', 'roblox', 'tiktok'] as const;
+type HealthTarget = typeof HEALTH_TARGETS[number];
+type BackendCheck = {
+  target: HealthTarget;
+  clientError?: string;
+  dns: { outcome: 'resolved' | 'failed' | 'blocked'; addressCount?: number; durationMs: number; code?: string };
+  http: { outcome: 'connected' | 'failed' | 'skipped'; status?: number; durationMs?: number; code?: string };
+};
+type DiagnosticEvent = { stage: string; status?: number; code?: string; method?: string; requestType?: string; requestId?: number; at: string };
 export default function ProxyPage() {
   const { settings, update } = useCustomization();
   const adblockOn = settings.adblock.enabled;
@@ -25,6 +34,11 @@ export default function ProxyPage() {
   const [loading, setLoading] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [limited, setLimited] = useState(false);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [serviceWorkerState, setServiceWorkerState] = useState('not checked');
+  const [backendChecks, setBackendChecks] = useState<Partial<Record<HealthTarget, BackendCheck>>>({});
+  const [checkingBackend, setCheckingBackend] = useState(false);
+  const [diagnosticEvents, setDiagnosticEvents] = useState<DiagnosticEvent[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const navigate = useCallback((input: string) => {
@@ -46,12 +60,44 @@ export default function ProxyPage() {
     }
   }, []);
 
+  const runOutboundDiagnostics = useCallback(async () => {
+    setCheckingBackend(true);
+    const results = await Promise.all(HEALTH_TARGETS.map(async target => {
+      try {
+        const response = await fetch(`/api/proxy/diagnostics?target=${target}`, {
+          cache: 'no-store', signal: AbortSignal.timeout(10000),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const value = await response.json() as BackendCheck;
+        if (value.target !== target || !value.dns || !value.http) throw new Error('Invalid diagnostic response');
+        return [target, value] as const;
+      } catch (cause) {
+        return [target, {
+          target, clientError: safeProxyErrorCode(cause),
+          dns: { outcome: 'failed' as const, durationMs: 0 },
+          http: { outcome: 'skipped' as const },
+        }] as const;
+      }
+    }));
+    setBackendChecks(Object.fromEntries(results) as Partial<Record<HealthTarget, BackendCheck>>);
+    setCheckingBackend(false);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const onWorkerDiagnostic = (event: MessageEvent) => {
       const data = event.data;
       const stages = new Set(['request.blocked', 'response.http-error', 'request.failed', 'worker.error', 'worker.unhandled-rejection']);
       if (!data || data.ggLounge !== 'proxy-diagnostic' || data.source !== 'service-worker' || !stages.has(data.stage)) return;
+      setDiagnosticEvents(previous => [{
+        stage: String(data.stage).slice(0, 64),
+        status: Number.isInteger(data.status) ? data.status : undefined,
+        code: typeof data.code === 'string' ? data.code : undefined,
+        method: typeof data.method === 'string' ? data.method : undefined,
+        requestType: typeof data.requestType === 'string' ? data.requestType : undefined,
+        requestId: Number.isInteger(data.requestId) ? data.requestId : undefined,
+        at: new Date().toLocaleTimeString(),
+      }, ...previous].slice(0, 8));
       proxyDiagnostic(data.stage, {
         source: 'service-worker',
         outcome: ['ok', 'failed', 'blocked'].includes(data.outcome) ? data.outcome : undefined,
@@ -71,6 +117,7 @@ export default function ProxyPage() {
     bootProxy().then(result => {
       if (cancelled || !iframe.current) return;
       runtime.current = result;
+      setServiceWorkerState(result.serviceWorker.state);
       const frame = result.controller.createFrame(iframe.current);
       controlledFrame.current = frame;
       frame.addEventListener('urlchange', event => {
@@ -81,7 +128,7 @@ export default function ProxyPage() {
       if (requested) navigate(requested);
     }).catch(cause => {
       proxyDiagnostic('page.boot.failed', { outcome: 'failed', code: safeProxyErrorCode(cause) });
-      if (!cancelled) { setStatus('Not connected'); setError(cause instanceof Error ? cause.message : 'Proxy startup failed.'); }
+      if (!cancelled) { setServiceWorkerState('failed to activate'); setStatus('Not connected'); setError(cause instanceof Error ? cause.message : 'Proxy startup failed.'); }
     });
     return () => {
       cancelled = true;
@@ -90,6 +137,19 @@ export default function ProxyPage() {
       if (timer.current) clearTimeout(timer.current);
     };
   }, [attempt, navigate]);
+
+  useEffect(() => {
+    const activeRuntime = runtime.current;
+    if (!ready || !activeRuntime) return;
+    setProxyWorkerDiagnostics(
+      activeRuntime.serviceWorker,
+      diagnosticsOpen || proxyDiagnosticsEnabled(),
+      activeRuntime.transport,
+    );
+    return () => {
+      setProxyWorkerDiagnostics(activeRuntime.serviceWorker, proxyDiagnosticsEnabled(), activeRuntime.transport);
+    };
+  }, [diagnosticsOpen, ready]);
 
   function onLoad() {
     if (!current) return;
@@ -139,9 +199,56 @@ export default function ProxyPage() {
       </button>
       <a href="/apps" style={{ fontSize: 13 }}>Apps</a>
     </header>
-    <div role="status" aria-live="polite" style={{ padding: '8px 18px', background: 'var(--panel)', color: limited ? '#ffd18b' : '#b5c1cc', fontSize: 12 }}>
-      {loading ? 'Loading website through Scramjet…' : status}
+    <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '8px 18px', background: 'var(--panel)', color: limited ? '#ffd18b' : '#b5c1cc', fontSize: 12 }}>
+      <span>{loading ? 'Loading website through Scramjet…' : status}</span>
+      <button type="button" aria-expanded={diagnosticsOpen} onClick={() => setDiagnosticsOpen(open => !open)} style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid rgba(255,255,255,.18)', borderRadius: 8, padding: '5px 9px', color: 'inherit', background: 'transparent', cursor: 'pointer', font: 'inherit' }}>
+        <Activity size={14} /> {diagnosticsOpen ? 'Hide diagnostics' : 'Diagnostics'}
+      </button>
     </div>
+    {diagnosticsOpen && <section aria-label="Proxy developer diagnostics" style={{ padding: '14px 18px', background: 'var(--panel)', borderBottom: '1px solid var(--line)', color: 'var(--foreground)', fontSize: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+        <div><strong>Proxy diagnostics</strong><div style={{ color: 'var(--muted)', marginTop: 3 }}>Fixed unauthenticated probes only. No destination URLs, cookies, headers or response bodies are recorded.</div></div>
+        <button type="button" disabled={checkingBackend} onClick={() => void runOutboundDiagnostics()} style={{ border: '1px solid rgba(215,243,74,.5)', borderRadius: 8, padding: '7px 10px', color: 'var(--lime)', background: 'rgba(215,243,74,.08)', cursor: checkingBackend ? 'wait' : 'pointer', font: 'inherit' }}>
+          {checkingBackend ? 'Checking destinations…' : 'Test backend outbound access'}
+        </button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 8 }}>
+        <div><strong>Scramjet</strong><div>{ready ? 'Initialized' : status === 'Not connected' ? 'Initialization failed' : 'Starting'}</div></div>
+        <div><strong>Transport</strong><div>{runtime.current?.transport === 'wisp' ? 'Wisp' : runtime.current?.transport === 'http' ? 'Bare HTTP fallback' : 'Not selected'}</div></div>
+        <div><strong>Wisp</strong><div>{runtime.current?.wispStatus === 'connected' ? 'Protocol handshake completed' : runtime.current?.wispStatus === 'failed' ? 'Handshake failed; HTTP fallback selected' : runtime.current?.wispStatus === 'not-configured' ? 'WISP_URL is not configured' : 'Not checked'}</div></div>
+        <div><strong>Bare v3</strong><div>{ready ? 'Discovery succeeded' : 'Not confirmed'}</div></div>
+        <div><strong>Service worker</strong><div>{serviceWorkerState} · scope /browse/</div></div>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <strong>Backend DNS / TLS / HTTP checks</strong>
+        {!Object.keys(backendChecks).length && <div style={{ color: 'var(--muted)', marginTop: 4 }}>Not tested from the deployed Node runtime yet.</div>}
+        {HEALTH_TARGETS.map(target => {
+          const check = backendChecks[target];
+          if (!check) return null;
+          const tlsLabel = check.http.outcome === 'connected' ? 'TLS connected' : check.http.code === 'TLS_ERROR' ? 'TLS failed' : check.http.outcome === 'failed' ? 'TLS unverified' : 'not attempted';
+          const httpFailure = check.http.code === 'CONNECTION_RESET' ? 'connection reset before an HTTP response'
+            : check.http.code === 'CONNECTION_REFUSED' ? 'connection refused before an HTTP response'
+              : check.http.code === 'NETWORK_UNREACHABLE' ? 'network route unavailable'
+                : check.http.code === 'TIMEOUT' ? 'connection timed out'
+                  : check.http.code === 'TLS_ERROR' ? 'TLS handshake failed'
+                    : `network error (${check.http.code || 'NETWORK_ERROR'})`;
+          const httpLabel = check.http.outcome === 'connected'
+            ? `HTTP ${check.http.status}${check.http.status !== undefined && check.http.status >= 300 && check.http.status < 400 ? ' redirect not followed' : ''} · host reached`
+            : check.http.outcome === 'failed' ? `no HTTP response · ${httpFailure}` : 'HTTP not attempted';
+          return <div key={target} style={{ marginTop: 4 }}><strong style={{ textTransform: 'capitalize' }}>{target}</strong>: {check.clientError ? `diagnostic request failed (${check.clientError})` : `DNS ${check.dns.outcome}${check.dns.code ? ` (${check.dns.code})` : ''} · ${tlsLabel} · ${httpLabel}`}</div>;
+        })}
+        <div style={{ color: 'var(--muted)', marginTop: 5 }}>An HTTP 403/404 still proves the backend reached the site; it does not mean the site permits browsing or login.</div>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <strong>Recent proxied request events</strong>
+        {!diagnosticEvents.length && <div style={{ color: 'var(--muted)', marginTop: 4 }}>No failures or blocked requests recorded in this page session.</div>}
+        <ul style={{ margin: '5px 0 0', paddingLeft: 18 }}>
+          {diagnosticEvents.map((entry, index) => <li key={`${entry.at}-${index}`}>
+            {entry.at} · {entry.stage}{entry.method ? ` · ${entry.method}` : ''}{entry.requestType ? ` · ${entry.requestType}` : ''}{entry.status !== undefined ? ` · HTTP ${entry.status}` : ''}{entry.code ? ` · ${entry.code}` : ''}
+          </li>)}
+        </ul>
+      </div>
+    </section>}
     {error && <div role="alert" style={{ padding: 20, margin: 16, border: '1px solid #ae5960', borderRadius: 12, background: '#2c1920', color: '#ffd4d8' }}>
       <strong>Couldn’t connect</strong><p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{error}</p>
       <button className="play-button" onClick={() => ready && current ? navigate(address) : setAttempt(value => value + 1)}>Retry connection</button>

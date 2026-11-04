@@ -48,7 +48,13 @@ function isSameAppOrigin(req: Request, requestUrl: URL, origin: string, trustPro
 /** Preserve Bare's JSON headers and stream with Node backpressure. In particular,
  * never truncate x-bare-headers (breaks cookies/range/video), override .end(), or
  * construct a Response with a body for HEAD/204/304. WebSockets use Wisp. */
-export function createBareHandler(bare: { routeRequest: (req: IncomingMessage, res: ServerResponse) => Promise<void> }) {
+export function createBareHandler(
+  bare: { routeRequest: (req: IncomingMessage, res: ServerResponse) => Promise<void> },
+  options: { requestTimeoutMs?: number } = {},
+) {
+const requestTimeoutMs = Number.isFinite(options.requestTimeoutMs) && (options.requestTimeoutMs ?? 0) > 0
+  ? options.requestTimeoutMs!
+  : 55_000;
 return async function handle(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const origin = req.headers.get('origin');
@@ -86,7 +92,7 @@ return async function handle(req: Request): Promise<Response> {
     let resolved = false;
     let finished = false;
     const responseHeaders = new Headers();
-    const timer = setTimeout(() => fail(504, 'The upstream connection timed out.'), 55000);
+    const timer = setTimeout(() => fail(504, 'The upstream connection timed out.'), requestTimeoutMs);
     function cleanup() { if (finished) return; finished = true; clearTimeout(timer); req.signal.removeEventListener('abort', abort); }
     function abort() { incoming.aborted = true; fail(499, 'The client disconnected.'); }
     function fail(status: number, message: string) {
