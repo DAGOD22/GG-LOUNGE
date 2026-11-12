@@ -569,10 +569,8 @@
     ]
   },
   "big-tower-tiny-square": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+    "available": true,
+    "issues": []
   },
   "house-of-hazards": {
     "available": false,
@@ -697,5 +695,201 @@
     "issues": [
       "Missing local index.html"
     ]
+  },
+  "bloons-td-5": {
+    "available": true,
+    "issues": []
+  },
+  "bloons-td-6": {
+    "available": true,
+    "issues": []
+  },
+  "idle-breakout": {
+    "available": true,
+    "issues": []
+  },
+  "evil-glitch": {
+    "available": true,
+    "issues": []
+  },
+  "sand-game": {
+    "available": true,
+    "issues": []
+  },
+  "trap-the-cat": {
+    "available": true,
+    "issues": []
+  },
+  "spacebar-clicker": {
+    "available": true,
+    "issues": []
+  },
+  "pixel-speedrun": {
+    "available": true,
+    "issues": []
+  },
+  "zrist": {
+    "available": true,
+    "issues": []
+  },
+  "territorial-io": {
+    "available": true,
+    "issues": []
+  },
+  "johnny-trigger": {
+    "available": true,
+    "issues": []
+  },
+  "get-on-top": {
+    "available": true,
+    "issues": []
+  },
+  "fireblob": {
+    "available": true,
+    "issues": []
+  },
+  "boxel-rebound": {
+    "available": true,
+    "issues": []
+  },
+  "unicycle-hero": {
+    "available": true,
+    "issues": []
+  },
+  "noob-miner": {
+    "available": true,
+    "issues": []
+  },
+  "trivia-crack": {
+    "available": true,
+    "issues": []
+  },
+  "circloO": {
+    "available": true,
+    "issues": []
+  },
+  "pac-man": {
+    "available": true,
+    "issues": []
+  },
+  "coreball": {
+    "available": true,
+    "issues": []
+  },
+  "agar-io-lite": {
+    "available": true,
+    "issues": []
+  },
+  "wordle-unlimited": {
+    "available": true,
+    "issues": []
+  },
+  "2048-cupcakes": {
+    "available": true,
+    "issues": []
+  },
+  "zombie-rush": {
+    "available": true,
+    "issues": []
+  },
+  "big-ice-tower-tiny-square": {
+    "available": true,
+    "issues": []
+  },
+  "google-baseball": {
+    "available": true,
+    "issues": []
+  },
+  "tetrominoes": {
+    "available": true,
+    "issues": []
+  },
+  "jumping-shell": {
+    "available": true,
+    "issues": []
+  },
+  "monster-tracks": {
+    "available": true,
+    "issues": []
+  },
+  "blumgi-rocket": {
+    "available": true,
+    "issues": []
+  },
+  "football-legends": {
+    "available": true,
+    "issues": []
+  },
+  "choppy-orc": {
+    "available": true,
+    "issues": []
+  },
+  "stacktris": {
+    "available": true,
+    "issues": []
+  },
+  "clash-of-vikings": {
+    "available": true,
+    "issues": []
+  },
+  "tag": {
+    "available": true,
+    "issues": []
+  },
+  "bad-time-simulator": {
+    "available": true,
+    "issues": []
+  },
+  "bad-ice-cream-2": {
+    "available": true,
+    "issues": []
+  },
+  "candy-crush": {
+    "available": true,
+    "issues": []
+  },
+  "state-io": {
+    "available": true,
+    "issues": []
+  },
+  "retro-highway": {
+    "available": true,
+    "issues": []
+  },
+  "merge-round-racers": {
+    "available": true,
+    "issues": []
+  },
+  "bad-ice-cream-3": {
+    "available": true,
+    "issues": []
+  },
+  "plonky": {
+    "available": true,
+    "issues": []
+  },
+  "circloO-2": {
+    "available": true,
+    "issues": []
+  },
+  "moto-x3m-spooky-land": {
+    "available": true,
+    "issues": []
+  },
+  "iron-snout": {
+    "available": true,
+    "issues": []
+  },
+  "opposite-day": {
+    "available": true,
+    "issues": []
+  },
+  "space-is-key": {
+    "available": true,
+    "issues": []
+  },
+  "idle-dice": {
+    "available": true,
+    "issues": []
   }
 }
