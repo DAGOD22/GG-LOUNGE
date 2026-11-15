@@ -59,8 +59,16 @@ export function GameModal({
   const timeRef = useRef(0)
   const lastAchSentRef = useRef<string>('')
 
+  // Games that save in a non-localStorage format (e.g. an Emscripten/IndexedDB
+  // filesystem) upload and restore their own save through /api/save. The generic
+  // localStorage snapshot below must not run for those, or it would overwrite a
+  // real save with a key dump.
+  const SELF_MANAGED_SAVES = new Set(['leaf-blower-revolution'])
+  const selfManagedSave = SELF_MANAGED_SAVES.has(game.id)
+
   // Fix 3: improved collect/save with diff and no reload loop
   const collectSaveFromFrame = useCallback((): string | null => {
+    if (selfManagedSave) return null
     const iframe = frameRef.current
     if (!iframe?.contentWindow) return null
     try {
@@ -160,6 +168,7 @@ export function GameModal({
     if (!authUser || !game) return
     saveAppliedRef.current = false
     pendingSaveRef.current = null
+    if (selfManagedSave) return
     lastSaveDataRef.current = null
     setSaveStatus('idle')
     const abort = new AbortController()
@@ -178,11 +187,13 @@ export function GameModal({
       })
       .catch(() => {})
     return () => abort.abort()
-  }, [authUser, game, applySaveToFrame])
+  }, [authUser, game, applySaveToFrame, selfManagedSave])
 
   // Fix 3+5: autosave only when visible, diff-aware, properly cleaned
   useEffect(() => {
     if (!authUser || !game) return
+    // self-managed games upload their own save format from inside the game frame
+    if (selfManagedSave) return
     // push every 7s, but only if document visible and game focused
     const id = window.setInterval(() => {
       if (document.visibilityState === 'hidden') return
@@ -210,7 +221,7 @@ export function GameModal({
       window.removeEventListener('beforeunload', onBeforeUnload)
       if (saveAbortRef.current) saveAbortRef.current.abort()
     }
-  }, [authUser, game, pushSave, collectSaveFromFrame])
+  }, [authUser, game, pushSave, collectSaveFromFrame, selfManagedSave])
 
   // --- Achievements: fetch + heartbeat + inference ---
   useEffect(() => {

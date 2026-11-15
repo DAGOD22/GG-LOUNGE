@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Leaf Blower Revolution — Idle Game</title>
+<meta name="description" content="Leaf Blower Revolution - Idle Game by Humble North. The real GameMaker HTML5 build, hosted on GG-Lounge with GG-Lounge sign-in for cloud saves.">
+<link rel="icon" href="favicon.ico">
+<!--
+  Leaf Blower Revolution - Idle Game, by Humble North.
+
+  Everything the game needs is in this folder and served by GG-Lounge itself:
+
+      game.unx      the game itself (GameMaker data file)
+      runner.js     GameMaker HTML5 runtime
+      runner.wasm   runtime WebAssembly
+      runner.data   runtime assets
+      runner.json   runtime manifest
+
+  This page is the local host page for that runtime. No CDN, no iframe and no
+  third-party embed: the runner and the game data are fetched from this
+  directory only. Two things are added on top of the runtime:
+
+    * GG-Lounge account sign-in (real, server-side) and a cloud copy of the
+      game's own save files, so a signed-in player can resume anywhere.
+    * A progress screen while the 60 MB of game files download.
+-->
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0c1410; color: #e9f4e6;
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  #stage { position: fixed; inset: 0; background: #0c1410; }
+  canvas#canvas { display: block; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); background: #000; outline: none; touch-action: none; }
+
+  #boot { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 18px;
+    background: radial-gradient(120% 120% at 20% 0%, #16301f 0%, #0c1410 62%); }
+  #boot.hide { display: none; }
+  .card { width: min(560px, 100%); }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand img { width: 46px; height: 46px; border-radius: 12px; image-rendering: pixelated; }
+  .brand h1 { margin: 0; font-size: 21px; letter-spacing: -.02em; }
+  .brand p { margin: 3px 0 0; font-size: 12px; opacity: .6; }
+  .bar { height: 12px; border-radius: 7px; background: #20352a; overflow: hidden; margin: 18px 0 8px; }
+  .bar > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #6fcf6f, #d9e86a); transition: width .25s; }
+  .bar > i.indet { width: 34%; animation: slide 1.05s ease-in-out infinite alternate; }
+  @keyframes slide { from { margin-left: 0 } to { margin-left: 66% } }
+  .row { display: flex; justify-content: space-between; gap: 10px; font-variant-numeric: tabular-nums; font-size: 12.5px; opacity: .9; }
+  ul.files { list-style: none; margin: 14px 0 12px; padding: 0; }
+  ul.files li { display: grid; grid-template-columns: 20px 1fr auto; gap: 8px; padding: 6px 0;
+    border-top: 1px solid #1d3025; font-size: 12.5px; }
+  ul.files li small { display: block; opacity: .5; font-size: 11px; }
+  ul.files li b { font-weight: 600; text-align: right; opacity: .85; font-variant-numeric: tabular-nums; }
+  .msg { min-height: 2.6em; font-size: 12.5px; opacity: .9; }
+  .msg.bad { color: #ff9a9a; opacity: 1; }
+  .msg.warn { color: #ffd479; opacity: 1; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  button, .btn { appearance: none; border: 0; border-radius: 9px; padding: 9px 15px; font: inherit;
+    font-weight: 650; cursor: pointer; background: #6fcf6f; color: #0c1410; text-decoration: none; display: inline-block; }
+  button.ghost, .btn.ghost { background: transparent; color: #e9f4e6; border: 1px solid #3a5544; }
+  button[disabled] { opacity: .5; cursor: not-allowed; }
+  .note { margin-top: 12px; font-size: 11.5px; opacity: .55; }
+
+  #account { position: fixed; top: 10px; right: 10px; z-index: 20; display: flex; gap: 8px; align-items: center;
+    max-width: calc(100vw - 20px); padding: 6px 6px 6px 12px; border-radius: 999px;
+    background: rgba(9, 18, 13, .84); border: 1px solid #2c4335; backdrop-filter: blur(6px); font-size: 12px; }
+  #account.hide { display: none; }
+  #account .who { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+  #account .dot { width: 7px; height: 7px; border-radius: 50%; background: #6fcf6f; box-shadow: 0 0 0 3px rgba(111,207,111,.15); }
+  #account button { padding: 6px 11px; font-size: 11.5px; border-radius: 999px; }
+  #account button.ghost { border-color: #33503f; }
+
+  #toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 25;
+    display: none; gap: 10px; align-items: center; max-width: calc(100vw - 24px);
+    padding: 10px 12px 10px 14px; border-radius: 12px; background: rgba(9, 18, 13, .95);
+    border: 1px solid #2c4335; box-shadow: 0 16px 40px rgba(0,0,0,.45); font-size: 12.5px; }
+  #toast.show { display: flex; }
+  #toast button { padding: 6px 11px; font-size: 11.5px; border-radius: 999px; }
+
+  #authPanel { position: fixed; inset: 0; z-index: 40; display: none; place-items: center; padding: 16px;
+    background: rgba(4, 9, 6, .74); backdrop-filter: blur(8px); }
+  #authPanel.show { display: grid; }
+  #authPanel .sheet { width: min(400px, 100%); background: #101c15; border: 1px solid #2c4335; border-radius: 16px;
+    padding: 18px; box-shadow: 0 24px 70px rgba(0,0,0,.5); }
+  #authPanel h2 { margin: 0 0 2px; font-size: 17px; }
+  #authPanel .sub { margin: 0 0 12px; font-size: 12px; opacity: .6; }
+  #authPanel label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; opacity: .62; margin: 10px 0 5px; }
+  #authPanel input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #2c4335;
+    background: #0a1310; color: #e9f4e6; font: inherit; }
+  #authPanel .err { min-height: 1.4em; margin: 10px 0 0; font-size: 12px; color: #ff9a9a; }
+  #authPanel .foot { display: flex; gap: 10px; justify-content: space-between; align-items: center; margin-top: 10px; }
+  #authPanel .linkish { background: none; border: 0; color: #b7e86a; padding: 0; font-size: 12px;
+    text-decoration: underline; cursor: pointer; }
+  .tag { display: inline-block; padding: 2px 7px; border-radius: 999px; border: 1px solid #2c4335;
+    font-size: 10.5px; opacity: .8; margin-left: 6px; vertical-align: 2px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas></div>
+
+<div id="account" class="hide" aria-live="polite">
+  <span class="dot" aria-hidden="true"></span>
+  <span class="who" id="acctWho">Player</span>
+  <button type="button" id="acctSave" title="Upload a cloud copy of this game's save files">Save</button>
+  <button type="button" class="ghost" id="acctLogout">Sign out</button>
+</div>
+
+<div id="toast" role="status"><span id="toastMsg"></span><button type="button" id="toastAct" hidden>OK</button></div>
+
+<div id="authPanel" role="dialog" aria-modal="true" aria-label="GG-Lounge account">
+  <div class="sheet">
+    <h2 id="authTitle">Sign in to GG-Lounge</h2>
+    <p class="sub">Your GG-Lounge account keeps a cloud copy of your Leaf Blower Revolution save, so you can carry on from any device.</p>
+    <form id="authForm">
+      <div id="authRegisterExtra" style="display:none">
+        <label for="authFood">Favourite food (used for password reset)</label>
+        <input id="authFood" name="favoriteFood" type="text" autocomplete="off">
+      </div>
+      <label for="authUser">Username</label>
+      <input id="authUser" name="username" type="text" autocomplete="username" required>
+      <label for="authPass">Password</label>
+      <input id="authPass" name="password" type="password" autocomplete="current-password" required>
+      <p class="err" id="authErr"></p>
+      <div class="foot">
+        <button type="submit" id="authSubmit">Sign in</button>
+        <button type="button" class="linkish" id="authSwitch">Create an account</button>
+      </div>
+      <div class="foot">
+        <button type="button" class="linkish" id="authSkip">Keep playing signed out</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="boot">
+  <div class="card">
+    <div class="brand">
+      <img src="favicon.ico" alt="">
+      <div>
+        <h1>Leaf Blower Revolution <span class="tag">Idle Game</span></h1>
+        <p>by Humble North &middot; real GameMaker build, hosted on this site</p>
+      </div>
+    </div>
+    <div class="bar"><i id="bootFill" class="indet"></i></div>
+    <div class="row"><span id="bootPct">Starting&hellip;</span><span id="bootRate"></span></div>
+    <ul class="files" id="bootFiles"></ul>
+    <div class="msg" id="bootMsg">Loading the game engine&hellip;</div>
+    <div class="actions">
+      <button type="button" id="bootRetry" hidden>Retry</button>
+      <button type="button" class="ghost" id="bootHide" hidden>Hide this screen</button>
+    </div>
+    <p class="note">
+      Progress is saved in this browser automatically. Sign in with your GG-Lounge account (top right, or after the game
+      loads) to also keep a cloud copy. The game&rsquo;s own Humble North / GX account dialog inside the game talks to
+      Humble North&rsquo;s servers and is separate from GG-Lounge sign-in.
+    </p>
+  </div>
+</div>
+
+<script>
+/* ================================================================== *
+ * GG-Lounge account: real sign-in against this site's /api/auth
+ * ================================================================== */
+(function () {
+  var state = { user: null, onSignIn: [] };
+  var $ = function (id) { return document.getElementById(id); };
+  var panel = $('authPanel'), form = $('authForm'), mode = 'login';
+
+  function api(path, body) {
+    return fetch('/api' + path, {
+      method: body ? 'POST' : 'GET',
+      headers: body ? { 'content-type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+      credentials: 'same-origin',
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        if (!r.ok) throw new Error((data && data.error) || ('Request failed (' + r.status + ')'));
+        return data;
+      });
+    });
+  }
+
+  function render() {
+    var box = $('account');
+    if (state.user) { box.classList.remove('hide'); $('acctWho').textContent = state.user.username; }
+    else box.classList.add('hide');
+  }
+
+  function setMode(next) {
+    mode = next;
+    var reg = mode === 'register';
+    $('authTitle').textContent = reg ? 'Create a GG-Lounge account' : 'Sign in to GG-Lounge';
+    $('authSubmit').textContent = reg ? 'Create account' : 'Sign in';
+    $('authSwitch').textContent = reg ? 'I already have an account' : 'Create an account';
+    $('authRegisterExtra').style.display = reg ? '' : 'none';
+    $('authPass').setAttribute('autocomplete', reg ? 'new-password' : 'current-password');
+    $('authErr').textContent = '';
+  }
+
+  var auth = {
+    getUser: function () { return state.user; },
+    open: function () { setMode('login'); panel.classList.add('show'); setTimeout(function () { $('authUser').focus(); }, 30); },
+    close: function () { panel.classList.remove('show'); },
+    onSignIn: function (fn) { state.onSignIn.push(fn); },
+    refresh: function () {
+      return api('/auth/me').then(function (d) {
+        state.user = (d && d.user) || null;
+        render();
+        return state.user;
+      }).catch(function () { render(); return null; });
+    },
+  };
+  window.GGL_AUTH = auth;
+
+  $('authSwitch').addEventListener('click', function () { setMode(mode === 'login' ? 'register' : 'login'); });
+  $('authSkip').addEventListener('click', auth.close);
+  panel.addEventListener('click', function (e) { if (e.target === panel) auth.close(); });
+  $('acctLogout').addEventListener('click', function () {
+    fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(function () {})
+      .then(function () { state.user = null; render(); });
+  });
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var username = $('authUser').value.trim();
+    var password = $('authPass').value;
+    var favoriteFood = $('authFood').value.trim();
+    $('authErr').textContent = '';
+    $('authSubmit').disabled = true;
+    var req = mode === 'register'
+      ? api('/auth/register', { username: username, password: password, favoriteFood: favoriteFood })
+      : api('/auth/login', { username: username, password: password });
+    req.then(function (data) {
+      state.user = data.user || { username: username };
+      $('authPass').value = '';
+      render();
+      auth.close();
+      state.onSignIn.forEach(function (fn) { try { fn(state.user); } catch (err) {} });
+    }).catch(function (err) {
+      $('authErr').textContent = err.message;
+    }).then(function () { $('authSubmit').disabled = false; });
+  });
+
+  render();
+  window.GGL_AUTH_READY = auth.refresh();
+})();
+
+/* ================================================================== *
+ * Cloud saves.
+ *
+ * The game's save files live in its save folder ("/_savedata"), which the
+ * storage host in gx-storage.js keeps in IndexedDB. Reading that store gives
+ * us the game's own bytes exactly as written — save.dat, save-main.dat,
+ * save.tmp and options.dat — with nothing re-encoded.
+ * ================================================================== */
+(function () {
+  var GAME_ID = 'leaf-blower-revolution';
+  var MOUNT = '/_savedata';
+  var SAVE_FILE = /(^|\/)(save[^/]*\.(dat|tmp)|options\.dat)$/i;
+  var account = null;
+
+  function pickSaveFiles(all) {
+    var out = {};
+    Object.keys(all || {}).forEach(function (k) {
+      if (SAVE_FILE.test(k)) out[k] = all[k];
+    });
+    return out;
+  }
+
+  function readSaveFiles() {
+    if (!window.GGL_GX_SAVE) return Promise.resolve({});
+    return window.GGL_GX_SAVE.read(MOUNT).then(pickSaveFiles).catch(function () { return {}; });
+  }
+
+  function writeSaveFiles(files) {
+    if (!window.GGL_GX_SAVE) return Promise.resolve(false);
+    return window.GGL_GX_SAVE.write(files, MOUNT);
+  }
+
+  function hashString(str) {
+    var h = 2166136261;
+    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0).toString(16) + '-' + str.length;
+  }
+
+  // save.dat is ~1.2 MB of mostly-text; gzip brings it under the API's cap.
+  function gzip(bytes) {
+    if (typeof CompressionStream !== 'function') return Promise.resolve(null);
+    try {
+      var stream = new Blob([new Uint8Array(bytes)]).stream().pipeThrough(new CompressionStream('gzip'));
+      return new Response(stream).arrayBuffer().then(function (buf) { return new Uint8Array(buf); })
+        .catch(function () { return null; });
+    } catch (e) { return Promise.resolve(null); }
+  }
+
+  function gunzip(bytes) {
+    if (typeof DecompressionStream !== 'function') return Promise.resolve(null);
+    try {
+      var stream = new Blob([new Uint8Array(bytes)]).stream().pipeThrough(new DecompressionStream('gzip'));
+      return new Response(stream).arrayBuffer().then(function (buf) { return new Uint8Array(buf); })
+        .catch(function () { return null; });
+    } catch (e) { return Promise.resolve(null); }
+  }
+
+  function toB64(bytes) {
+    var bin = '', chunk = 0x8000;
+    for (var i = 0; i < bytes.length; i += chunk) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(bin);
+  }
+
+  function fromB64(str) {
+    var bin = atob(str), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+
+  // Storage format: one gzip blob for the whole save folder, base64'd inside
+  // the app-wide { data: "<json string>" } save envelope.
+  function encode(files) {
+    var names = Object.keys(files);
+    var meta = { game: GAME_ID, format: 'lbr-gzip', mount: MOUNT, keys: names, savedAt: new Date().toISOString() };
+    return Promise.all(names.map(function (k) { return gzip(files[k]); })).then(function (gz) {
+      var packed = {}, small = true;
+      names.forEach(function (k, i) {
+        if (gz[i]) packed[k] = { gz: toB64(gz[i]) }; else { packed[k] = { raw: toB64(files[k]) }; small = false; }
+      });
+      meta.files = packed;
+      meta.compressed = small;
+      return JSON.stringify(meta);
+    });
+  }
+
+  function decode(parsed) {
+    var packed = parsed && parsed.files;
+    if (!packed || !Object.keys(packed).length) return Promise.resolve(null);
+    var names = Object.keys(packed);
+    return Promise.all(names.map(function (k) {
+      var e = packed[k] || {};
+      if (e.gz) return gunzip(fromB64(e.gz)).then(function (b) { return b || new Uint8Array(0); });
+      return Promise.resolve(fromB64(e.raw || ''));
+    })).then(function (vals) {
+      var out = {};
+      names.forEach(function (k, i) { out[k] = Array.prototype.slice.call(vals[i]); });
+      return out;
+    });
+  }
+
+  // Local saves belong to whoever was signed in when they were written. If a
+  // different account turns up on this browser and the account has no cloud
+  // save of its own, the previous player's files must not be uploaded to it.
+  var OWNER_KEY = 'ggl-lbr-save-owner';
+
+  function owner() { try { return localStorage.getItem(OWNER_KEY) || ''; } catch (e) { return ''; } }
+  function setOwner(name) { try { localStorage.setItem(OWNER_KEY, name || ''); } catch (e) {} }
+
+  function ensureOwner(username) {
+    var previous = owner();
+    if (!previous || previous === username) { setOwner(username); return Promise.resolve(false); }
+    // Someone else was using this browser. Drop their local files first.
+    return (window.GGL_GX_SAVE ? window.GGL_GX_SAVE.clear(MOUNT) : Promise.resolve(false))
+      .then(function () { setOwner(username); cloud.lastHash = ''; return true; });
+  }
+
+  var cloud = {
+    lastHash: '',
+    busy: false,
+    status: 'idle',
+    read: readSaveFiles,
+    write: writeSaveFiles,
+
+    pull: function () {
+      var user = account && account.getUser();
+      if (!user) return Promise.resolve(false);
+      return ensureOwner(user.username).then(function (foreign) {
+        if (foreign) return false;
+        return fetch('/api/save/' + GAME_ID, { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data || !data.save || !data.save.data) return false;
+          var parsed;
+          try { parsed = JSON.parse(data.save.data); } catch (e) { return false; }
+          cloud.lastHash = hashString(data.save.data);
+          return decode(parsed).then(function (files) {
+            if (!files || !Object.keys(files).length) return false;
+            return writeSaveFiles(files);
+          });
+        }).catch(function () { return false; });
+      });
+    },
+
+    push: function (force) {
+      var user = account && account.getUser();
+      if (!user || cloud.busy) return Promise.resolve(false);
+      cloud.busy = true;
+      cloud.status = 'saving';
+      return ensureOwner(user.username).then(function () { return readSaveFiles(); }).then(function (files) {
+        if (!Object.keys(files).length) { cloud.busy = false; cloud.status = 'idle'; return false; }
+        return encode(files).then(function (body) {
+        cloud.busy = false;
+        var h = hashString(body);
+        if (!force && h === cloud.lastHash) { cloud.status = 'saved'; return true; }
+        var payload = JSON.stringify({ data: body });
+        // `keepalive` survives an unload, but Chromium caps its body at 64 KB,
+        // so only use it when the payload fits and otherwise send normally.
+        var init = {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          credentials: 'same-origin',
+          body: payload,
+        };
+        if (payload.length < 60000) init.keepalive = true;
+        return fetch('/api/save/' + GAME_ID, init).then(function (r) {
+          cloud.status = r.ok ? 'saved' : 'error';
+          if (r.ok) cloud.lastHash = h;
+          return r.ok;
+        });
+        });
+      }).catch(function () { cloud.busy = false; cloud.status = 'error'; return false; });
+    },
+  };
+  window.GGL_CLOUD = cloud;
+
+  // Wire the account once it exists (this script may run first).
+  var boot = setInterval(function () {
+    if (!window.GGL_AUTH) return;
+    account = window.GGL_AUTH;
+    clearInterval(boot);
+    window.GGL_CLOUD_READY = (window.GGL_AUTH_READY || Promise.resolve(null)).then(function (user) {
+      return user ? cloud.pull() : false;
+    });
+  }, 10);
+})();
+
+/* ================================================================== *
+ * Game host: download and start the GameMaker runner from js/
+ * ================================================================== */
+(function () {
+  var RUNTIME = 'js/';
+  var $ = function (id) { return document.getElementById(id); };
+  var files = {
+    unx:  { label: 'Game data',   size: 51455014, st: 'wait', loaded: 0, total: 0, host: '' },
+    data: { label: 'Engine data', size: 5868937,  st: 'wait', loaded: 0, total: 0, host: '' },
+    wasm: { label: 'Engine',      size: 5690211,  st: 'wait', loaded: 0, total: 0, host: '' }
+  };
+  var started = false, anyStarted = false, lastBytesAt = Date.now(), failure = null, doneAt = 0, samples = [];
+
+  function which(url) {
+    url = String(url || '');
+    if (/game\.unx(\?|#|$)/.test(url)) return files.unx;
+    if (/runner\.data(\?|#|$)/.test(url)) return files.data;
+    if (/runner\.wasm(\?|#|$)/.test(url)) return files.wasm;
+    return null;
+  }
+  function hostOf(url) { try { return new URL(url, location.href).host; } catch (e) { return ''; } }
+  function begin(f, url) { f.st = 'down'; f.loaded = 0; f.total = 0; f.host = hostOf(url); anyStarted = true; }
+  function progress(f, loaded, total) { if (loaded > f.loaded) lastBytesAt = Date.now(); f.loaded = loaded; if (total) f.total = total; }
+  function finish(f) { f.st = 'done'; f.loaded = f.total || f.size; lastBytesAt = Date.now(); }
+  function fail(f, why) { f.st = 'fail'; f.loaded = 0; f.total = 0; failure = { f: f, why: why }; }
+
+  // Track both transports the runtime uses for its data files.
+  var nativeFetch = window.fetch ? window.fetch.bind(window) : null;
+  if (nativeFetch) {
+    window.fetch = function (input, init) {
+      var url = typeof input === 'string' ? input : (input && input.url) || '';
+      var p = nativeFetch(input, init);
+      var f = which(url);
+      if (!f) return p;
+      begin(f, url);
+      return p.then(function (resp) {
+        if (!resp.ok) { fail(f, 'HTTP ' + resp.status); return resp; }
+        var len = +resp.headers.get('content-length') || 0;
+        try {
+          var reader = resp.clone().body.getReader(), got = 0;
+          (function pump() {
+            reader.read().then(function (chunk) {
+              if (chunk.done) return finish(f);
+              got += chunk.value.length; progress(f, got, len); pump();
+            }).catch(function () {});
+          })();
+        } catch (e) { finish(f); }
+        return resp;
+      });
+    };
+  }
+  var nativeOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (method, url) {
+    var f = which(url);
+    if (f) {
+      begin(f, url);
+      var xhr = this;
+      xhr.addEventListener('progress', function (e) { if (xhr.status < 400) progress(f, e.loaded, e.lengthComputable ? e.total : 0); });
+      xhr.addEventListener('load', function () {
+        if (xhr.status >= 200 && xhr.status < 400) finish(f); else fail(f, 'HTTP ' + xhr.status);
+      });
+      xhr.addEventListener('error', function () { fail(f, 'network error'); });
+    }
+    return nativeOpen.apply(this, arguments);
+  };
+
+  // The runtime tells us when the first frame is on screen, and reports the
+  // game-data download through these two host callbacks.
+  window.onFirstFrameRendered = function () { started = true; };
+  window.g_pWadLoadCallback = function (loaded, total) {
+    var f = files.unx;
+    if (!f) return;
+    f.st = 'down';
+    f.loaded = loaded > 0 ? loaded : 0;
+    if (total > 0) { f.total = total; f.size = total; }
+    lastBytesAt = Date.now();
+    if (total > 0 && loaded >= total) finish(f);
+  };
+
+  // "Downloading data... (123/4567)" from Module.setStatus.
+  function noteStatus(text) {
+    if (!text) return;
+    var m = /\((\d+)\s*\/\s*(\d+)\)/.exec(text);
+    if (!m) return;
+    var loaded = parseInt(m[1], 10), total = parseInt(m[2], 10);
+    if (!(total > 0)) return;
+    var f = files.data.st === 'done' ? files.unx : files.data;
+    f.st = 'down';
+    f.loaded = loaded;
+    f.total = total;
+    f.size = total;
+    lastBytesAt = Date.now();
+  }
+  window.addEventListener('error', function (e) {
+    var t = e.target;
+    if (t && t.tagName === 'SCRIPT' && t.src) failure = { f: { label: 'Script ' + t.src.split('/').pop() }, why: 'could not be loaded from this site' };
+  }, true);
+
+  function mb(n) { return (n / 1048576).toFixed(n >= 10485760 ? 0 : 1); }
+
+  function renderBoot() {
+    var now = Date.now(), list = [files.unx, files.data, files.wasm];
+    var total = 0, got = 0;
+    list.forEach(function (f) { var sz = f.total || f.size; total += sz; got += f.st === 'done' ? sz : Math.min(f.loaded, sz); });
+    var pct = Math.min(100, got / total * 100);
+    var allDone = list.every(function (f) { return f.st === 'done'; });
+    samples.push([now, got]);
+    while (samples.length > 1 && now - samples[0][0] > 3000) samples.shift();
+    var rate = samples.length > 1 ? (got - samples[0][1]) / ((now - samples[0][0]) / 1000) : 0;
+
+    var fill = $('bootFill');
+    if (anyStarted) { fill.classList.remove('indet'); fill.style.width = (started ? 100 : pct) + '%'; }
+    $('bootPct').textContent = started ? 'Starting…' : anyStarted ? Math.floor(pct) + '%  (' + mb(got) + ' / ' + mb(total) + ' MB)' : 'Starting…';
+    $('bootRate').textContent = (!allDone && rate > 1024) ? (rate / 1048576).toFixed(1) + ' MB/s' : '';
+    $('bootFiles').innerHTML = list.map(function (f) {
+      var icon = f.st === 'done' ? '✔' : f.st === 'fail' ? '✖' : f.st === 'down' ? '⬇' : '…';
+      var sz = f.total || f.size;
+      var amount = f.st === 'done' ? mb(sz) + ' MB'
+        : f.st === 'down' ? mb(f.loaded) + ' / ' + mb(sz) + ' MB'
+        : f.st === 'fail' ? 'failed' : 'waiting';
+      return '<li><span>' + icon + '</span><span>' + f.label + (f.host ? '<small>' + f.host + '</small>' : '') + '</span><b>' + amount + '</b></li>';
+    }).join('');
+
+    var msg = $('bootMsg'), cls = 'msg', text = 'Downloading game files…';
+    if (failure) {
+      cls += ' bad';
+      text = failure.f.label + ' failed: ' + failure.why + '. Reload to try again.';
+      $('bootRetry').hidden = false;
+    } else if (started) {
+      text = 'Game is starting…';
+    } else if (!anyStarted) {
+      text = 'Loading the game engine from this site…';
+    } else if (!allDone && now - lastBytesAt > 12000) {
+      cls += ' warn';
+      text = 'Nothing received for ' + Math.round((now - lastBytesAt) / 1000) + ' s — the connection stalled. Reloading may help.';
+    } else if (allDone) {
+      if (!doneAt) doneAt = now;
+      text = 'Download complete. Preparing the game…';
+      if (now - doneAt > 12000) {
+        cls += ' warn';
+        text = 'The files are loaded but the game has not started yet. This can take a moment on slower devices.';
+        $('bootHide').hidden = false;
+      }
+    }
+    msg.className = cls;
+    msg.textContent = text;
+    return started;
+  }
+
+  function pollBoot() {
+    var done = renderBoot();
+    if (done) {
+      setTimeout(function () { $('boot').classList.add('hide'); }, 700);
+      setTimeout(function () { var b = $('boot'); if (b && b.parentNode) b.parentNode.removeChild(b); }, 1800);
+      return;
+    }
+    setTimeout(pollBoot, 250);
+  }
+  pollBoot();
+  $('bootRetry').addEventListener('click', function () { location.reload(); });
+  $('bootHide').addEventListener('click', function () { $('boot').classList.add('hide'); });
+
+  // Canvas fit: the game draws a 16:9 picture and asks the browser for the
+  // screen size once, so we keep our own letterbox while it owns the buffer.
+  function fitCanvas() {
+    var c = document.querySelector('canvas');
+    if (!c) return;
+    var cw = c.width || 0, ch = c.height || 0;
+    if (!cw || !ch) return;
+    var vw = window.innerWidth || document.documentElement.clientWidth;
+    var vh = window.innerHeight || document.documentElement.clientHeight;
+    var scale = Math.min(vw / cw, vh / ch);
+    var w = Math.max(1, Math.round(cw * scale)), h = Math.max(1, Math.round(ch * scale));
+    if (c.style.width !== w + 'px') c.style.width = w + 'px';
+    if (c.style.height !== h + 'px') c.style.height = h + 'px';
+  }
+  window.onGameSetWindowSize = fitCanvas;
+  window.addEventListener('resize', fitCanvas);
+  window.addEventListener('orientationchange', function () { setTimeout(fitCanvas, 150); setTimeout(fitCanvas, 500); });
+
+  // The runner reads screen.width/height as the display size, once, at start.
+  try {
+    Object.defineProperty(screen, 'width', { configurable: true, get: function () { return 1920; } });
+    Object.defineProperty(screen, 'height', { configurable: true, get: function () { return 1080; } });
+  } catch (e) {}
+
+  // Module + the bare globals the GameMaker runtime expects.
+  window.gameRuntimeDir = RUNTIME;
+  window.Module = {
+    canvas: document.getElementById('canvas'),
+    locateFile: function (path) { return RUNTIME + path; },
+    setStatus: function (text) {
+      noteStatus(text);
+      document.title = text ? text + ' — Leaf Blower Revolution' : 'Leaf Blower Revolution';
+    },
+    monitorRunDependencies: function (left) {
+      if (left === 0) document.title = 'Leaf Blower Revolution';
+    },
+  };
+
+  // Manifest exactly as the game's published HTML5 build ships it
+  // (runner.json in this folder) so the runtime's cache/asset list matches.
+  var MANIFEST = ['runner.data', 'runner.js', 'runner.wasm', 'audio-worklet.js', 'game.unx'];
+  var MANIFEST_MD5 = [
+    '376106ee3abe5c122a94eb521c669f06',
+    '0db3aff0cd53b31628505ed0741c854d',
+    '9f2d2ae08c0bc749b040f83f74427502',
+    'e8f1e8db8cf996f8715a6f2164c2e44e',
+    'c920d3b018092c41fb0a1619af598ba5'
+  ];
+  window.manifestFiles = function () { return MANIFEST.join(';'); };
+  window.manifestFilesMD5 = function () { return MANIFEST_MD5; };
+  window.g_pAddAsyncMethod = -1;
+  window.setAddAsyncMethod = function (fn) { window.g_pAddAsyncMethod = fn; };
+  window.g_pWadLoadCallback = null;
+  window.setWadLoadCallback = function (fn) { window.g_pWadLoadCallback = fn; };
+
+  function loadRunner() {
+    // Storage host must exist before the runtime mounts /_savedata.
+    var s = document.createElement('script');
+    s.src = RUNTIME + 'runner.js';
+    s.onerror = function () {
+      failure = { f: { label: 'runner.js' }, why: 'could not be loaded from this site' };
+      $('bootRetry').hidden = false;
+    };
+    document.body.appendChild(s);
+    setInterval(function () { fitCanvas(); if (window.GGL_AUTH && window.GGL_AUTH.getUser()) updateSaveButton(); }, 2000);
+  }
+
+  function startRunner() {
+    // Order matters: the account relay must be installed before the runtime
+    // makes any request, so the game's own sign-in dialog reaches its official
+    // account server through this site (see account-relay.js).
+    var storage = document.createElement('script');
+    storage.src = 'gx-storage.js';
+    storage.onload = storage.onerror = function () {
+      var relay = document.createElement('script');
+      relay.src = 'account-relay.js';
+      relay.onload = loadRunner;
+      relay.onerror = loadRunner; // game still runs; sign-in then falls back to the direct server
+      document.body.appendChild(relay);
+    };
+    document.body.appendChild(storage);
+  }
+
+  function updateSaveButton() {
+    var cloud = window.GGL_CLOUD;
+    if (!cloud) return;
+    var btn = $('acctSave');
+    if (cloud.status === 'saving') btn.textContent = 'Saving…';
+    else if (cloud.status === 'saved') btn.textContent = 'Saved ✓';
+    else btn.textContent = 'Save';
+  }
+
+  // Cloud save autosave + wiring. Wait for the cloud module's first pull so a
+  // restored save is in place before the GameMaker filesystem mounts.
+  function wireCloud() {
+    var cloud = window.GGL_CLOUD;
+    if (!cloud) { setTimeout(wireCloud, 50); return; }
+    if (!$('acctSave').dataset.wired) {
+      $('acctSave').dataset.wired = '1';
+      $('acctSave').addEventListener('click', function () {
+        if (!window.GGL_AUTH.getUser()) { window.GGL_AUTH.open(); return; }
+        window.GGL_CLOUD.push(true);
+      });
+      window.GGL_AUTH.onSignIn(function () {
+        window.GGL_CLOUD.pull().then(function (restored) {
+          if (restored) {
+            showToast('Cloud save copied into this browser. Reload to continue from it.', 'Reload', function () { location.reload(); });
+          } else {
+            window.GGL_CLOUD.push(true).then(function (ok) {
+              if (ok) showToast('Signed in. This browser\u2019s save is in your cloud slot.', 'OK');
+            });
+          }
+        });
+      });
+      // The game just wrote save.dat / options.dat: mirror it to the account,
+      // debounced so a burst of writes still costs one upload.
+      window.addEventListener('ggl:save-written', function () {
+        if (!window.GGL_AUTH.getUser()) return;
+        clearTimeout(wireCloud._push);
+        wireCloud._push = setTimeout(function () { window.GGL_CLOUD.push(false); }, 4000);
+      });
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'hidden' && window.GGL_AUTH.getUser()) window.GGL_CLOUD.push(true);
+      });
+      window.addEventListener('pagehide', function () {
+        if (window.GGL_AUTH.getUser()) window.GGL_CLOUD.push(true);
+      });
+      setInterval(function () {
+        if (!window.GGL_AUTH.getUser()) return;
+        if (document.visibilityState === 'hidden') return;
+        window.GGL_CLOUD.push(false);
+      }, 45000);
+    }
+    (window.GGL_CLOUD_READY || Promise.resolve(false)).then(startRunner);
+  }
+  wireCloud();
+
+  function showToast(message, label, action) {
+    var box = $('toast'), btn = $('toastAct');
+    $('toastMsg').textContent = message;
+    box.classList.add('show');
+    btn.hidden = !label;
+    if (label) btn.textContent = label;
+    btn.onclick = function () { box.classList.remove('show'); if (action) action(); };
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function () { box.classList.remove('show'); }, 12000);
+  }
+})();
+</script>
+</body>
+</html>

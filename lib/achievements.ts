@@ -363,6 +363,15 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'gd_100_attempts', gameId: 'geometry-dash', title: 'Masochist', description: 'Attempt a level 100 times', icon: '😵', tier: 'platinum', target: 100, unit: 'attempts', points: 50, rarity: 'epic' },
   { id: 'hole_500_eats', gameId: 'holeio', title: 'Consume Everything', description: 'Eat 500 objects in total', icon: '🕳️✨', tier: 'diamond', target: 500, unit: 'eats', points: 80, rarity: 'legendary' },
 
+  // Leaf Blower Revolution — Idle Game (Humble North)
+  { id: 'lbr_first_leaf', gameId: 'leaf-blower-revolution', title: 'First Gust', description: 'Blow your very first leaf', icon: '🍂', tier: 'bronze', target: 1, unit: 'leaves', points: 5, rarity: 'common' },
+  { id: 'lbr_autoblower', gameId: 'leaf-blower-revolution', title: 'Hired Help', description: 'Buy your first autoblower', icon: '🤖', tier: 'bronze', target: 1, unit: 'autoblowers', points: 15, rarity: 'common' },
+  { id: 'lbr_1k_leaves', gameId: 'leaf-blower-revolution', title: 'Neighbourhood Menace', description: 'Blow 1,000 leaves', icon: '🌪️', tier: 'silver', target: 1000, unit: 'leaves', points: 20, rarity: 'common' },
+  { id: 'lbr_prestige', gameId: 'leaf-blower-revolution', title: 'New Leaf', description: 'Prestige for the first time', icon: '♻️', tier: 'silver', target: 1, unit: 'prestiges', points: 30, rarity: 'rare' },
+  { id: 'lbr_autoblowers_10', gameId: 'leaf-blower-revolution', title: 'Set and Forget', description: 'Own 10 autoblowers', icon: '⚙️', tier: 'gold', target: 10, unit: 'autoblowers', points: 40, rarity: 'rare' },
+  { id: 'lbr_1m_leaves', gameId: 'leaf-blower-revolution', title: 'Leaf Baron', description: 'Blow 1,000,000 leaves', icon: '💰', tier: 'gold', target: 1000000, unit: 'leaves', points: 50, rarity: 'epic' },
+  { id: 'lbr_1b_leaves', gameId: 'leaf-blower-revolution', title: 'Leaf Universe', description: 'Blow 1,000,000,000 leaves', icon: '🌌', tier: 'diamond', target: 1000000000, unit: 'leaves', points: 100, rarity: 'legendary' },
+
 ]
 
 export function getAchievementsForGame(gameId: string): Achievement[] {
