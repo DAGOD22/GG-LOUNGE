@@ -85,8 +85,49 @@ export const MAX_HTML_BYTES = 50 * 1024 * 1024; // 50MB per game (chunked upload
 export const MAX_CHUNK_BYTES = 1024 * 1024; // 1MB per request (serverless limits)
 export const MAX_ICON_BYTES = 300 * 1024; // 300KB favicon (data URL)
 
+/**
+ * Connection string for the managed Postgres we run on.
+ *
+ * Vercel's Neon/Postgres integrations inject POSTGRES_URL (and friends) rather
+ * than DATABASE_URL, so looking only at DATABASE_URL dropped every serverless
+ * deployment onto the local JSON fallback — which is read-only on Vercel, making
+ * sign-up/sign-in appear broken. Accept the integration names, and repair the
+ * URL if the integration hands us one without a scheme or with a dbname that
+ * the pooled endpoint does not accept.
+ */
+export function getDatabaseUrl(): string | null {
+  const candidates = [
+    process.env.DATABASE_URL,
+    process.env.POSTGRES_URL,
+    process.env.DATABASE_URL_UNPOOLED,
+    process.env.POSTGRES_PRISMA_URL,
+    process.env.POSTGRES_URL_NON_POOLING,
+  ];
+  for (const raw of candidates) {
+    const value = raw?.trim();
+    if (!value) continue;
+    let url = value;
+    if (!/^postgres(ql)?:\/\//i.test(url)) url = `postgresql://${url}`;
+    try {
+      const parsed = new URL(url);
+      if (!parsed.searchParams.get("sslmode") && !/localhost|127\.0\.0\.1/.test(parsed.hostname)) {
+        parsed.searchParams.set("sslmode", "require");
+      }
+      return parsed.href;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+/** True when this process can't persist anything (serverless, no database). */
+function isEphemeralHost(): boolean {
+  return Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY);
+}
+
 export function getMode(): DbMode {
-  return process.env.DATABASE_URL ? "postgres" : "local";
+  return getDatabaseUrl() ? "postgres" : "local";
 }
 
 /* ---------------- Postgres ---------------- */
@@ -95,7 +136,7 @@ let pool: Pool | null = null;
 function getPool(): Pool {
   if (!pool) {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: getDatabaseUrl() || undefined,
       max: 5,
       idleTimeoutMillis: 15000,
       connectionTimeoutMillis: 10000,
@@ -275,6 +316,13 @@ interface LocalStore {
 let localDir: string | null = null;
 async function getLocalDir(): Promise<string> {
   if (localDir) return localDir;
+  // On a serverless host the filesystem is ephemeral and mostly read-only, so
+  // writing "accounts" there would lose them. Fail loudly instead of pretending.
+  if (isEphemeralHost()) {
+    throw new Error(
+      "Accounts need the Postgres database. Set DATABASE_URL (or connect the Neon/Vercel Postgres integration) and redeploy.",
+    );
+  }
   const candidates = [
     process.env.DATA_DIR,
     path.join(process.cwd(), ".data"),

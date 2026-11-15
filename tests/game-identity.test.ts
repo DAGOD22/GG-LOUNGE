@@ -28,6 +28,8 @@ test('playable catalog never advertises a missing entry point or duplicates', ()
   for(const game of games) assert.ok(existsSync('public'+game.path),game.id);
   assert.equal(dedupeGames(games).length,games.length);
   assert.equal(games.length+unavailableGames.length,dedupeGames(catalogGames).length);
-  assert.ok(unavailableGames.some(game=>game.id==='geometry-dash'));
+  // Geometry Dash used to be an empty stub; it now ships the real Griffpatch
+  // port, so the playable test asserts the opposite: it must be playable.
+  assert.ok(games.some(game=>game.id==='geometry-dash'));
   assert.ok(games.some(game=>game.id==='minecraft-classic'));
 });

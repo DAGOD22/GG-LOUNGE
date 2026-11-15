@@ -1,4 +1,4 @@
-import { readFile, writeFile, access } from 'node:fs/promises';
+import { readFile, writeFile, access, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import ts from 'typescript';
 const publicRoot = resolve('public');
@@ -21,7 +21,17 @@ const rows = entries.map(entry => {
 });
 const exists = async file => { try { await access(file); return true; } catch { return false; } };
 const audit = {};
-for (const game of rows) {
+// Installed entries that are no longer listed still get a row, so "available"
+// means "real, runnable build on disk" rather than "mentioned in the catalogue".
+const rowIds = new Set(rows.map(row => row.id));
+const extraRows = [];
+for (const id of await readdir(resolve(publicRoot, 'games'))) {
+  if (rowIds.has(id)) continue;
+  const entry = resolve(publicRoot, 'games', id, 'index.html');
+  if (!await exists(entry)) continue;
+  extraRows.push({ id, title: id, path: `/games/${id}/index.html` });
+}
+for (const game of [...rows, ...extraRows]) {
   const issues = [];
   const entry = resolve(publicRoot, '.' + game.path);
   if (!await exists(entry)) issues.push('Missing local index.html');
@@ -30,11 +40,17 @@ for (const game of rows) {
     if (/data-gg-game-state="missing-assets"/.test(html)) issues.push('Authorized browser build not installed');
     if (/<base\b[^>]+href=["']https?:|document\.write\(['"]<base/i.test(html)) issues.push('Remote CDN loader, not a local game');
     if (/<iframe\b[^>]+src=["'](?:https?:)?\/\//i.test(html)) issues.push('External embed, not local game files');
-    for (const [,ref] of html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)) {
+    // Ignore commented-out markup: several builds ship disabled experiment
+    // blocks referencing files that were never part of the release.
+    const activeHtml = html.replace(/<!--[\s\S]*?-->/g, '');
+    for (const [,ref] of activeHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)) {
       if (/^(data:|blob:)/i.test(ref)) continue;
       const url = new URL(ref, 'https://local.invalid' + game.path);
       if (url.origin !== 'https://local.invalid') { issues.push('External runtime script: ' + url.hostname); continue; }
-      const target = resolve(publicRoot, '.' + decodeURIComponent(url.pathname));
+      let decodedPath;
+      try { decodedPath = decodeURIComponent(url.pathname); }
+      catch { issues.push('Invalid script path encoding'); continue; }
+      const target = resolve(publicRoot, '.' + decodedPath);
       if (!target.startsWith(publicRoot + '/')) { issues.push('Invalid script path'); continue; }
       if (!await exists(target)) issues.push('Missing runtime: ' + url.pathname);
       else if (/^\s*<(?:!doctype|html)/i.test((await readFile(target,'utf8')).slice(0,200))) issues.push('Runtime contains an HTML error page: ' + url.pathname);

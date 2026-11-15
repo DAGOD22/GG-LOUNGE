@@ -8,39 +8,15 @@
  * ever talks to the lounge itself ("school mode").
  */
 
+// Instance list lives in lib/yt-instances.ts
+import { PIPED_INSTANCES } from "@/lib/yt-instances";
+export { PIPED_INSTANCES };
+
 // Public Piped API instances (https://github.com/TeamPiped/documentation).
 // CDN-backed instances first — tokhmi/moomoo/syncpundit are the healthiest 2025-2026 (rarely 502).
 // kavin.rocks is kept but de-prioritised because it frequently 502s in schools.
 // The proxy rotates with fallback, so ordering matters only for the first attempt.
-export const PIPED_INSTANCES = [
-  "https://pipedapi.tokhmi.xyz",
-  "https://pipedapi.moomoo.me",
-  "https://pipedapi.syncpundit.io",
-  "https://api-piped.mha.fi",
-  "https://piped-api.garudalinux.org",
-  "https://pipedapi.rivo.lol",
-  "https://pipedapi.leptons.xyz",
-  "https://piped-api.lunar.icu",
-  "https://ytapi.dc09.ru",
-  "https://pipedapi.colinslegacy.com",
-  "https://yapi.vyper.me",
-  "https://api.looleh.xyz",
-  "https://piped-api.cfe.re",
-  "https://pipedapi.r4fo.com",
-  "https://pipedapi.nosebs.ru",
-  "https://pipedapi.kavin.rocks",
-  "https://pipedapi-libre.kavin.rocks",
-  "https://pipedapi.adminforge.de",
-  "https://api.piped.yt",
-  "https://pipedapi.drgns.space",
-  "https://pipedapi.ducks.party",
-  "https://api.piped.private.coffee",
-  "https://pipedapi.reallyaweso.me",
-  "https://pipedapi.codespace.cz",
-  "https://pipedapi.orangenet.cc",
-  "https://pipedapi.owo.si",
-  "https://pipedapi.darkness.services",
-] as const;
+
 
 // Hosts we are willing to proxy bytes for (video/audio/images).
 // Piped stream URLs come from pipedproxy-* hosts or googlevideo; thumbnails
@@ -130,6 +106,9 @@ export async function fetchWithTimeout(
     clearTimeout(timer);
   }
 }
+
+/** Self-check endpoint that the UI probes once per session. */
+export const PIPED_PROBE_PATH = "/streams/dQw4w9WgXcQ";
 
 export type PipedResult =
   | { ok: true; data: unknown; instance: string; status: number }

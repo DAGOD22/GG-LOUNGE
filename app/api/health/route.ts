@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 
+import { getDatabaseUrl } from "@/lib/db";
+
 export const dynamic = 'force-dynamic'
 
 const PIPED_PROBE = 'https://pipedapi.tokhmi.xyz/streams/dQw4w9WgXcQ'
@@ -58,7 +60,7 @@ export async function GET() {
       checks,
       gamesCount,
       env: {
-        hasDatabase: !!process.env.DATABASE_URL,
+        hasDatabase: !!getDatabaseUrl(),
         siteUrl: process.env.NEXT_PUBLIC_SITE_URL || null,
       },
     },
