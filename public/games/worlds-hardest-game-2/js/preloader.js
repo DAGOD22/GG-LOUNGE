@@ -52,6 +52,10 @@ function initSounds() {
 	soundsToMute.push(sfx_door);
 	
 
+    // GG-Lounge: this build ships without the looping soundtrack. Treat the
+    // missing file as loaded so the asset counter still completes and the game
+    // starts; music.play() on a failed element is a harmless no-op.
+    music.addEventListener           ("error", soundLoaded);
     music.addEventListener           ("canplaythrough", soundLoaded);
     sfx_bounce0.addEventListener     ("canplaythrough", soundLoaded);
     sfx_bounce1.addEventListener     ("canplaythrough", soundLoaded);
