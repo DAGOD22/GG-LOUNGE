@@ -1,4 +1,38 @@
 {
+  "2048": {
+    "available": true,
+    "issues": []
+  },
+  "krunker": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "1v1-lol": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "skribbl": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "slither": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "agar": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "geoguessr": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
   "suika": {
     "available": true,
     "issues": []
@@ -280,6 +314,42 @@
     "issues": []
   },
   "basketball-stars": {
+    "available": true,
+    "issues": []
+  },
+  "smashkarts": {
+    "available": true,
+    "issues": []
+  },
+  "DogeMiner": {
+    "available": true,
+    "issues": []
+  },
+  "defend-the-tank": {
+    "available": true,
+    "issues": []
+  },
+  "boxhead2play": {
+    "available": true,
+    "issues": []
+  },
+  "canyondefense": {
+    "available": true,
+    "issues": []
+  },
+  "adrenaline-challenge": {
+    "available": true,
+    "issues": []
+  },
+  "tosstheturtle": {
+    "available": true,
+    "issues": []
+  },
+  "matrixrampage": {
+    "available": true,
+    "issues": []
+  },
+  "gimme-the-airpod": {
     "available": true,
     "issues": []
   },
@@ -620,6 +690,10 @@
     "issues": []
   },
   "motox3m": {
+    "available": true,
+    "issues": []
+  },
+  "meme-2048": {
     "available": true,
     "issues": []
   },

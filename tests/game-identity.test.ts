@@ -25,7 +25,10 @@ test('merges Cat Pizza votes, keeps oldest stable ID and does not mutate source 
   assert.equal(output.length,2);assert.equal(output[0].id,'a');assert.equal(output[0].votes,4);assert.equal(rows[1].votes,2);
 });
 test('playable catalog never advertises a missing entry point or duplicates', () => {
-  for(const game of games) assert.ok(existsSync('public'+game.path),game.id);
+  // Proxy-mounted titles are live services with no local build; every other
+  // playable entry must resolve to a real file on disk.
+  for(const game of games) if(!game.proxy) assert.ok(existsSync('public'+game.path),game.id);
+  for(const game of games) if(game.proxy) assert.match(game.path,/^https:\/\//,game.id);
   assert.equal(dedupeGames(games).length,games.length);
   assert.equal(games.length+unavailableGames.length,dedupeGames(catalogGames).length);
   // Geometry Dash used to be an empty stub; it now ships the real Griffpatch

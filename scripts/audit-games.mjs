@@ -31,7 +31,13 @@ for (const id of await readdir(resolve(publicRoot, 'games'))) {
   if (!await exists(entry)) continue;
   extraRows.push({ id, title: id, path: `/games/${id}/index.html` });
 }
+// Games that only exist as a live service (multiplayer servers, CDNs we cannot
+// mirror) are mounted through the in-app proxy. They carry an absolute https
+// path plus proxy:true and have no local build to audit.
+const proxyRows = rows.filter(row => /^https:\/\//.test(row.path));
+for (const row of proxyRows) { audit[row.id] = { available: true, proxy: true, issues: [] }; }
 for (const game of [...rows, ...extraRows]) {
+  if (/^https:\/\//.test(game.path)) continue;
   const issues = [];
   const entry = resolve(publicRoot, '.' + game.path);
   if (!await exists(entry)) issues.push('Missing local index.html');

@@ -8,7 +8,7 @@ import { unavailableGames, getGameAssetIssues } from '@/lib/games'
 import Fuse from 'fuse.js'
 import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap, LayoutGrid, Rows3, Shuffle, ExternalLink, Copy, AlertCircle, Loader2, ChevronLeft, ChevronRight, Sun, Moon, Download, Flag, Flame, Crown, Gift, Monitor, Keyboard, Bug, ThumbsUp, Globe, MessageSquare, Star, Timer, WifiOff, Wifi, Filter, ArrowUpDown, Eye, EyeOff, ShieldAlert, ListFilter, Users, LogIn, LogOut, User, Cloud, CloudOff, Save, Menu } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, CONTROLS_LEGEND, hashDay, gameOfDayIndex, PROXY_TILES, isNearDuplicate, normalizeTitle } from '@/lib/games'
+import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, CONTROLS_LEGEND, hashDay, gameOfDayIndex, PROXY_TILES, isNearDuplicate, normalizeTitle, curatedRank } from '@/lib/games'
 import type { Game } from '@/lib/games'
 import { GameCard, ShelfCard } from '@/components/GameCard'
 import { LibraryToolbar } from '@/components/LibraryToolbar'
@@ -294,8 +294,10 @@ export default function Page() {
       if (sortBy==='popular') base = [...base].sort((a,b)=> (playCounts[b.id]||0) - (playCounts[a.id]||0))
       else if (sortBy==='az') base = [...base].sort((a,b)=> a.title.localeCompare(b.title))
       else if (sortBy==='newest') base = [...base].reverse()
-      // featured first when default
-      else base = [...base].sort((a,b)=> (b.featured?1:0) - (a.featured?1:0))
+      // default order is the hand-ranked best-of list, then featured tiles
+      else base = [...base].sort((a,b)=>
+        curatedRank(a.id) - curatedRank(b.id) || (b.featured?1:0) - (a.featured?1:0)
+      )
       return base
     },
     [allGames, favorites, filter, query, playCounts, sortBy, hideLow, showStaffOnly, searchIndex, fuse],
@@ -323,7 +325,7 @@ export default function Page() {
     }
     return Object.entries(map).sort((a,b)=> b[1].length - a[1].length)
   }, [visibleGames, view, filter, query])
-  const staffGames = useMemo(()=> allGames.filter(g=> STAFF_PICKS.includes(g.id)), [allGames])
+  const staffGames = useMemo(()=> STAFF_PICKS.map(id=> allGames.find(g=> g.id===id)).filter((g): g is Game => Boolean(g)), [allGames])
 
   const spotlight = featuredGames[spotIdx] || games[0]
   const gameOfDay = useMemo(()=> {

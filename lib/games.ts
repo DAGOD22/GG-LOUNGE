@@ -1,6 +1,6 @@
 import assetAudit from "./game-assets.json";
 import { dedupeGames } from "./game-identity";
-export type Game = { id: string; title: string; subtitle: string; description: string; genre: string; tone: string; mark: string; color: string; path: string; icon?: string; featured?: boolean }
+export type Game = { id: string; title: string; subtitle: string; description: string; genre: string; tone: string; mark: string; color: string; path: string; icon?: string; featured?: boolean; proxy?: boolean }
 // Icons: local 512x512 webp — generated via PIL, hash-distributed colors
 export function getGameIconUrl(id: string): string {
   // Prefer WebP (75% smaller: 8-45KB vs 200KB png), fallback to png via <img onError> in GameCard
@@ -87,6 +87,26 @@ export const catalogGames: Game[] = [
   { id: 'minecraft-classic', title: 'Minecraft Classic', subtitle: 'The original, in a tab.', description: "The bundled Classic browser client, repaired to start in offline single-player mode.", genre: 'Sandbox', tone: 'Blocky', mark: 'MC', color: 'twenty', path: '/games/minecraft-classic/index.html', icon: getGameIconUrl('minecraft-classic') },
             { id: 'twitch-tetris', title: 'Tetris', subtitle: 'Pure blocks.', description: "A clean modern Tetris — spin, drop, clear.", genre: 'Puzzle', tone: 'Retro', mark: 'TE', color: 'devil', path: '/games/twitch-tetris/index.html', icon: getGameIconUrl('twitch-tetris') },
       { id: 'basketball-stars', title: 'Basketball Stars', subtitle: 'Ball is life.', description: "Fast 1v1 hoops — shoot, steal and dunk on your rival.", genre: 'Arcade', tone: 'Chaos', mark: 'BS', color: 'frost', path: '/games/basketball-stars/index.html', icon: getGameIconUrl('basketball-stars') },
+  // Live-service titles: there is no build we can legally mirror and they need
+  // their own servers, so they launch inside the in-app proxy at the game's own
+  // page — never the surrounding site chrome.
+  { id: 'krunker', title: 'Krunker', subtitle: 'Browser FPS, no download.', description: "The full Krunker client running from its own site: pick a lobby, pick a class, and jump straight into a match.", genre: 'Battle', tone: 'Arena', mark: 'KR', color: 'neon', path: 'https://krunker.io/?game=SV', icon: getGameIconUrl('krunker'), proxy: true },
+  { id: '1v1-lol', title: '1v1.LOL', subtitle: 'Build. Shoot. Win.', description: "The real 1v1.LOL client — build, edit and fight in a live duel. Opens through the built-in browser, no install.", genre: 'Battle', tone: 'Arena', mark: '1v', color: 'coral', path: 'https://1v1.lol/', icon: getGameIconUrl('1v1-lol'), proxy: true },
+  { id: 'skribbl', title: 'Skribbl.io', subtitle: 'Draw. Guess. Chaos.', description: "Free multiplayer pictionary with your friends — create a private room and share the code.", genre: 'Community', tone: 'Party', mark: 'SB', color: 'frost', path: 'https://skribbl.io/', icon: getGameIconUrl('skribbl'), proxy: true },
+  { id: 'slither', title: 'Slither.io', subtitle: 'Eat. Grow. Trap.', description: "The original .io snake arena — real players, real servers, one leaderboard.", genre: 'Arcade', tone: 'Arena', mark: 'SL', color: 'forest', path: 'https://slither.io/', icon: getGameIconUrl('slither'), proxy: true },
+  { id: 'agar', title: 'Agar.io', subtitle: 'Become the biggest cell.', description: "The classic cell-eating multiplayer arena that started the .io wave.", genre: 'Arcade', tone: 'Arena', mark: 'AG', color: 'plasma', path: 'https://agar.io/', icon: getGameIconUrl('agar'), proxy: true },
+  { id: 'geoguessr', title: 'GeoGuessr', subtitle: 'Where on earth?', description: "Drop somewhere on the planet and work out where you are from the street view alone. Free daily challenge.", genre: 'Puzzle', tone: 'Travel', mark: 'GG', color: 'sunset', path: 'https://www.geoguessr.com/', icon: getGameIconUrl('geoguessr'), proxy: true },
+  { id: '2048', title: '2048', subtitle: 'Just one more merge.', description: "Slide the tiles, merge the numbers, and chase the 2048 square in the original browser puzzle hit.", genre: 'Puzzle', tone: 'Numbers', mark: '2K', color: 'cream', path: '/games/2048/index.html', icon: getGameIconUrl('2048') },
+  { id: 'smashkarts', title: 'Smash Karts', subtitle: 'Karts with guns.', description: "Online kart combat — grab weapons, blow up the lobby, and steal first place.", genre: 'Racing', tone: 'Arena', mark: 'SK', color: 'drive', path: '/games/smashkarts/index.html', icon: getGameIconUrl('smashkarts') },
+  { id: 'ragdoll-archers', title: 'Ragdoll Archers', subtitle: 'Loose and let go.', description: "Two ragdoll archers, floppy physics, and a duel where every shot is a comedy.", genre: 'Battle', tone: 'Physics', mark: 'RA', color: 'coral', path: '/games/ragdoll-archers/index.html', icon: getGameIconUrl('ragdoll-archers') },
+  { id: 'DogeMiner', title: 'Doge Miner', subtitle: 'Much digging. Very gold.', description: "Mine with a dodgeball-loving shiba, buy upgrades and stack ridiculous doge profits.", genre: 'Idle', tone: 'Retro', mark: 'DG', color: 'youtube', path: '/games/DogeMiner/index.html', icon: getGameIconUrl('DogeMiner') },
+  { id: 'defend-the-tank', title: 'Defend the Tank', subtitle: 'Hold the line.', description: "Fortify a lone tank against waves of attackers, and spend the loot between fights.", genre: 'Arcade', tone: 'Defence', mark: 'DT', color: 'forest', path: '/games/defend-the-tank/index.html', icon: getGameIconUrl('defend-the-tank') },
+  { id: 'boxhead2play', title: 'Boxhead Returns', subtitle: 'Zombies, squared.', description: "The classic top-down zombie survival shooter — gun, grenades, and endless swarms.", genre: 'Battle', tone: 'Survival', mark: 'BH', color: 'devil', path: '/games/boxhead2play/index.html', icon: getGameIconUrl('boxhead2play') },
+  { id: 'canyondefense', title: 'Canyon Defense', subtitle: 'Nothing gets through.', description: "Build a tower gauntlet down a canyon and stop every convoy before it reaches base.", genre: 'Puzzle', tone: 'Strategy', mark: 'CD', color: 'frost', path: '/games/canyondefense/index.html', icon: getGameIconUrl('canyondefense') },
+  { id: 'adrenaline-challenge', title: 'Adrenaline Challenge', subtitle: 'No brakes needed.', description: "Downhill BMX at full tilt — pull tricks, land clean and beat the clock.", genre: 'Racing', tone: 'Stunts', mark: 'AC', color: 'neon', path: '/games/adrenaline-challenge/index.html', icon: getGameIconUrl('adrenaline-challenge') },
+  { id: 'tosstheturtle', title: 'Toss the Turtle', subtitle: 'How far can he go?', description: "Launch an extremely durable turtle across the world and spend the cash on bigger cannons.", genre: 'Arcade', tone: 'Chaos', mark: 'TT', color: 'forest', path: '/games/tosstheturtle/index.html', icon: getGameIconUrl('tosstheturtle') },
+  { id: 'matrixrampage', title: 'Matrix Rampage', subtitle: 'Bullet time.', description: "Side-scrolling shooter with slow-motion dodges and a quest to save Trinity.", genre: 'Battle', tone: 'Cinematic', mark: 'MR', color: 'twenty', path: '/games/matrixrampage/index.html', icon: getGameIconUrl('matrixrampage') },
+  { id: 'gimme-the-airpod', title: 'Gimme the Airpod', subtitle: 'One pod. One shot.', description: "A tiny physics duel — grab the airpod, blast your rival, and celebrate obnoxiously.", genre: 'Battle', tone: 'Chaos', mark: 'GA', color: 'coral', path: '/games/gimme-the-airpod/index.html', icon: getGameIconUrl('gimme-the-airpod') },
   { id: 'stickman-golf', title: 'Stickman Golf', subtitle: 'Fore!', description: "Fling the stickman through crazy golf courses.", genre: 'Arcade', tone: 'Fun', mark: 'SG', color: 'hextris', path: '/games/stickman-golf/index.html', icon: getGameIconUrl('stickman-golf') },
   { id: 'stickman-boost', title: 'Stickman Boost', subtitle: 'Hold on tight.', description: "High-speed stickman runner — jump, slide, survive.", genre: 'Arcade', tone: 'Reflex', mark: 'S3', color: 'cookie', path: '/games/stickman-boost/index.html', icon: getGameIconUrl('stickman-boost') },
   { id: 'fnaf', title: 'Five Nights at Freddy’s', subtitle: 'Survive five nights.', description: "The original FNAF — watch the cameras, save power, keep them out.", genre: 'Arcade', tone: 'Horror', mark: 'F1', color: 'coral', path: '/games/fnaf/index.html', icon: getGameIconUrl('fnaf') },
@@ -182,8 +202,26 @@ export const games: Game[] = dedupeGames(catalogGames).filter(game => audited[ga
 
 export const filters = ['All games', 'Idle', 'Arcade', 'Puzzle', 'Racing', 'Platformer', 'Simulation', 'Sandbox', 'Community', 'Battle', 'Favorites']
 export const pubColors = ['cookie', 'drive', 'mining', 'devil', 'stack', 'hextris', 'twenty', 'youtube', 'neon', 'frost', 'sunset', 'forest', 'midnight', 'coral', 'plasma', 'aqua']
-export const FEATURED_IDS = ['cookie-clicker','stack','drive-mad','moto-x3m','among-us','retro-bowl','hole-io']
-export const STAFF_PICKS = ['cookie-clicker','retro-bowl','among-us','stack','hole-io','moto-x3m','drive-mad']
+// Hand-ranked "best of the best" — this is the default order the library shows,
+// so the titles people actually open first sit at the top instead of whatever
+// order the catalog was assembled in. Anything not listed keeps catalog order.
+export const CURATED_ORDER = [
+  'eaglercraftx','geometry-dash','ragdoll-archers','slope','slope-2','retro-bowl',
+  'drive-mad','moto-x3m','motox3m-pool','motox3m-winter','motox3m-spooky','basket-random',
+  'boxing-random','ovo','vex-8','vex-6','vex-5','vex-4','vex-3','bloonstd2','bloonstd',
+  '2048','krunker','skribbl','slither','1v1-lol','geoguessr','agar','among-us','temple-run-2','tunnel-rush','stack','crossy-road',
+  'stickman-boost','basketball-stars','drift-boss','paperio2','superhot','sm64',
+  'minecraft-classic','grindcraft','cookie-clicker','fruitninja','flappy-bird',
+  'doodle-jump','chrome-dino','wordle','worlds-hardest-game','worlds-hardest-game-2',
+  'fnaf','granny','baldis-basics','ducklife3','learntofly2','bloxors','circlo','n-gon',
+]
+export const CURATED_RANK = new Map(CURATED_ORDER.map((id, index) => [id, index]))
+export function curatedRank(id: string): number {
+  const rank = CURATED_RANK.get(id)
+  return rank === undefined ? CURATED_ORDER.length : rank
+}
+export const FEATURED_IDS = ['eaglercraftx','geometry-dash','ragdoll-archers','slope','retro-bowl','drive-mad','moto-x3m','among-us','smashkarts','cookie-clicker']
+export const STAFF_PICKS = ['eaglercraftx','geometry-dash','ragdoll-archers','slope','retro-bowl','drive-mad','moto-x3m','basket-random','bloonstd2','2048']
 export const LOW_QUALITY_HINTS = new Set(['spiral-roll','shape-transform','mr-dude','obby-snowboard','spiders','summer','real-pool-3d','gta-mods','cheese-chompers-3d','bad-simulator','volley-random','soccer-random','basket-bros','build-defend','red-vs-blue','gunspin','steep-descent','crazy-crash-landing','cyber-cars','extreme-racing','monster-truck'])
 export const CONTROLS_LEGEND: Record<string,string> = {
   Arcade: 'Arrows / WASD to move • Space to jump/action • R to restart',

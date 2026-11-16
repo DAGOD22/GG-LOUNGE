@@ -37,13 +37,13 @@ export function normalizeProxyUrl(input: string): string {
 
 // navigator.serviceWorker.ready can resolve for an unrelated worker, or wait
 // forever when /proxy is outside /browse/. Wait for THIS registration instead.
-export function waitForActivation(reg: ServiceWorkerRegistration, timeoutMs = 15000): Promise<void> {
+export function waitForActivation(reg: ServiceWorkerRegistration, timeoutMs = 15000): Promise<ServiceWorkerRegistration> {
   return new Promise((resolve, reject) => {
     const worker = reg.installing || reg.waiting || reg.active;
     if (!worker) return reject(new Error('Proxy worker was not installed.'));
     const finish = (error?: Error) => {
       clearTimeout(timer); worker.removeEventListener('statechange', check);
-      error ? reject(error) : resolve();
+      error ? reject(error) : resolve(reg);
     };
     const check = () => {
       if (worker.state === 'activated') finish();
@@ -62,7 +62,12 @@ export function bootProxy(): Promise<ProxyRuntime> {
     if (!('SharedWorker' in window)) throw new Error('This browser does not support the shared worker required by this proxy. Try a current desktop browser.');
     // Remove ONLY obsolete lounge UV registrations; leave unrelated app workers alone.
     const old = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(old.filter(reg => /\/(?:uv\/)?uv\.sw\.js$/.test(new URL((reg.active || reg.waiting || reg.installing)?.scriptURL || location.href).pathname)).map(reg => reg.unregister()));
+    await Promise.all(old.filter(reg => {
+      const scriptPath = new URL((reg.active || reg.waiting || reg.installing)?.scriptURL || location.href).pathname;
+      // Drop obsolete UV workers and the old /browse/-scoped Scramjet worker,
+      // which could never control the /proxy page that drives it.
+      return /\/(?:uv\/)?uv\.sw\.js$/.test(scriptPath) || scriptPath === '/proxy/sw.js';
+    }).map(reg => reg.unregister()));
     await Promise.all([loadScript('/proxy-runtime/baremux/index.js'), loadScript('/proxy-runtime/scramjet/scramjet.all.js')]);
     const win = window as unknown as RuntimeWindow;
     const { ScramjetController: Controller } = win.$scramjetLoadController();
@@ -93,8 +98,19 @@ export function bootProxy(): Promise<ProxyRuntime> {
       if (!health.ok || !Array.isArray(manifest?.versions) || !manifest.versions.includes('v3')) throw new Error('The lounge HTTP proxy is unavailable.');
       await mux.setTransport('/proxy-runtime/bare/index.mjs', [new URL('/api/bare/', location.href).href]);
     }
-    const registration = await navigator.serviceWorker.register('/proxy/sw.js', { scope: '/browse/', updateViaCache: 'none' });
-    await waitForActivation(registration);
+    // The worker must claim the whole origin: the /proxy page itself issues the
+    // /browse/ navigations, and a worker scoped to /browse/ can never control
+    // the page that drives it (every navigation fell through to a 503).
+    let registration = await navigator.serviceWorker.register('/gg-sw.js', { scope: '/', updateViaCache: 'none' });
+    registration = await waitForActivation(registration);
+    if (!navigator.serviceWorker.controller) {
+      // First visit: wait for this page to be claimed before the first navigation.
+      await new Promise<void>(resolve => {
+        const done = () => resolve();
+        navigator.serviceWorker.addEventListener('controllerchange', done, { once: true });
+        setTimeout(done, 3000);
+      });
+    }
     return { controller, transport, notice: transport === 'wisp'
       ? 'Scramjet · Wisp connected. Destination and network restrictions still apply.'
       : 'Scramjet · HTTP only. Configure WISP_URL for WebSockets, streaming and cloud apps.' };
