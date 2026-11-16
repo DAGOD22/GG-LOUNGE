@@ -563,19 +563,7 @@
     "available": true,
     "issues": []
   },
-  "csgo-clicker": {
-    "available": true,
-    "issues": []
-  },
   "flashtetris": {
-    "available": true,
-    "issues": []
-  },
-  "grindcraft": {
-    "available": true,
-    "issues": []
-  },
-  "idle-shark": {
     "available": true,
     "issues": []
   },
@@ -584,14 +572,6 @@
     "issues": []
   },
   "minecraftbeta": {
-    "available": true,
-    "issues": []
-  },
-  "motox3m": {
-    "available": true,
-    "issues": []
-  },
-  "particle-clicker": {
     "available": true,
     "issues": []
   },
@@ -619,11 +599,31 @@
     "available": true,
     "issues": []
   },
+  "csgo-clicker": {
+    "available": true,
+    "issues": []
+  },
+  "idle-shark": {
+    "available": true,
+    "issues": []
+  },
+  "particle-clicker": {
+    "available": true,
+    "issues": []
+  },
   "tv-static": {
     "available": true,
     "issues": []
   },
   "you-are-bezos": {
+    "available": true,
+    "issues": []
+  },
+  "grindcraft": {
+    "available": true,
+    "issues": []
+  },
+  "motox3m": {
     "available": true,
     "issues": []
   },

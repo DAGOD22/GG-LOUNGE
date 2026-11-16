@@ -2834,3 +2834,29 @@ h4,
 .gg-wordmark {
   font-family: var(--gg-font-display);
 }
+
+/* Inline status messages (apps launcher, proxy relay notices). */
+.notice {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin: 0.75rem 0;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--lime);
+  border-radius: 0.6rem;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.notice-warn {
+  border-left-color: var(--coral);
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--coral) 12%, transparent);
+}
+.notice a {
+  color: var(--lime);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
