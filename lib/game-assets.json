@@ -5,7 +5,6 @@
   },
   "big-tower-tiny-square": {
     "available": true,
-    "proxy": true,
     "issues": []
   },
   "state-io": {
@@ -344,6 +343,202 @@
     "issues": []
   },
   "basketball-stars": {
+    "available": true,
+    "issues": []
+  },
+  "kittensgame": {
+    "available": true,
+    "issues": []
+  },
+  "universal-paperclips": {
+    "available": true,
+    "issues": []
+  },
+  "antimatter-dimensions": {
+    "available": true,
+    "issues": []
+  },
+  "space-company": {
+    "available": true,
+    "issues": []
+  },
+  "hextris": {
+    "available": true,
+    "issues": []
+  },
+  "hexgl": {
+    "available": true,
+    "issues": []
+  },
+  "react-tetris": {
+    "available": true,
+    "issues": []
+  },
+  "snakes": {
+    "available": true,
+    "issues": []
+  },
+  "pong": {
+    "available": true,
+    "issues": []
+  },
+  "breakout-arcade": {
+    "available": true,
+    "issues": []
+  },
+  "pacman-classic": {
+    "available": true,
+    "issues": []
+  },
+  "minesweeper-css": {
+    "available": true,
+    "issues": []
+  },
+  "bomberman": {
+    "available": true,
+    "issues": []
+  },
+  "infinite-mario": {
+    "available": true,
+    "issues": []
+  },
+  "asteroids": {
+    "available": true,
+    "issues": []
+  },
+  "invaderz": {
+    "available": true,
+    "issues": []
+  },
+  "space-invaders": {
+    "available": true,
+    "issues": []
+  },
+  "sudoku": {
+    "available": true,
+    "issues": []
+  },
+  "js-paint": {
+    "available": true,
+    "issues": []
+  },
+  "cut-the-rope": {
+    "available": true,
+    "issues": []
+  },
+  "cut-the-rope-time-travel": {
+    "available": true,
+    "issues": []
+  },
+  "cut-the-rope-holiday": {
+    "available": true,
+    "issues": []
+  },
+  "a-dark-room": {
+    "available": true,
+    "issues": []
+  },
+  "trimp": {
+    "available": true,
+    "issues": []
+  },
+  "untrusted": {
+    "available": true,
+    "issues": []
+  },
+  "browserquest": {
+    "available": true,
+    "issues": []
+  },
+  "pacman": {
+    "available": true,
+    "issues": []
+  },
+  "astray": {
+    "available": true,
+    "issues": []
+  },
+  "clumsy-bird": {
+    "available": true,
+    "issues": []
+  },
+  "2048-classic": {
+    "available": true,
+    "issues": []
+  },
+  "skifree": {
+    "available": true,
+    "issues": []
+  },
+  "js-racer": {
+    "available": true,
+    "issues": []
+  },
+  "gauntlet": {
+    "available": true,
+    "issues": []
+  },
+  "javascript-tetris": {
+    "available": true,
+    "issues": []
+  },
+  "snake-arcade": {
+    "available": true,
+    "issues": []
+  },
+  "simple-chess-ai": {
+    "available": true,
+    "issues": []
+  },
+  "pathfinding-visualizer": {
+    "available": true,
+    "issues": []
+  },
+  "snowbattle": {
+    "available": true,
+    "issues": []
+  },
+  "the-final-earth": {
+    "available": true,
+    "issues": []
+  },
+  "ns-shaft": {
+    "available": true,
+    "issues": []
+  },
+  "idle-breakout": {
+    "available": true,
+    "issues": []
+  },
+  "craftmine": {
+    "available": true,
+    "issues": []
+  },
+  "sand-game": {
+    "available": true,
+    "issues": []
+  },
+  "missile-game": {
+    "available": true,
+    "issues": []
+  },
+  "connect3": {
+    "available": true,
+    "issues": []
+  },
+  "meme-2048": {
+    "available": true,
+    "issues": []
+  },
+  "cupcake-2048": {
+    "available": true,
+    "issues": []
+  },
+  "doge-2048": {
+    "available": true,
+    "issues": []
+  },
+  "flappy-2048": {
     "available": true,
     "issues": []
   },
@@ -720,10 +915,6 @@
     "issues": []
   },
   "motox3m": {
-    "available": true,
-    "issues": []
-  },
-  "meme-2048": {
     "available": true,
     "issues": []
   },

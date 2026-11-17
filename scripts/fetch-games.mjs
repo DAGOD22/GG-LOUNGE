@@ -52,6 +52,22 @@ const TOKEN = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
 
 /** id -> source folder inside the mirror */
 const GAMES = {
+  "cut-the-rope": "ctr",
+  "cut-the-rope-holiday": "ctr-holiday",
+  "cut-the-rope-time-travel": "ctr-tr",
+  "big-tower-tiny-square": "btts",
+  snowbattle: "snowbattle",
+  "the-final-earth": "the-final-earth",
+  "ns-shaft": "ns-shaft",
+  "idle-breakout": "idle-breakout",
+  craftmine: "craftmine",
+  "sand-game": "sand-game",
+  "missile-game": "missiles",
+  connect3: "connect3",
+  "meme-2048": "meme2048",
+  "cupcake-2048": "cupcake2048",
+  "doge-2048": "doge2048",
+  "flappy-2048": "flappy-2048",
   eaglercraftx: "minecraft",
   "2048": "2048",
   smashkarts: "smashkarts",

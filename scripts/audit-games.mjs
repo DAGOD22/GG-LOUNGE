@@ -1,4 +1,4 @@
-import { readFile, writeFile, access, readdir } from 'node:fs/promises';
+import { readFile, writeFile, access, readdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import ts from 'typescript';
 const publicRoot = resolve('public');
@@ -59,7 +59,12 @@ for (const game of [...rows, ...extraRows]) {
       const target = resolve(publicRoot, '.' + decodedPath);
       if (!target.startsWith(publicRoot + '/')) { issues.push('Invalid script path'); continue; }
       if (!await exists(target)) issues.push('Missing runtime: ' + url.pathname);
-      else if (/^\s*<(?:!doctype|html)/i.test((await readFile(target,'utf8')).slice(0,200))) issues.push('Runtime contains an HTML error page: ' + url.pathname);
+      else {
+        // Some builds legitimately request a directory (used as a data root),
+        // so only files can be inspected for an HTML error page.
+        const info = await stat(target).catch(() => null);
+        if (info?.isFile() && /^\s*<(?:!doctype|html)/i.test((await readFile(target,'utf8')).slice(0,200))) issues.push('Runtime contains an HTML error page: ' + url.pathname);
+      }
     }
     // Unity's legacy config lists the binaries needed before the first frame.
     for (const [,ref] of html.matchAll(/UnityLoader\.instantiate\(\s*["'][^"']+["']\s*,\s*["']([^"']+\.json)["']/g)) {

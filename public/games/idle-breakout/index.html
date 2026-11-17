@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Idle Breakout</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <style>
+    html, body { margin: 0; height: 100%; background: #1b1d22; overflow: hidden; }
+    #wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+    /* The GameMaker HTML5 export looks itself up by the id "canvas". */
+    #canvas { display: block; max-width: 100%; max-height: 100%; touch-action: none; outline: none; }
+  </style>
+</head>
+<body>
+  <div id="wrap"><canvas id="canvas" width="1024" height="768"></canvas></div>
+  <script src="html5game/Coding_BreakOut1.js"></script>
+  <script>
+    // GameMaker exposes GameMaker_Init but does not call it without its own
+    // loader page, which this build does not ship.
+    window.addEventListener('load', function () {
+      try {
+        if (typeof GameMaker_Init === 'function') GameMaker_Init();
+      } catch (error) {
+        console.error('Idle Breakout failed to start:', error);
+      }
+    });
+  </script>
+</body>
+</html>
