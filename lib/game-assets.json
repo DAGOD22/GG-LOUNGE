@@ -3,6 +3,36 @@
     "available": true,
     "issues": []
   },
+  "big-tower-tiny-square": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "state-io": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "shell-shockers": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "ev-io": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "drift-hunters": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "qwop": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
   "krunker": {
     "available": true,
     "proxy": true,

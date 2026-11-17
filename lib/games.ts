@@ -90,6 +90,12 @@ export const catalogGames: Game[] = [
   // Live-service titles: there is no build we can legally mirror and they need
   // their own servers, so they launch inside the in-app proxy at the game's own
   // page — never the surrounding site chrome.
+  { id: 'big-tower-tiny-square', title: 'Big Tower Tiny Square', subtitle: 'Precision parkour', description: "Tiny square, huge tower — the original wall-jump gauntlet, played from Coolmath's own copy of the game.", genre: 'Platformer', tone: 'Precision', mark: 'B6', color: 'sunset', path: 'https://www.coolmathgames.com/0-big-tower-tiny-square', icon: getGameIconUrl('big-tower-tiny-square'), proxy: true },
+  { id: 'state-io', title: 'State.io', subtitle: 'Take every state.', description: "Real-time strategy in the .io mould — grow your territories and swallow the map.", genre: 'Battle', tone: 'Strategy', mark: 'ST', color: 'frost', path: 'https://state.io/', icon: getGameIconUrl('state-io'), proxy: true },
+  { id: 'shell-shockers', title: 'Shell Shockers', subtitle: 'Eggs with guns.', description: "Blue Wizard's free browser FPS — pick a shell and jump into a live match.", genre: 'Battle', tone: 'Arena', mark: 'SS', color: 'devil', path: 'https://shellshock.io/', icon: getGameIconUrl('shell-shockers'), proxy: true },
+  { id: 'ev-io', title: 'Ev.io', subtitle: 'Arena FPS, in a tab.', description: "Fast, class-based browser shooter with real matchmaking.", genre: 'Battle', tone: 'Arena', mark: 'EV', color: 'plasma', path: 'https://ev.io/', icon: getGameIconUrl('ev-io'), proxy: true },
+  { id: 'drift-hunters', title: 'Drift Hunters', subtitle: 'Sideways, forever.', description: "The browser drifting sim everyone knows — build the car, link the corners.", genre: 'Racing', tone: 'Drift', mark: 'DH', color: 'drive', path: 'https://www.drift-hunters.com/', icon: getGameIconUrl('drift-hunters'), proxy: true },
+  { id: 'qwop', title: 'QWOP', subtitle: 'Walk. Somehow.', description: "Bennett Foddy's deliberately impossible running game, from the original foddy.net page.", genre: 'Arcade', tone: 'Chaos', mark: 'QW', color: 'cream', path: 'https://www.foddy.net/Athletics.html', icon: getGameIconUrl('qwop'), proxy: true },
   { id: 'krunker', title: 'Krunker', subtitle: 'Browser FPS, no download.', description: "The full Krunker client running from its own site: pick a lobby, pick a class, and jump straight into a match.", genre: 'Battle', tone: 'Arena', mark: 'KR', color: 'neon', path: 'https://krunker.io/?game=SV', icon: getGameIconUrl('krunker'), proxy: true },
   { id: '1v1-lol', title: '1v1.LOL', subtitle: 'Build. Shoot. Win.', description: "The real 1v1.LOL client — build, edit and fight in a live duel. Opens through the built-in browser, no install.", genre: 'Battle', tone: 'Arena', mark: '1v', color: 'coral', path: 'https://1v1.lol/', icon: getGameIconUrl('1v1-lol'), proxy: true },
   { id: 'skribbl', title: 'Skribbl.io', subtitle: 'Draw. Guess. Chaos.', description: "Free multiplayer pictionary with your friends — create a private room and share the code.", genre: 'Community', tone: 'Party', mark: 'SB', color: 'frost', path: 'https://skribbl.io/', icon: getGameIconUrl('skribbl'), proxy: true },
@@ -209,7 +215,7 @@ export const CURATED_ORDER = [
   'eaglercraftx','geometry-dash','ragdoll-archers','slope','slope-2','retro-bowl',
   'drive-mad','moto-x3m','motox3m-pool','motox3m-winter','motox3m-spooky','basket-random',
   'boxing-random','ovo','vex-8','vex-6','vex-5','vex-4','vex-3','bloonstd2','bloonstd',
-  '2048','krunker','skribbl','slither','1v1-lol','geoguessr','agar','among-us','temple-run-2','tunnel-rush','stack','crossy-road',
+  '2048','krunker','skribbl','slither','shell-shockers','state-io','big-tower-tiny-square','1v1-lol','ev-io','qwop','geoguessr','drift-hunters','agar','among-us','temple-run-2','tunnel-rush','stack','crossy-road',
   'stickman-boost','basketball-stars','drift-boss','paperio2','superhot','sm64',
   'minecraft-classic','grindcraft','cookie-clicker','fruitninja','flappy-bird',
   'doodle-jump','chrome-dino','wordle','worlds-hardest-game','worlds-hardest-game-2',

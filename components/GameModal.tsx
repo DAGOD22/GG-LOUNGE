@@ -588,10 +588,10 @@ export function GameModal({
           >
             <Bug size={14} /> {reportSent ? 'Reported' : 'Report'}
           </button>
-          <button onClick={() => { if (navigator.clipboard) navigator.clipboard.writeText(location.origin + (game.proxy ? `/proxy?url=${encodeURIComponent(game.path)}` : game.path)) }} title="Copy link" aria-label="Copy link">
+          <button onClick={() => { if (navigator.clipboard) navigator.clipboard.writeText(location.origin + (game.proxy ? `/play/${game.id}` : game.path)) }} title="Copy link" aria-label="Copy link">
             <Copy size={16} />
           </button>
-          <button onClick={() => window.open(game.proxy ? `/proxy?url=${encodeURIComponent(game.path)}` : game.path, '_blank')} title="Open in new tab" aria-label="Open in new tab">
+          <button onClick={() => window.open(game.proxy ? `/play/${game.id}` : game.path, '_blank')} title="Open in new tab" aria-label="Open in new tab">
             <ExternalLink size={16} />
           </button>
           <button onClick={() => onToggleFavorite(game.id)} title={isFavorite ? 'Remove favorite' : 'Add favorite'} aria-label="Favorite">
@@ -691,7 +691,7 @@ export function GameModal({
               <button className="btn-mini" onClick={() => { setFrameError(null); setFrameLoading(true); if (frameRef.current) frameRef.current.src = frameRef.current.src }}>
                 Retry
               </button>
-              <button className="btn-mini" onClick={() => window.open(game.proxy ? `/proxy?url=${encodeURIComponent(game.path)}` : game.path, '_blank')}>
+              <button className="btn-mini" onClick={() => window.open(game.proxy ? `/play/${game.id}` : game.path, '_blank')}>
                 Open in new tab
               </button>
               <a className="btn-mini" href="/proxy">
@@ -706,7 +706,7 @@ export function GameModal({
         <iframe
           ref={frameRef}
           className="game-frame"
-          src={game.proxy ? `/proxy?url=${encodeURIComponent(game.path)}` : game.path}
+          src={game.proxy ? `/play/${game.id}` : game.path}
           title={game.title}
           allow="fullscreen; autoplay; gamepad; keyboard-map; clipboard-read; clipboard-write; encrypted-media; picture-in-picture; web-share"
           allowFullScreen
