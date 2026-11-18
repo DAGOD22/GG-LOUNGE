@@ -24,3 +24,8 @@ test-results/
 *.tsbuildinfo
 public/game-runtime/
 .next-build/
+
+# Games vendor their own runtime deps (e.g. jQuery) under these paths and ship
+# them as static assets — they must be committed or the game 404s in prod.
+!public/games/*/node_modules/
+!public/games/*/node_modules/**
