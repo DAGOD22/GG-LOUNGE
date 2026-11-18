@@ -48,7 +48,7 @@ export default function ProxyPage() {
       frame.addEventListener('urlchange', (event: { url: string }) => {
         if (!cancelled) { setAddress(String(event.url)); setCurrent(String(event.url)); }
       });
-      setReady(true); setLimited(result.transport === 'http'); setStatus(result.notice);
+      setReady(true); setLimited(false); setStatus(result.notice);
       const requested = new URLSearchParams(location.search).get('url');
       if (requested) navigate(requested);
     }).catch(cause => {

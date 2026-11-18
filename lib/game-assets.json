@@ -3,10 +3,6 @@
     "available": true,
     "issues": []
   },
-  "big-tower-tiny-square": {
-    "available": true,
-    "issues": []
-  },
   "state-io": {
     "available": true,
     "proxy": true,
@@ -430,7 +426,91 @@
     "available": true,
     "issues": []
   },
+  "server-survival": {
+    "available": true,
+    "issues": []
+  },
+  "isocity": {
+    "available": true,
+    "issues": []
+  },
+  "sandspiel": {
+    "available": true,
+    "issues": []
+  },
+  "sandboxels": {
+    "available": true,
+    "issues": []
+  },
+  "evolve-idle": {
+    "available": true,
+    "issues": []
+  },
+  "civis": {
+    "available": true,
+    "issues": []
+  },
+  "loopy": {
+    "available": true,
+    "issues": []
+  },
+  "classic-pool": {
+    "available": true,
+    "issues": []
+  },
+  "quantum-game": {
+    "available": true,
+    "issues": []
+  },
+  "pacman-tribute": {
+    "available": true,
+    "issues": []
+  },
+  "flexbox-froggy": {
+    "available": true,
+    "issues": []
+  },
+  "grid-garden": {
+    "available": true,
+    "issues": []
+  },
+  "tetris-classic": {
+    "available": true,
+    "issues": []
+  },
+  "star-battle": {
+    "available": true,
+    "issues": []
+  },
+  "dino-3d": {
+    "available": true,
+    "issues": []
+  },
+  "kaboom-minesweeper": {
+    "available": true,
+    "issues": []
+  },
+  "mahjong-solitaire": {
+    "available": true,
+    "issues": []
+  },
+  "solitaire": {
+    "available": true,
+    "issues": []
+  },
+  "polygons": {
+    "available": true,
+    "issues": []
+  },
+  "rush-3d": {
+    "available": true,
+    "issues": []
+  },
   "cut-the-rope-holiday": {
+    "available": true,
+    "issues": []
+  },
+  "big-tower-tiny-square": {
     "available": true,
     "issues": []
   },
@@ -775,10 +855,6 @@
     "issues": []
   },
   "minesweeper": {
-    "available": true,
-    "issues": []
-  },
-  "solitaire": {
     "available": true,
     "issues": []
   },

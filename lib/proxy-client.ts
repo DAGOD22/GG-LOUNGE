@@ -14,7 +14,7 @@ export type ProxyRuntime = {
   encode: (url: string) => string;
   /** Recover the real destination from a proxied URL or frame href. */
   decode: (value: string) => string | null;
-  transport: 'http' | 'wisp';
+  transport: 'bare';
   notice: string;
 };
 export type ScramjetFrame = {
@@ -117,13 +117,11 @@ export function bootProxy(): Promise<ProxyRuntime> {
     const codec = win.Ultraviolet?.codec?.xor;
     if (!codec) throw new Error('The proxy runtime failed to load. Reload and try again.');
 
-    let transport: 'http' | 'wisp' = 'http';
-    let notice = 'Ultraviolet · connected through the lounge proxy.';
-    try {
-      const response = await fetch('/api/proxy/config', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
-      const config = response.ok ? await response.json() : null;
-      if (config?.wisp) { transport = 'wisp'; notice = 'Ultraviolet · Wisp connected. Destination and network restrictions still apply.'; }
-    } catch { /* the HTTP transport is the default */ }
+    // HTTP-only transport. There is deliberately no Wisp/WebSocket path: the
+    // in-app Bare relay handles every request, so a missing Wisp server can no
+    // longer leave proxied pages stuck on a blank screen.
+    const transport: 'bare' = 'bare';
+    const notice = 'Connected through the lounge proxy.';
 
     return {
       prefix: PREFIX,

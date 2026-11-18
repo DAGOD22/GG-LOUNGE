@@ -86,6 +86,28 @@ const GAMES = {
   "snake-arcade": { repo: "patorjk/JavaScript-Snake", subdir: "src" },
   "simple-chess-ai": { repo: "lhartikk/simple-chess-ai" },
   "pathfinding-visualizer": { repo: "qiao/PathFinding.js", subdir: "visual" },
+
+  // --- round 5: 20 more real, open-source titles (all locally hosted) ---
+  "server-survival":    { repo: "pshenok/server-survival" },
+  "isocity":            { repo: "victorqribeiro/isocity" },
+  "sandspiel":          { repo: "MaxBittker/sandspiel" },
+  "cube-composer":      { repo: "sharkdp/cube-composer" },
+  "evolve-idle":        { repo: "pmotschmann/Evolve" },
+  "civis":              { repo: "Venerons/civis" },
+  "sandboxels":         { repo: "R74nCom/sandboxels" },
+  "classic-pool":       { repo: "henshmi/Classic-Pool-Game" },
+  "quantum-game":       { repo: "stared/quantum-game" },
+  "pacman-tribute":     { repo: "masonicGIT/pacman" },
+  "flexbox-froggy":     { repo: "thomaspark/flexboxfroggy" },
+  "grid-garden":        { repo: "thomaspark/gridgarden" },
+  "kaboom-minesweeper": { repo: "pwmarcz/kaboom" },
+  "level13":            { repo: "nroutasuo/level13" },
+  "tetris-classic":     { repo: "ytiurin/tetris" },
+  "star-battle":        { repo: "gd4Ark/star-battle" },
+  "breaklock":          { repo: "maxwellito/breaklock" },
+  "dino-3d":            { repo: "Priler/dino3d" },
+  "mahjong-solitaire":  { repo: "ffalt/mah", branch: "gh-pages" },
+  "solitaire":          { repo: "gcedo/react-solitaire", subdir: "dist" },
 };
 
 const ROOT = path.resolve("public/games");

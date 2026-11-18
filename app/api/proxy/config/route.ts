@@ -1,18 +1,28 @@
 import { NextResponse } from 'next/server';
-import { assertPublicTarget } from '@/lib/network-target';
+
+/**
+ * Proxy transport discovery.
+ *
+ * The lounge proxy runs entirely on the in-app Bare relay (/api/bare/), which
+ * is a plain HTTP transport. It used to advertise a Wisp (WebSocket) endpoint
+ * as well, and the client preferred it whenever one was configured — but a Wisp
+ * link needs its own always-on WebSocket server, and on this deployment it was
+ * either missing or unreachable, so proxied pages hung on a blank screen.
+ *
+ * There is now no Wisp at all: no environment variable, no WebSocket branch, no
+ * "Wisp connected" status. Browsing works over HTTP only.
+ */
 export const dynamic = 'force-dynamic';
+
 export function GET() {
-  const raw = process.env.WISP_URL?.trim();
-  let wisp: string | null = process.env.GG_LOCAL_WISP === '1' && !process.env.VERCEL ? '/wisp/' : null;
-  if (raw) {
-    try {
-      const url = new URL(raw);
-      if (url.protocol !== 'wss:' || url.username || url.password || /^(localhost|127\.|0\.|\[?::1\]?$)/i.test(url.hostname)) throw new Error();
-      assertPublicTarget(url);
-      wisp = url.href;
-    } catch {
-      return NextResponse.json({ error: 'WISP_URL must be a public wss:// endpoint without credentials.' }, { status: 503 });
-    }
-  }
-  return NextResponse.json({ engine: 'scramjet', wisp, websockets: Boolean(wisp) }, { headers: { 'Cache-Control': 'no-store' } });
+  return NextResponse.json(
+    {
+      engine: 'ultraviolet',
+      transport: 'bare',
+      bare: '/api/bare/',
+      wisp: null,
+      websockets: false,
+    },
+    { headers: { 'Cache-Control': 'no-store' } },
+  );
 }

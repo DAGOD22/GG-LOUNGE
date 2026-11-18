@@ -1279,8 +1279,16 @@ footer {
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--ink);
+  /* The bar has a fixed dark backdrop, so the typed address needs a light
+     colour. --ink is the DARK colour used on lime buttons — using it here made
+     the URL you typed unreadable (black on black). */
+  color: #f4f2ec;
+  caret-color: var(--lime);
   font-size: 14px;
+}
+.proxy-form input::selection {
+  background: rgba(215, 243, 74, 0.35);
+  color: #ffffff;
 }
 .proxy-form input::placeholder {
   color: rgba(255, 255, 255, 0.4);
