@@ -34,8 +34,11 @@ const chainBroken = new Set<string>();
 function targetHost(req: Request): string {
   const header = req.headers.get('x-bare-host');
   if (header) return header.toLowerCase();
-  // Path-style targets: /api/bare/https%3A%2F%2Fexample.com%2F
-  const segment = new URL(req.url).pathname.split('/api/bare/')[1]?.split('/')[0];
+  // Path-style targets: /api/bare/v3/https%3A%2F%2Fexample.com%2F — the version
+  // segment is not a host, and treating it as one would mark every path-style
+  // request as chain-broken after a single failure.
+  const segments = new URL(req.url).pathname.split('/api/bare/')[1]?.split('/') || [];
+  const segment = /^v[123]$/.test(segments[0]) ? segments[1] : segments[0];
   if (!segment) return '';
   try {
     const decoded = decodeURIComponent(segment);
