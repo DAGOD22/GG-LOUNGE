@@ -58,6 +58,50 @@
     "proxy": true,
     "issues": []
   },
+  "subway-surfers": {
+    "available": true,
+    "issues": []
+  },
+  "mykonos": {
+    "available": true,
+    "issues": []
+  },
+  "series-of-tubes": {
+    "available": true,
+    "issues": []
+  },
+  "quake": {
+    "available": true,
+    "issues": []
+  },
+  "diablo": {
+    "available": true,
+    "issues": []
+  },
+  "doom-js13k": {
+    "available": true,
+    "issues": []
+  },
+  "wolfenstein": {
+    "available": true,
+    "issues": []
+  },
+  "wolf3d-classic": {
+    "available": true,
+    "issues": []
+  },
+  "prince-of-persia": {
+    "available": true,
+    "issues": []
+  },
+  "candy-crush": {
+    "available": true,
+    "issues": []
+  },
+  "webretro": {
+    "available": true,
+    "issues": []
+  },
   "suika": {
     "available": true,
     "issues": []
