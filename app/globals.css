@@ -25,7 +25,9 @@
   --muted: #6b7280;
   --line: rgba(17, 17, 24, 0.12);
   --panel: #f4f4f5;
-  --ink: #ffffff;
+  /* --ink is the colour of text that sits ON lime buttons and badges. It has
+     to stay dark in the light theme too — white-on-lime was unreadable. */
+  --ink: #111118;
   --surface: rgba(0, 0, 0, 0.04);
   --surface-hover: rgba(0, 0, 0, 0.06);
   --surface-strong: rgba(0, 0, 0, 0.08);
@@ -1211,7 +1213,9 @@ footer {
   display: flex;
   flex-direction: column;
   background: var(--bg, #0b0e12);
-  color: var(--ink);
+  /* --ink is the DARK colour, used for text sitting on lime buttons. On this
+     dark shell it made the heading and body copy black-on-black. */
+  color: var(--foreground);
 }
 .proxy-bar {
   display: flex;
@@ -1222,7 +1226,10 @@ footer {
   background: rgba(255, 255, 255, 0.03);
   flex-wrap: wrap;
 }
+/* Brand + nav sit on the dark proxy bar with a fixed dark backdrop, so pin
+   their colours instead of inheriting the (theme-dependent) shell colour. */
 .proxy-brand {
+  color: #f4f2ec;
   display: flex;
   align-items: center;
   gap: 8px;

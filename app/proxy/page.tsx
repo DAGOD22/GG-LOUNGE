@@ -84,7 +84,7 @@ export default function ProxyPage() {
         <Search size={15} /><input aria-label="Website address or search" placeholder="Search or enter a website" value={address} onChange={event => setAddress(event.target.value)} />
         <button type="submit" disabled={!ready}>Go</button>
       </form>
-      <a href="/apps" style={{ fontSize: 13 }}>Apps</a>
+      <a href="/apps" style={{ fontSize: 13, color: 'var(--foreground)' }}>Apps</a>
     </header>
     <div role="status" aria-live="polite" style={{ padding: '8px 18px', background: 'var(--panel)', color: limited ? '#ffd18b' : '#b5c1cc', fontSize: 12 }}>
       {loading ? 'Loading through the proxy…' : status}

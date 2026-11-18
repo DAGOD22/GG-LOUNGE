@@ -25,20 +25,27 @@
   }
 
   // --- fetch -----------------------------------------------------------
+  // Two shapes have to survive the rewrite:
+  //   fetch("https://lbr.../router.php", {method:"POST", body})
+  //   fetch(new Request("https://lbr.../router.php", {method:"POST", body}))
+  // The second one used to lose its body (we passed the URL plus empty
+  // options, so the upload went out as a bodiless GET and the server
+  // rejected it), which is exactly what "Save upload failed" was.
   if (window.fetch) {
     var nativeFetch = window.fetch;
     window.fetch = function (input, init) {
       try {
-        var url = typeof input === 'string' ? input : (input && input.url) || '';
+        var url = typeof input === "string" ? input : (input && input.url) || "";
         if (isOfficial(url)) {
-          var opts = Object.assign({}, init || {});
-          // Keep the browser's own referrer/origin out of the relayed request;
-          // the official server sees the same form body the game built.
-          opts.credentials = 'same-origin';
-          delete opts.mode;
-          var target = url;
-          if (typeof input !== 'string' && input && input.method && !opts.method) opts.method = input.method;
-          return nativeFetch.call(window, relay(target), opts);
+          if (typeof input === "string") {
+            var opts = Object.assign({}, init || {});
+            opts.credentials = "same-origin";
+            delete opts.mode;
+            return nativeFetch.call(window, relay(url), opts);
+          }
+          // Request object: rebuild it against the relay, keeping the body.
+          var rebuilt = new Request(relay(url), input);
+          return nativeFetch.call(window, rebuilt, init);
         }
       } catch (e) {}
       return nativeFetch.apply(window, arguments);
@@ -52,6 +59,14 @@
     if (isOfficial(url)) args[1] = relay(url);
     return nativeOpen.apply(this, args);
   };
+
+  // --- sendBeacon (used for some fire-and-forget save pings) -----------
+  if (navigator.sendBeacon) {
+    var nativeBeacon = navigator.sendBeacon.bind(navigator);
+    navigator.sendBeacon = function (url, data) {
+      return nativeBeacon(isOfficial(url) ? relay(url) : url, data);
+    };
+  }
 
   // --- the game's health check reads a status code from a plain load ----
   window.ggLbrRelay = { isOfficial: isOfficial, relay: relay };

@@ -12,6 +12,10 @@ export function ProxyGameFrame({ title, target }: { title: string; target: strin
   const [src, setSrc] = useState('');
   const [error, setError] = useState('');
   const [status, setStatus] = useState('Loading…');
+  // A proxied title can fail *after* the runtime boots — the remote site blocks
+  // the proxy, or a script never finishes. Without this the player just stares
+  // at a black frame with no explanation.
+  const [stalled, setStalled] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -26,6 +30,26 @@ export function ProxyGameFrame({ title, target }: { title: string; target: strin
     });
     return () => { cancelled = true; };
   }, [target]);
+
+  // Preflight the target through the proxy itself. An iframe fires `onLoad`
+  // even when it lands on the browser's error page, so the only honest check is
+  // asking the proxy for the URL and seeing whether it returns anything.
+  useEffect(() => {
+    if (!src) return;
+    let cancelled = false;
+    setStalled(false);
+    (async () => {
+      try {
+        const res = await fetch(src, { credentials: 'omit' });
+        const body = await res.text();
+        if (cancelled) return;
+        if (!res.ok || body.trim().length < 40) setStalled(true);
+      } catch {
+        if (!cancelled) setStalled(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [src]);
 
   return (
     <main style={{ position: 'fixed', inset: 0, background: '#0b0d12', display: 'flex', flexDirection: 'column' }}>
@@ -50,6 +74,19 @@ export function ProxyGameFrame({ title, target }: { title: string; target: strin
           allowFullScreen
           style={{ flex: 1, width: '100%', height: '100%', border: 0, background: '#000' }}
         />
+      )}
+      {src && stalled && (
+        <div
+          role="alert"
+          style={{ position: 'absolute', left: '50%', bottom: 28, transform: 'translateX(-50%)', maxWidth: 560, width: 'calc(100% - 32px)', padding: '14px 18px', borderRadius: 12, border: '1px solid #3a4450', background: 'rgba(17, 20, 26, 0.96)', color: '#e8ecf1', font: '13px/1.5 system-ui', boxShadow: '0 18px 40px rgba(0,0,0,.5)' }}
+        >
+          <strong style={{ display: 'block', marginBottom: 4 }}>{title} is taking a while to load.</strong>
+          This title runs through the proxy. Some sites block proxied traffic, and a managed browser may disable service workers.
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <button onClick={() => location.reload()} style={{ padding: '7px 14px', borderRadius: 999, border: 0, background: '#d9f56b', color: '#0b0d12', fontWeight: 800, cursor: 'pointer' }}>Reload</button>
+            <a href={target} target="_blank" rel="noreferrer" style={{ padding: '7px 14px', borderRadius: 999, border: '1px solid #3a4450', color: '#e8ecf1', fontWeight: 700, textDecoration: 'none' }}>Open direct</a>
+          </div>
+        </div>
       )}
     </main>
   );

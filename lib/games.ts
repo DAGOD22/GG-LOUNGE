@@ -90,7 +90,6 @@ export const catalogGames: Game[] = [
   // Live-service titles: there is no build we can legally mirror and they need
   // their own servers, so they launch inside the in-app proxy at the game's own
   // page — never the surrounding site chrome.
-  { id: 'big-tower-tiny-square', title: 'Big Tower Tiny Square', subtitle: 'Precision parkour', description: "Tiny square, huge tower — the original wall-jump gauntlet, played from Coolmath's own copy of the game.", genre: 'Platformer', tone: 'Precision', mark: 'B6', color: 'sunset', path: 'https://www.coolmathgames.com/0-big-tower-tiny-square', icon: getGameIconUrl('big-tower-tiny-square'), proxy: true },
   { id: 'state-io', title: 'State.io', subtitle: 'Take every state.', description: "Real-time strategy in the .io mould — grow your territories and swallow the map.", genre: 'Battle', tone: 'Strategy', mark: 'ST', color: 'frost', path: 'https://state.io/', icon: getGameIconUrl('state-io'), proxy: true },
   { id: 'shell-shockers', title: 'Shell Shockers', subtitle: 'Eggs with guns.', description: "Blue Wizard's free browser FPS — pick a shell and jump into a live match.", genre: 'Battle', tone: 'Arena', mark: 'SS', color: 'devil', path: 'https://shellshock.io/', icon: getGameIconUrl('shell-shockers'), proxy: true },
   { id: 'ev-io', title: 'Ev.io', subtitle: 'Arena FPS, in a tab.', description: "Fast, class-based browser shooter with real matchmaking.", genre: 'Battle', tone: 'Arena', mark: 'EV', color: 'plasma', path: 'https://ev.io/', icon: getGameIconUrl('ev-io'), proxy: true },

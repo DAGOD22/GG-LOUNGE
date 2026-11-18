@@ -19,7 +19,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ALLOWED_HOSTS = new Set(["lbr.humblenorth.de", "humblenorth.de"]);
-const MAX_BODY_BYTES = 64 * 1024;
+// Leaf Blower Revolution saves grow with progress — a few hours in they are
+// routinely several hundred kilobytes, and lategame saves pass a megabyte.
+// The old 64 KB cap rejected those uploads with a 413, which the game reports
+// as "Save upload failed, please wait 1 minute and try again."
+const MAX_BODY_BYTES = 8 * 1024 * 1024;
 const CORS = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "POST, OPTIONS",
@@ -69,12 +73,27 @@ export async function GET(req: Request) {
   }
 }
 
+function forwardHeaders(req: Request): Record<string, string> {
+  const headers: Record<string, string> = {
+    "content-type": req.headers.get("content-type") || "application/x-www-form-urlencoded",
+    accept: "application/json, text/plain, */*",
+    "user-agent": "GG-Lounge/1.0 (+leaf-blower-revolution)",
+  };
+  // The runtime may gzip/deflate a large save before posting it.
+  const encoding = req.headers.get("content-encoding");
+  if (encoding && encoding !== "identity") headers["content-encoding"] = encoding;
+  return headers;
+}
+
 export async function POST(req: Request) {
   const target = resolveTarget(req);
   if (!target) return NextResponse.json({ error: "Only the official game account host is supported." }, { status: 400, headers: CORS });
 
-  const body = await req.text();
-  if (body.length > MAX_BODY_BYTES) {
+  // Read raw bytes. A big save is posted gzipped, and `req.text()` would
+  // decode it with the wrong charset and forward mangled data (the game then
+  // reports the save as failed). The relay must be byte-transparent.
+  const bytes = Buffer.from(await req.arrayBuffer());
+  if (bytes.byteLength > MAX_BODY_BYTES) {
     return NextResponse.json({ error: "Request too large." }, { status: 413, headers: CORS });
   }
 
@@ -83,12 +102,8 @@ export async function POST(req: Request) {
   try {
     const upstream = await fetch(target, {
       method: "POST",
-      headers: {
-        "content-type": req.headers.get("content-type") || "application/x-www-form-urlencoded",
-        accept: "application/json, text/plain, */*",
-        "user-agent": "GG-Lounge/1.0 (+leaf-blower-revolution)",
-      },
-      body,
+      headers: forwardHeaders(req),
+      body: bytes,
       redirect: "follow",
       signal: controller.signal,
     });
