@@ -29,3 +29,8 @@ public/game-runtime/
 # them as static assets — they must be committed or the game 404s in prod.
 !public/games/*/node_modules/
 !public/games/*/node_modules/**
+# Deduplicated game masters, referenced by symlinks from public/games.
+# They must be committed and must live outside public/ so Vercel's copier
+# dereferences links instead of recursing into the tree it is copying.
+!.game-assets-shared/
+!.game-assets-shared/**

@@ -1,1 +1,1 @@
-/home/user/GG-LOUNGE/public/games/_shared/351afefc8177da7c.js
+../../../../.game-assets-shared/351afefc8177da7c.js

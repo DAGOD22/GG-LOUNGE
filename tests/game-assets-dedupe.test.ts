@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, statSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
+import { join, resolve, dirname, isAbsolute } from 'node:path';
+import { readlinkSync } from 'node:fs';
 
 const GAMES = join(new URL('..', import.meta.url).pathname, 'public', 'games');
 const MIN_BYTES = 64 * 1024; // matches scripts/dedupe-game-assets.mjs
@@ -41,6 +42,28 @@ test('no large byte-identical payloads are stored more than once', () => {
     [],
     'duplicate payloads found — run: node scripts/dedupe-game-assets.mjs --apply',
   );
+});
+
+test('dedupe links are relative and inside the repository', () => {
+  // An absolute link works in this checkout and breaks in any other clone —
+  // it dangles in Vercel's /vercel/path0 and the asset 404s. This happened
+  // once, so it is now a test.
+  const absolute: string[] = [];
+  const outside: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isSymbolicLink()) {
+        const target = readlinkSync(full);
+        if (isAbsolute(target)) absolute.push(full.slice(GAMES.length + 1));
+        const resolved = resolve(dirname(full), target);
+        if (!resolved.includes('.game-assets-shared')) outside.push(resolved);
+      } else if (entry.isDirectory()) walk(full);
+    }
+  };
+  walk(GAMES);
+  assert.deepEqual(absolute, [], 'absolute links: run node scripts/dedupe-game-assets.mjs --restore --apply');
+  assert.deepEqual(outside, [], 'links must point at .game-assets-shared, not at a game');
 });
 
 test('the shared asset store only holds real files', () => {

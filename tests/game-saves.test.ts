@@ -64,7 +64,13 @@ function loadSave(script: string, opts: { localStorageBroken?: boolean } = {}) {
   return { GGSave: sandbox.GGSave, jar, cookieStore, sandbox };
 }
 
-const source = readFileSync(SAVE_HELPER, 'utf8');
+// Loaded once, but behind a test so a missing helper reports as one clear
+// failure instead of crashing the whole file with ENOENT.
+let source = '';
+test('the shared save helper exists', () => {
+  assert.ok(existsSync(SAVE_HELPER), `${SAVE_HELPER} is missing — it is hand-written, not generated`);
+  source = readFileSync(SAVE_HELPER, 'utf8');
+});
 
 test('save helper is valid JavaScript and exposes its API', () => {
   const { GGSave } = loadSave(source);
