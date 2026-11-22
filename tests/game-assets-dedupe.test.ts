@@ -1,99 +1,91 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, statSync, readFileSync } from 'node:fs';
+import { readdirSync, statSync, lstatSync, readFileSync, existsSync, readlinkSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join, resolve, dirname, isAbsolute } from 'node:path';
-import { readlinkSync } from 'node:fs';
+import { join } from 'node:path';
 
 const GAMES = join(new URL('..', import.meta.url).pathname, 'public', 'games');
 const MIN_BYTES = 64 * 1024; // matches scripts/dedupe-game-assets.mjs
 const WARN_BYTES = 8 * 1024 * 1024;
 
-/**
- * Duplicate payloads are what made the deploy carry ~441 MB of dead weight: the
- * same Ruffle runtime shipped 47 times, the same Vex soundtrack twice, and so
- * on. scripts/dedupe-game-assets.mjs collapses them into public/games/_shared
- * plus symlinks, and this test stops a future import from quietly re-adding a
- * large duplicate.
- */
-test('no large byte-identical payloads are stored more than once', () => {
-  const seen = new Map<string, string[]>();
-  const walk = (dir: string) => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = join(dir, entry.name);
-      if (entry.isSymbolicLink()) continue; // already deduplicated
-      if (entry.isDirectory()) {
-        if (full === join(GAMES, '_shared')) continue;
-        walk(full);
-      } else if (entry.isFile()) {
-        let size = 0;
-        try { size = statSync(full).size; } catch { continue; }
-        if (size < MIN_BYTES) continue;
-        const hash = createHash('sha256').update(readFileSync(full)).digest('hex');
-        (seen.get(hash) || seen.set(hash, []).get(hash)!).push(full.slice(GAMES.length + 1));
-      }
-    }
-  };
-  walk(GAMES);
+function walk(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) walk(full, out);
+    else if (entry.isFile()) out.push(full);
+  }
+  return out;
+}
 
-  const offenders = [...seen.values()].filter(list => list.length > 1);
+/**
+ * Duplicate payloads are what made this checkout bloated: the same Ruffle
+ * runtime shipped 47 times, the same art atlases twice over. Git stores those
+ * blobs once, but every copy still landed on disk. scripts/dedupe-game-assets.mjs
+ * hardlinks them, which saves the space without changing what any tool sees.
+ */
+test('large byte-identical payloads share one inode', () => {
+  const seen = new Map<string, string[]>();
+  for (const file of walk(GAMES)) {
+    let size = 0;
+    try { size = statSync(file).size; } catch { continue; }
+    if (size < MIN_BYTES) continue;
+    const hash = createHash('sha256').update(readFileSync(file)).digest('hex');
+    (seen.get(hash) || seen.set(hash, []).get(hash)!).push(file.slice(GAMES.length + 1));
+  }
+
+  const spread = [...seen.values()]
+    .map(list => ({ list, inodes: new Set(list.map(f => statSync(join(GAMES, f)).ino)) }))
+    .filter(entry => entry.inodes.size > 1);
+
   assert.deepEqual(
-    offenders.slice(0, 5),
+    spread.slice(0, 5).map(e => e.list[0]),
     [],
-    'duplicate payloads found — run: node scripts/dedupe-game-assets.mjs --apply',
+    'identical payloads on separate inodes — run: npm run dedupe:games:apply',
   );
 });
 
-test('dedupe links are relative and inside the repository', () => {
-  // An absolute link works in this checkout and breaks in any other clone —
-  // it dangles in Vercel's /vercel/path0 and the asset 404s. This happened
-  // once, so it is now a test.
-  const absolute: string[] = [];
-  const outside: string[] = [];
-  const walk = (dir: string) => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = join(dir, entry.name);
-      if (entry.isSymbolicLink()) {
-        const target = readlinkSync(full);
-        if (isAbsolute(target)) absolute.push(full.slice(GAMES.length + 1));
-        const resolved = resolve(dirname(full), target);
-        if (!resolved.includes('.game-assets-shared')) outside.push(resolved);
-      } else if (entry.isDirectory()) walk(full);
-    }
-  };
-  walk(GAMES);
-  assert.deepEqual(absolute, [], 'absolute links: run node scripts/dedupe-game-assets.mjs --restore --apply');
-  assert.deepEqual(outside, [], 'links must point at .game-assets-shared, not at a game');
+test('no game asset is a symlink', () => {
+  // Symlinks are not deployable here. Vercel copies public/ and dereferences
+  // links as it goes: a target inside public/ fails with "Cannot copy X to a
+  // subdirectory of itself", and a target outside it fails the same way. Two
+  // production builds died on this, so it is asserted rather than remembered.
+  const links = walk(GAMES).filter(file => lstatSync(file).isSymbolicLink());
+  assert.deepEqual(links.slice(0, 5).map(f => f.slice(GAMES.length + 1)), []);
 });
 
-test('the shared asset store only holds real files', () => {
-  const shared = join(GAMES, '_shared');
-  let entries: string[] = [];
-  try { entries = readdirSync(shared); } catch { entries = []; }
-  for (const name of entries) {
-    const stat = statSync(join(shared, name));
-    assert.ok(stat.size > 0, `${name} in _shared is empty`);
+test('deduplicated files are still complete and readable', () => {
+  // Hardlinks share bytes, so a truncated or wrong-inode link would corrupt
+  // several games at once. Spot-check the payloads that are linked most widely.
+  const targets = [
+    ['bloonstd2', 'c5c02c4e65c1c4423a97.wasm', 6593880],
+    ['candy-crush', 'app.js', null],
+  ] as const;
+  for (const [game, name, size] of targets) {
+    const file = join(GAMES, game, name);
+    assert.ok(existsSync(file), `${game}/${name} is missing`);
+    const stat = statSync(file);
+    assert.ok(stat.size > 0, `${game}/${name} is empty`);
+    if (size) assert.equal(stat.size, size, `${game}/${name} changed size`);
+  }
+});
+
+test('game entry points still load', () => {
+  // A hardlink mistake would most likely show up as a game that cannot run.
+  const entryPoints = ['2048', 'bloonstd2', 'candy-crush', 'doodle-jump', 'cut-the-rope', 'moto-x3m'];
+  for (const id of entryPoints) {
+    const file = join(GAMES, id, 'index.html');
+    assert.ok(existsSync(file), `${id}/index.html is missing`);
+    assert.ok(readFileSync(file, 'utf8').length > 200, `${id}/index.html looks truncated`);
   }
 });
 
 test('oversized single payloads are known and intentional', () => {
-  // Not a hard failure — these titles were explicitly requested and are large
-  // by nature (full Unity builds, a 49 MB GameMaker export). This test exists
-  // so a *new* surprise huge file shows up in review instead of hiding.
-  const big: string[] = [];
-  const walk = (dir: string) => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = join(dir, entry.name);
-      if (entry.isSymbolicLink()) continue;
-      if (entry.isDirectory()) walk(full);
-      else {
-        try { if (statSync(full).size > WARN_BYTES) big.push(full.slice(GAMES.length + 1)); } catch {}
-      }
-    }
-  };
-  walk(GAMES);
-  // 60 legitimate large payloads today (Unity/GameMaker/Godot builds). The cap
-  // is headroom above that, not a target: it only fires when something new and
-  // unexpectedly huge lands.
+  // Not a hard failure — these titles were explicitly requested and are large by
+  // nature (full Unity builds, a 49 MB GameMaker export). This exists so a *new*
+  // surprise huge file shows up in review instead of hiding.
+  const big = walk(GAMES).filter(file => {
+    try { return statSync(file).size > WARN_BYTES; } catch { return false; }
+  });
+  // 60 legitimate payloads today; the cap is headroom, not a target.
   assert.ok(big.length < 90, `unexpected number of >8 MB payloads: ${big.length}`);
 });
