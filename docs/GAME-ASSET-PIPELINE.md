@@ -86,3 +86,20 @@ school-Chromebook case stays covered.
 and `/thumbnails/*`. Before that, 3.2 GB of assets shipped with no cache header
 at all and every visitor re-downloaded them on every page view. Game entry HTML
 gets a shorter window so a newly shipped build is picked up quickly.
+
+## Deploy constraints worth remembering
+
+Two things about this repository will bite anyone who changes `public/`:
+
+1. **Never put a symlink under `public/`.** Vercel copies `public/` and
+   dereferences links as it goes, so *any* link there fails the build — a
+   target inside `public/` gives `Cannot copy X to a subdirectory of itself`,
+   and a target outside it gives the same error with a relative path. Both
+   variants were tried and both killed a production deploy. Hardlinks are fine:
+   they are ordinary files to the copier.
+2. **`next build` and `next start` succeeding proves nothing about the deploy.**
+   The symlink breakage built and served perfectly locally. Anything that
+   changes how files appear on disk has to be proven with a real Vercel build.
+
+`npm test` covers both: it fails on any symlink under `public/games`, and on
+identical payloads that have drifted onto separate inodes.
