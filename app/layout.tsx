@@ -1,4 +1,5 @@
 import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import type { Metadata, Viewport } from 'next'
 import '@fontsource-variable/space-grotesk'
 import '@fontsource-variable/inter'
@@ -92,7 +93,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           }}
         />
         <CustomizationProvider>{children}</CustomizationProvider>
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        {process.env.NODE_ENV === 'production' && (
+          <>
+            <Analytics />
+            <SpeedInsights />
+          </>
+        )}
       </body>
     </html>
   )
