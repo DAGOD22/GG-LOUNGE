@@ -48,7 +48,10 @@ function targetHost(req: Request): string {
 
 // Node reports chain problems with a few codes; match the wording that survives
 // Bare's JSON error body as well as the raw code.
-const CERT_FAILURE = /certificate|CERT_|self.signed|unable to verify|issuer chain/i;
+// Node reports chain problems with a few codes; match the wording that survives
+// Bare's JSON error body as well as the raw code. UNABLE_TO_VERIFY* has no
+// word break before "VERIFY", so it needs its own alternative.
+const CERT_FAILURE = /certificate|CERT_|self.signed|unable to verify|UNABLE_TO_VERIFY|verify the first certificate|issuer chain/i;
 
 async function handle(req: Request): Promise<Response> {
   const host = targetHost(req);

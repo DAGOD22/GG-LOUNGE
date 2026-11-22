@@ -1,9 +1,21 @@
 document.addEventListener('DOMContentLoaded', () => {
 const grid = document.querySelector('.grid')
 const scoreDisplay = document.getElementById('score')
+const bestDisplay = document.getElementById('best')
 const width = 8
 const squares = []
 let score = 0
+// Best score survives reloads; GGSave falls back to cookies when the browser
+// blocks localStorage, so school Chromebooks still keep their record.
+let best = (window.GGSave ? GGSave.get('best', 0) : 0) || 0
+if (bestDisplay) bestDisplay.textContent = best
+function recordScore(){
+  if (score > best) {
+    best = score
+    if (window.GGSave) GGSave.set('best', best)
+    if (bestDisplay) bestDisplay.textContent = best
+  }
+}
 
 const candyColors = [
     'url(images/red-candy.png)',
@@ -109,7 +121,7 @@ function moveIntoSquareBelow() {
 
       if(rowOfFour.every(index => squares[index].style.backgroundImage === decidedColor && !isBlank)) {
         score += 4
-        scoreDisplay.innerHTML = score
+        scoreDisplay.innerHTML = score; recordScore()
         rowOfFour.forEach(index => {
         squares[index].style.backgroundImage = ''
         })
@@ -127,7 +139,7 @@ function moveIntoSquareBelow() {
 
       if(columnOfFour.every(index => squares[index].style.backgroundImage === decidedColor && !isBlank)) {
         score += 4
-        scoreDisplay.innerHTML = score
+        scoreDisplay.innerHTML = score; recordScore()
         columnOfFour.forEach(index => {
         squares[index].style.backgroundImage = ''
         })
@@ -148,7 +160,7 @@ checkColumnForFour()
 
       if(rowOfThree.every(index => squares[index].style.backgroundImage === decidedColor && !isBlank)) {
         score += 3
-        scoreDisplay.innerHTML = score
+        scoreDisplay.innerHTML = score; recordScore()
         rowOfThree.forEach(index => {
         squares[index].style.backgroundImage = ''
         })
@@ -166,7 +178,7 @@ checkColumnForFour()
 
       if(columnOfThree.every(index => squares[index].style.backgroundImage === decidedColor && !isBlank)) {
         score += 3
-        scoreDisplay.innerHTML = score
+        scoreDisplay.innerHTML = score; recordScore()
         columnOfThree.forEach(index => {
         squares[index].style.backgroundImage = ''
         })

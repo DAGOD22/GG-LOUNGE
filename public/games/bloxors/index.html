@@ -44,7 +44,16 @@
           player.load("bloxors.swf");
       });
     </script>
-    <script src="ruffle/ruffle.js"></script>
+<script data-gg-flash-saves>
+      // Keep Flash shared objects (scores, saved levels, unlocks) on disk
+      // instead of in memory, so progress survives a reload.
+      window.RufflePlayer = window.RufflePlayer || {};
+      window.RufflePlayer.config = Object.assign(
+        { storage: "disk", localStorage: true, letterbox: "on" },
+        window.RufflePlayer.config || {}
+      );
+    </script>
+        <script src="ruffle/ruffle.js"></script>
 </center>
   </body>
 </html>
