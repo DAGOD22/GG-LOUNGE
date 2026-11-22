@@ -15,7 +15,6 @@ export function getGameIconFallbackPng(id: string): string {
   return `/game-icons/${id}.png`
 }
 export const catalogGames: Game[] = [
-  { id: 'subway-surfers', title: "Subway Surfers", subtitle: "Run the rails.", description: "The endless-runner everyone knows, running as a real 3D WebGL build hosted here \u2014 grab coins, dodge trains, keep running. Community WebGL port; Subway Surfers is a trademark of SYBO Games.", genre: 'Arcade', tone: 'Endless', mark: 'SS', color: 'drive', path: '/games/subway-surfers/index.html', icon: getGameIconUrl('subway-surfers'), featured: true },
   { id: 'mykonos', title: "Mykonos", subtitle: "Build a Greek island.", description: "A full voxel island builder in the browser \u2014 carve beaches, stack whitewashed houses and shape your own Aegean coastline, all in real time.", genre: 'Sandbox', tone: 'Voxel', mark: 'MY', color: 'aqua', path: '/games/mykonos/index.html', icon: getGameIconUrl('mykonos'), featured: true },
   { id: 'series-of-tubes', title: "Series of Tubes", subtitle: "Build the internet.", description: "A strategic network-building game about wiring the world together \u2014 lay cable, route traffic and watch your little empire of packets grow.", genre: 'Strategy', tone: 'Networks', mark: 'SoT', color: 'neon', path: '/games/series-of-tubes/index.html', icon: getGameIconUrl('series-of-tubes') },
   { id: 'quake', title: "Quake", subtitle: "The original, in a tab.", description: "id Software's 1996 landmark, compiled to WebAssembly and running here with the full shareware campaign \u2014 real 3D levels, real monsters, real rocket jumps.", genre: 'Shooter', tone: 'Classic FPS', mark: 'QK', color: 'twenty', path: '/games/quake/index.html', icon: getGameIconUrl('quake'), featured: true },
@@ -296,7 +295,7 @@ export const pubColors = ['cookie', 'drive', 'mining', 'devil', 'stack', 'hextri
 // so the titles people actually open first sit at the top instead of whatever
 // order the catalog was assembled in. Anything not listed keeps catalog order.
 export const CURATED_ORDER = [
-  'quake','webretro','subway-surfers','doom-js13k','sm64','wolf3d-classic','wolfenstein',
+  'quake','webretro','doom-js13k','sm64','wolf3d-classic','wolfenstein',
   'prince-of-persia','diablo','mykonos','series-of-tubes','candy-crush',
   'eaglercraftx','geometry-dash','ragdoll-archers','slope','slope-2','retro-bowl',
   'drive-mad','moto-x3m','motox3m-pool','motox3m-winter','motox3m-spooky','basket-random',

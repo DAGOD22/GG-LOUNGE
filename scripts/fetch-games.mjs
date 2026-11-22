@@ -83,7 +83,7 @@ const GAMES = {
   canyondefense: "canyondefense",
   hextris: "hextris",
   "solar-smash": null, // no complete build in this mirror
-  "subway-surfers": null,
+  "subway-surfers": null, // removed: knock-off build that only ran in Firefox
   "survival-race": null,
   "drift-hunters": null,
   geodash: "geodash",

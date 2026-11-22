@@ -147,12 +147,6 @@ export function inferAchievementUpdates(gameId: string, win: any, stats?: { play
       push('mx_flip', Math.floor(time/20),1)
       push('mx_3_stars', Math.floor(plays*0.3),1)
       break
-    case 'subway-surfers':
-      push('ssurf_100_coins', Math.floor(time*4),100)
-      push('ssurf_500_coins', Math.floor(time*4),500)
-      push('ssurf_1000m', Math.floor(time*10),1000)
-      push('ssurf_5_games', plays,5)
-      break
     case 'geometry-dash':
       push('gd_first_level', Math.min(plays,1),1)
       push('gd_10_attempts', plays*3,10)

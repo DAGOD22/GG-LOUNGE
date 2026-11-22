@@ -98,10 +98,6 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'mx_3_stars', gameId: 'moto-x3m', title: 'Perfection', description: 'Get 3 stars on a level', icon: '⭐', tier: 'gold', target: 1, unit: 'stars', points: 25, rarity: 'rare' },
 
   // 11. Subway Surfers
-  { id: 'ssurf_100_coins', gameId: 'subway-surfers', title: 'Coin Collector', description: 'Collect 100 coins', icon: '🪙', tier: 'bronze', target: 100, unit: 'coins', points: 10, rarity: 'common' },
-  { id: 'ssurf_500_coins', gameId: 'subway-surfers', title: 'Vault', description: 'Collect 500 coins', icon: '💰', tier: 'silver', target: 500, unit: 'coins', points: 20, rarity: 'rare' },
-  { id: 'ssurf_1000m', gameId: 'subway-surfers', title: 'Endless Runner', description: 'Run 1000 meters', icon: '🏃', tier: 'silver', target: 1000, unit: 'meters', points: 25, rarity: 'rare' },
-  { id: 'ssurf_5_games', gameId: 'subway-surfers', title: 'Commuter', description: 'Play 5 runs', icon: '🚇', tier: 'bronze', target: 5, unit: 'runs', points: 10, rarity: 'common' },
 
   // 12. Geometry Dash
   { id: 'gd_first_level', gameId: 'geometry-dash', title: 'First Jump', description: 'Complete first level', icon: '🔷', tier: 'bronze', target: 1, unit: 'levels', points: 10, rarity: 'common' },
