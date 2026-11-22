@@ -5,17 +5,18 @@
 type Bucket = { count: number; resetAt: number }
 const buckets = new Map<string, Bucket>()
 
-// auto-clean every 5min
+// Auto-clean every 5 minutes. `process` is absent in edge runtimes, so the
+// handle is optional and only unref'd when Node gives us one.
+declare const globalThis: { __rlClean?: ReturnType<typeof setInterval> } & typeof global;
 if (typeof setInterval !== 'undefined') {
-  // @ts-ignore
-  if (!(globalThis as any).__rlClean) {
-    // @ts-ignore
-    ;(globalThis as any).__rlClean = setInterval(() => {
-      const now = Date.now()
-      for (const [k, b] of buckets.entries()) if (b.resetAt < now) buckets.delete(k)
-    }, 5 * 60 * 1000)
-    // @ts-ignore
-    if ((globalThis as any).__rlClean.unref) (globalThis as any).__rlClean.unref()
+  if (!globalThis.__rlClean) {
+    globalThis.__rlClean = setInterval(() => {
+      const now = Date.now();
+      for (const [k, b] of buckets.entries()) if (b.resetAt < now) buckets.delete(k);
+    }, 5 * 60 * 1000);
+    // Don't hold the event loop open (Node only; browsers return a number).
+    const handle = globalThis.__rlClean as unknown as { unref?: () => void };
+    if (typeof handle?.unref === 'function') handle.unref();
   }
 }
 

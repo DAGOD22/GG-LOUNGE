@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Ban, Clock, Skull, Activity, ShieldAlert } from 'lucide-react'
+import { Ban, Clock, Skull, Activity } from 'lucide-react'
 
 export default function BannedPage(){
   const [gate, setGate] = useState<{ banned:boolean, expiresAt:string|null, left:number } | null>(null)

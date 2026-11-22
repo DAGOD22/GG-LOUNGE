@@ -14,9 +14,6 @@ const CREAM = "#f4f2ec";
 function clamp(v: number, a: number, b: number): number {
   return v < a ? a : v > b ? b : v;
 }
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
 
 /** shared per-instance animation state: blink timer + squash spring */
 function rig() {

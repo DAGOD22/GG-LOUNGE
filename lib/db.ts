@@ -390,10 +390,6 @@ async function withLocalLock<T>(fn: (store: LocalStore) => Promise<T> | T): Prom
   await task;
   return result;
 }
-async function readLocalLocked(): Promise<LocalStore> {
-  // For pure reads, just read without lock (ok to be slightly stale)
-  return readLocal();
-}
 
 /* ---------------- Bans & kicks ---------------- */
 
@@ -1041,7 +1037,7 @@ async function listRawRequests(): Promise<GameRequest[]> {
   }
   const s = await readLocal();
   return s.requests
-    .map(({ html: _h, ...rest }) => ({...rest, votes: (rest as any).votes||1}))
+    .map(({ html: _html, ...rest }) => ({...rest, votes: (rest as any).votes||1}))
     .sort((a, b) => ((b as any).votes||0) - ((a as any).votes||0) || (a.createdAt < b.createdAt ? 1 : -1));
 }
 
@@ -1117,7 +1113,7 @@ export async function listGames(): Promise<PublishedGame[]> {
   }
   const s = await readLocal();
   return s.games
-    .map(({ html: _h, ...rest }) => rest)
+    .map(({ html, ...rest }) => rest)
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 

@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Play, Search, Video } from 'lucide-react';
 
@@ -145,8 +146,8 @@ export default function YouTubePage() {
   return (
     <main>
       <header className="site-header">
-        <a className="brand" href="/"><span className="brand-mark"><Video size={17} /></span><span>GG-LOUNGE<span className="tm">™</span></span></a>
-        <nav className="header-nav"><a href="/">Library</a><a href="/apps">Apps</a><a href="/proxy">Proxy</a></nav>
+        <Link className="brand" href="/"><span className="brand-mark"><Video size={17} /></span><span>GG-LOUNGE<span className="tm">™</span></span></Link>
+        <nav className="header-nav"><Link href="/">Library</Link><Link href="/apps">Apps</Link><Link href="/proxy">Proxy</Link></nav>
       </header>
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '24px 24px 60px' }}>
         <a href="/apps" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--muted)' }}><ArrowLeft size={14} /> Apps</a>

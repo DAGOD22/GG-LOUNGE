@@ -6,11 +6,11 @@ import { THEMES } from '@/lib/customization/settings'
 import { dedupeGames } from '@/lib/game-identity'
 import { unavailableGames, getGameAssetIssues } from '@/lib/games'
 import Fuse from 'fuse.js'
-import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap, LayoutGrid, Rows3, Shuffle, ExternalLink, Copy, AlertCircle, Loader2, ChevronLeft, ChevronRight, Sun, Moon, Download, Flag, Flame, Crown, Gift, Monitor, Keyboard, Bug, ThumbsUp, Globe, MessageSquare, Star, Timer, WifiOff, Wifi, Filter, ArrowUpDown, Eye, EyeOff, ShieldAlert, ListFilter, Users, LogIn, LogOut, User, Cloud, CloudOff, Save, Menu } from 'lucide-react'
+import { ArrowUpRight, Gamepad2, Heart, Play, ShieldCheck, Sparkles, Trophy, X, Shuffle, AlertCircle, Sun, Moon, Download, Flame, Gift, Keyboard, WifiOff, Wifi, LogIn, LogOut, User, Cloud, Menu } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, CONTROLS_LEGEND, hashDay, gameOfDayIndex, PROXY_TILES, isNearDuplicate, normalizeTitle, curatedRank } from '@/lib/games'
+import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, CONTROLS_LEGEND, gameOfDayIndex, isNearDuplicate, curatedRank } from '@/lib/games'
 import type { Game } from '@/lib/games'
-import { GameCard, ShelfCard } from '@/components/GameCard'
+import {  } from '@/components/GameCard'
 import { LibraryToolbar } from '@/components/LibraryToolbar'
 import { CatalogGrid } from '@/components/CatalogGrid'
 import { RequestPanel } from '@/components/RequestPanel'
@@ -47,7 +47,8 @@ export default function Page() {
   const [authForm, setAuthForm] = useState({ username:'', password:'', favoriteFood:'', newPassword:'' })
   const [authError, setAuthError] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
-  const [debouncedQuery, setDebouncedQuery] = useState('')
+  // Kept for the search input's debounce pipeline; the rendered list reads query.
+  const [, setDebouncedQuery] = useState('')
   const [sortBy, setSortBy] = useState<'featured'|'popular'|'newest'|'az'>('featured')
   const [visibleCount, setVisibleCount] = useState(36)
   const [hideLow, setHideLow] = useState(true)
@@ -361,34 +362,16 @@ export default function Page() {
       if(rows.length>0) return rows.slice(0,5)
     }
     // PROD honest global: never fake with local playCounts
-    if(serverLeaderboard.length===0) return featuredGames.slice(0,5).map((g,i)=> ({ game:g, count: 0}))
-    return featuredGames.slice(0,5).map((g,i)=> ({ game:g, count: 0}))
+    if(serverLeaderboard.length===0) return featuredGames.slice(0,5).map((g)=> ({ game:g, count: 0}))
+    return featuredGames.slice(0,5).map((g)=> ({ game:g, count: 0}))
   }, [allGames, playCounts, serverLeaderboard, authUser, featuredGames])
   // JSON-LD for SEO - top games as ItemList
-  function highlight(text:string, q:string){
-    if(!q) return text
-    const idx = text.toLowerCase().indexOf(q.toLowerCase())
-    if(idx===-1) return text
-    const before = text.slice(0, idx)
-    const match = text.slice(idx, idx+q.length)
-    const after = text.slice(idx+q.length)
-    // return JSX fragments via split render in caller — this helper returns parts
-    return ({ before, match, after } as any)
-  }
-  function Highlighted({ text, query }: { text:string; query:string }){
-    if(!query) return <>{text}</>
-    const lower=text.toLowerCase(), q=query.toLowerCase()
-    const i=lower.indexOf(q)
-    if(i===-1) return <>{text}</>
-    return <>{text.slice(0,i)}<mark className="hl">{text.slice(i,i+q.length)}</mark>{text.slice(i+q.length)}</>
-  }
-
   const jsonLd = useMemo(()=> ({
     '@context':'https://schema.org',
     '@type':'ItemList',
     name:'GG-Lounge Games',
     numberOfItems: allGames.length,
-    itemListElement: allGames.slice(0,24).map((g,i)=> ({
+    itemListElement: allGames.slice(0,24).map((g, i)=> ({
       '@type':'ListItem',
       position:i+1,
       item: {
@@ -458,8 +441,7 @@ export default function Page() {
       await refreshRequests();
     } catch (error) { window.alert(error instanceof Error ? error.message : 'Vote failed. Try again.'); }
   }
-  function openProxyTile(url:string){ window.location.href = '/proxy?url='+encodeURIComponent(url) }
-  function copyGameLink(path:string){ try{ navigator.clipboard.writeText(location.origin+path); }catch{} }
+  function openProxyTile(url:string){ window.location.assign('/proxy?url='+encodeURIComponent(url)) }
   // autosave now handled inside GameModal (Fix 3+5)
   async function doAuth(mode:'login'|'register'|'reset'){
     setAuthError(''); setAuthLoading(true)

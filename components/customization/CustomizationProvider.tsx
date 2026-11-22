@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { Settings2 } from 'lucide-react';
 import { AnimatedCursor } from './AnimatedCursor';
 import { defaults, sanitizeSettings, SETTINGS_KEY, THEMES, WALLPAPERS, iconHref, normalizeDestination, matchesBinding, isTypingTarget, accentInk, cursorValue, type Settings } from '@/lib/customization/settings';
@@ -15,7 +15,9 @@ export function useCustomization(){const ctx=useContext(CustomizationContext);if
 export function CustomizationProvider({children}:{children:ReactNode}) {
   const [settings,setSettings]=useState<Settings>(defaults),[ready,setReady]=useState(false),[open,setOpen]=useState(false),[capturing,setCapturing]=useState(false),[saveError,setSaveError]=useState(''),[mediaError,setMediaError]=useState(''),[mediaUrl,setMediaUrl]=useState(''),[systemReduced,setSystemReduced]=useState(false);
   const state=useRef(settings),captureRef=useRef(false),openRef=useRef(false),documents=useRef(new Set<Document>()),pointer=useRef({x:0,y:0}),video=useRef<HTMLVideoElement>(null);
-  state.current=settings;captureRef.current=capturing;openRef.current=open;
+  // Latest-value refs, assigned in an effect so a discarded render cannot leave
+  // them pointing at state that never committed.
+  useLayoutEffect(()=>{state.current=settings;captureRef.current=capturing;openRef.current=open;},[settings,capturing,open]);
   const update=useCallback((fn:(previous:Settings)=>Settings)=>setSettings(previous=>{const value=sanitizeSettings(fn(previous));state.current=value;return value;}),[]);
   const openSettings=useCallback(()=>{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});setOpen(true);},[]);
   const reset=useCallback(()=>{setSettings(defaults());setSaveError('');setMediaError('');},[]);
@@ -52,6 +54,7 @@ export function CustomizationProvider({children}:{children:ReactNode}) {
   useEffect(()=>{for(const doc of documents.current){if(!doc.defaultView){documents.current.delete(doc);continue;}applyCursor(doc);}},[settings.cursor,settings.theme.colors.accent,applyCursor]);
   const runPanic=useCallback(()=>{const current=state.current;let destination:string;try{destination=normalizeDestination(current.panic.destination,location.origin);}catch{return;}
     try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(current));}catch{}window.onbeforeunload=null;
+    // eslint-disable-next-line react-hooks/immutability -- panicking is imperative DOM teardown in an event handler; nothing here is render state
     for(const doc of documents.current){try{if(doc.defaultView)doc.defaultView.onbeforeunload=null;for(const el of doc.querySelectorAll<HTMLMediaElement>('audio,video'))el.pause();doc.exitPointerLock?.();}catch{}}
     // Remove frames so a game's beforeunload prompt cannot trap a panic redirect.
     for(const frame of document.querySelectorAll('iframe'))frame.remove();

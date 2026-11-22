@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
-import { Trophy, X, Star, Lock, Medal, Crown, Gamepad2, Search, Filter, Sparkles, Target, Zap } from 'lucide-react'
-import { ACHIEVEMENTS, RARITY_COLOR, getAchievementsForGame, GAMES_WITH_ACHIEVEMENTS } from '@/lib/achievements'
+import { Trophy, X, Star, Lock, Medal, Crown, Gamepad2, Search, Sparkles, Target } from 'lucide-react'
+import { ACHIEVEMENTS, RARITY_COLOR, GAMES_WITH_ACHIEVEMENTS } from '@/lib/achievements'
 import { games } from '@/lib/games'
 
 export function AchievementsHub({ open, onClose, authUser, onPlayGame }: { open: boolean; onClose: () => void; authUser: {id:string, username:string}|null; onPlayGame?: (id:string)=>void }){

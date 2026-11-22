@@ -18,7 +18,7 @@ export function GameCard({
   isFavorite,
   onToggle,
   onLaunch,
-  variant = 'grid',
+  variant: _variant = 'grid',
   query = '',
   priority = false,
 }: {

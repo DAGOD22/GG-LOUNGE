@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, statSync, lstatSync, readFileSync, existsSync, readlinkSync } from 'node:fs';
+import { readdirSync, statSync, lstatSync, readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 

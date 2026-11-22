@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getUserFromToken, listUserAchievements, getUserStats, listUserGameStats } from "@/lib/db"
+import { getUserFromToken, getUserStats, listUserGameStats } from "@/lib/db"
 import { ACHIEVEMENTS } from "@/lib/achievements"
 
 export const runtime = "nodejs"

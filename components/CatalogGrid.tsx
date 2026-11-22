@@ -1,11 +1,11 @@
 'use client'
 import { GameCard, ShelfCard } from '@/components/GameCard'
-import { Shuffle, Zap, Rows3 } from 'lucide-react'
+import { Shuffle, Zap } from 'lucide-react'
 import type { Game } from '@/lib/games'
 
 export function CatalogGrid({
   view, filter, query, visibleGames, paginatedGames, grouped, staffGames, allGames,
-  favorites, toggleFavorite, launch, loadMoreRef, visibleCount, setVisibleCount,
+  favorites, toggleFavorite, launch, loadMoreRef, setVisibleCount,
   setQuery, setFilter, setHideLow, setShowStaffOnly, shufflePick
 }: any){
   if(view==='shelves' && filter==='All games' && !query.trim()){

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import type { Metadata } from 'next'
 import { Gamepad2, Scale, AlertTriangle, Shield, FileText, Gavel, Mail } from 'lucide-react'
 
@@ -11,8 +12,8 @@ export default function TermsPage() {
     <main className="lounge-shell">
       <div className="noise" aria-hidden="true" />
       <header className="site-header">
-        <a href="/" className="brand"><span className="brand-mark"><Gamepad2 size={19} /></span><span>GG-LOUNGE<span className="tm">™</span></span></a>
-        <nav className="header-nav"><a href="/">Library</a><a href="/apps">Apps</a><a href="/proxy">Proxy</a><a href="/privacy">Privacy</a></nav>
+        <Link href="/" className="brand"><span className="brand-mark"><Gamepad2 size={19} /></span><span>GG-LOUNGE<span className="tm">™</span></span></Link>
+        <nav className="header-nav"><Link href="/">Library</Link><Link href="/apps">Apps</Link><Link href="/proxy">Proxy</Link><Link href="/privacy">Privacy</Link></nav>
         <div className="header-status"><span className="live-dot" /> Terms</div>
       </header>
       <section className="catalog" style={{ maxWidth: 860 }}>
@@ -64,7 +65,7 @@ export default function TermsPage() {
         </div>
       </section>
       <footer style={{ maxWidth: 860, margin: '40px auto 0', padding: '20px 38px', borderTop: '1px solid var(--line)', color: 'var(--muted)', fontSize: 11, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <span>© 2026 GG-LOUNGE STUDIOS™ • Adelaide, SA</span><span><a href="/privacy" style={{ textDecoration: 'underline' }}>Privacy</a> • <a href="/terms" style={{ textDecoration: 'underline' }}>Terms</a> • <a href="/">Home</a></span>
+        <span>© 2026 GG-LOUNGE STUDIOS™ • Adelaide, SA</span><span><Link href="/privacy" style={{ textDecoration: 'underline' }}>Privacy</Link> • <Link href="/terms" style={{ textDecoration: 'underline' }}>Terms</Link> • <Link href="/">Home</Link></span>
       </footer>
     </main>
   )

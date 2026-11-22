@@ -5,7 +5,6 @@ import { getDatabaseUrl } from "@/lib/db";
 export const dynamic = 'force-dynamic'
 
 const PIPED_PROBE = 'https://pipedapi.tokhmi.xyz/streams/dQw4w9WgXcQ'
-const BARE_LOCAL = '/api/bare/'
 
 export async function GET() {
   const started = Date.now()
@@ -14,7 +13,6 @@ export async function GET() {
   // 1) local bare health (same origin, should always be ok if server is up)
   try {
     const t = Date.now()
-    const url = process.env.NEXT_PUBLIC_SITE_URL ? `${process.env.NEXT_PUBLIC_SITE_URL}${BARE_LOCAL}` : BARE_LOCAL
     // In dev, use fetch to self via relative — but in route handler we can just check that bare module loads
     // We probe by importing bare health logic: just return ok
     checks['bare:local'] = { ok: true, ms: Date.now() - t }

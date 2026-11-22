@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react';
 import {
   Ban,
@@ -22,13 +23,11 @@ import {
   X,
   Zap,
   TrendingUp,
-  Sparkles,
-  Activity,
+    Activity,
   FileCode,
   Image as ImageIcon,
   Search,
-  Filter,
-  Crown,
+    Crown,
 } from 'lucide-react';
 import { readFileAsDataUrl, uploadGameHtml } from '@/lib/upload-client';
 
@@ -219,9 +218,9 @@ export default function AdminPage() {
             <button type="submit" className="btn-primary" style={{borderRadius:14, padding:'14px', background:'linear-gradient(135deg, var(--lime), #c6ff00)', boxShadow:'0 8px 24px rgba(215,243,74,.25)'}}>Unlock console <Zap size={14}/></button>
           </form>
           {error && <p className="admin-error" style={{textAlign:'center', background:'rgba(255,92,92,.12)', border:'1px solid rgba(255,92,92,.22)', padding:'10px 14px', borderRadius:12}}>{error}</p>}
-          <a className="admin-back" href="/" style={{display:'inline-flex', alignItems:'center', gap:6, justifyContent:'center', width:'100%', marginTop:16}}>
+          <Link className="admin-back" href="/" style={{display:'inline-flex', alignItems:'center', gap:6, justifyContent:'center', width:'100%', marginTop:16}}>
             ← Back to lounge
-          </a>
+          </Link>
         </section>
       </main>
     );
@@ -257,7 +256,7 @@ export default function AdminPage() {
         <div className="console-actions" style={{flexDirection:'column',alignItems:'stretch',gap:12, minWidth:280}}>
           <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
             <div style={{flex:1, display:'flex',alignItems:'center',gap:8, padding:'8px 12px', borderRadius:999, background:'rgba(0,0,0,.25)', border:'1px solid rgba(255,255,255,.08)'}}><Search size={14} style={{opacity:.5}}/><input value={search} onChange={e=> setSearch(e.target.value)} placeholder="Search IP, path, ban reason" style={{background:'transparent', border:0, outline:'none', color:'#fff', fontSize:12, flex:1}} /></div>
-            <a className="btn-ghost" href="/" style={{padding:'10px 14px', borderRadius:12, background:'rgba(255,255,255,.06)', backdropFilter:'blur(6px)'}}><Gamepad2 size={14}/> Lounge</a>
+            <Link className="btn-ghost" href="/" style={{padding:'10px 14px', borderRadius:12, background:'rgba(255,255,255,.06)', backdropFilter:'blur(6px)'}}><Gamepad2 size={14}/> Lounge</Link>
             <button className="btn-ghost" onClick={() => void logout()} style={{padding:'10px 14px', borderRadius:12}}>
               <LogOut size={15} /> Log out
             </button>

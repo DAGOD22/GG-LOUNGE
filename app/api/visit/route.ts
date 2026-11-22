@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     }
     await logGamePlay(gameId, ip, user.id);
     return NextResponse.json({ ok: true });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ ok: true });
   }
 }

@@ -120,7 +120,7 @@ export function bootProxy(): Promise<ProxyRuntime> {
     // HTTP-only transport. There is deliberately no Wisp/WebSocket path: the
     // in-app Bare relay handles every request, so a missing Wisp server can no
     // longer leave proxied pages stuck on a blank screen.
-    const transport: 'bare' = 'bare';
+    const transport = 'bare' as const;
     const notice = 'Connected through the lounge proxy.';
 
     return {
@@ -146,6 +146,6 @@ export function createFrame(iframe: HTMLIFrameElement, prefix: string): Scramjet
     go(url: string) { iframe.src = url; },
     back() { try { iframe.contentWindow?.history.back(); } catch { /* cross-origin after a navigation */ } },
     forward() { try { iframe.contentWindow?.history.forward(); } catch { /* cross-origin after a navigation */ } },
-    addEventListener(_type, _listener) { void prefix; },
+    addEventListener() { void prefix; },
   };
 }

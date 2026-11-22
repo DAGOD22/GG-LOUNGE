@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, ExternalLink, Globe, Home, RotateCw, Search } from 'lucide-react';
 import { bootProxy, createFrame, normalizeProxyUrl, type ProxyRuntime, type ScramjetFrame } from '@/lib/proxy-client';
@@ -73,7 +74,7 @@ export default function ProxyPage() {
   }
   return <main className="proxy-shell" style={{ minHeight: '100dvh' }}>
     <header className="proxy-bar" style={{ flexWrap: 'wrap', height: 'auto', minHeight: 58, padding: '10px 16px' }}>
-      <a className="proxy-brand" href="/"><Globe size={17} /> GG-LOUNGE <span>/ PROXY</span></a>
+      <Link className="proxy-brand" href="/"><Globe size={17} /> GG-LOUNGE <span>/ PROXY</span></Link>
       <div className="proxy-nav">
         <button aria-label="Back" disabled={!current} onClick={() => controlledFrame.current?.back()}><ArrowLeft size={16} /></button>
         <button aria-label="Forward" disabled={!current} onClick={() => controlledFrame.current?.forward()}><ArrowRight size={16} /></button>

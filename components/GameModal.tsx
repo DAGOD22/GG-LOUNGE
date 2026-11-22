@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Heart, Maximize2, X, Copy, ExternalLink, Gamepad2, Keyboard, Monitor, Bug, Flag, AlertCircle, Loader2, Save, Trophy, Star, Lock, Medal, Crown, Zap, Target } from 'lucide-react'
+import { Heart, Maximize2, X, Copy, ExternalLink, Gamepad2, Keyboard, Monitor, Bug, Flag, AlertCircle, Loader2, Save, Trophy, Star, Lock, Medal, Crown } from 'lucide-react'
 import type { Game } from '@/lib/games'
 import { CONTROLS_LEGEND } from '@/lib/games'
 import { inferAchievementUpdates } from '@/lib/achievement-tracker'
@@ -349,7 +349,6 @@ export function GameModal({
     } catch {}
     try {
       const doc = iframe.contentDocument
-      const win = iframe.contentWindow as any
       if (!doc) return
       // robust responsive patch — fill screen without cut-off
       if (!doc.querySelector('style[data-ggl-patch]')) {
