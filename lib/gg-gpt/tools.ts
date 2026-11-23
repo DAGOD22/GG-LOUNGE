@@ -215,9 +215,24 @@ async function geocode(place: string): Promise<{ name: string; lat: number; lon:
 }
 
 /** Live weather for a named place. Open-Meteo needs no key. */
+/**
+ * Weather, from two independent free services.
+ *
+ * open-meteo is the better data, but its free tier has a **daily request cap**
+ * and a diagnostic run was enough to exhaust it (HTTP 429 "Daily API request
+ * limit exceeded"). So a failure there is not the end of the answer: wttr.in
+ * serves current conditions with no key and no quota, from a different
+ * provider. Weather is the single most-asked live question, so it must not
+ * depend on one vendor's counter.
+ */
 export async function getWeather(place: string): Promise<ToolResult | null> {
   const geo = await geocode(place);
-  if (!geo) return null;
+  const primary = geo ? await openMeteo(geo).catch(() => null) : null;
+  if (primary) return primary;
+  return wttr(place).catch(() => null);
+}
+
+async function openMeteo(geo: { name: string; lat: number; lon: number }): Promise<ToolResult | null> {
   const res = await fetch(
     `https://api.open-meteo.com/v1/forecast?latitude=${geo.lat}&longitude=${geo.lon}` +
       `&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m` +
@@ -246,6 +261,38 @@ export async function getWeather(place: string): Promise<ToolResult | null> {
     lines.push(`Forecast — ${days.join(" | ")}`);
   }
   return { text: lines.join("\n"), data: { place: geo.name, current: c, daily: d }, source: "open-meteo" };
+}
+
+/** wttr.in: keyless, quota-free, plain text. Used when open-meteo is capped. */
+async function wttr(place: string): Promise<ToolResult | null> {
+  const res = await fetch(`https://wttr.in/${encodeURIComponent(place)}?format=j1`, {
+    headers: { "user-agent": "curl/8 (GG-GPT)", accept: "application/json" },
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!res.ok) return null;
+  const j = (await res.json()) as {
+    current_condition?: Array<Record<string, unknown>>;
+    nearest_area?: Array<{ areaName?: Array<{ value?: string }> }>;
+    weather?: Array<Record<string, unknown>>;
+  };
+  const cur = j.current_condition?.[0];
+  if (!cur) return null;
+  const name = j.nearest_area?.[0]?.areaName?.[0]?.value || place;
+  const desc = String((cur.weatherDesc as Array<{ value?: string }> | undefined)?.[0]?.value ?? "unknown conditions").trim();
+  const temp = Number(cur.temp_C ?? 0);
+  const feels = Number(cur.FeelsLikeC ?? temp);
+  const lines = [
+    `Right now in ${name}: ${Math.round(temp)}°C (feels like ${Math.round(feels)}°C), ${desc}.`,
+    `Humidity ${cur.humidity ?? "?"}%, wind ${cur.windspeedKmph ?? "?"} km/h ${cur.winddir16Point ?? ""}, precipitation ${cur.precipMM ?? 0} mm.`,
+  ];
+  const days = (j.weather || []).slice(0, 3).map(d => {
+    const date = String(d.date ?? "");
+    const max = Number((d.maxtempC as string) ?? 0);
+    const min = Number((d.mintempC as string) ?? 0);
+    return `${date}: ${Math.round(max)}°/${Math.round(min)}°C`;
+  });
+  if (days.length) lines.push(`Forecast — ${days.join(" | ")}`);
+  return { text: lines.join("\n"), data: { place: name, current: cur }, source: "wttr.in" };
 }
 
 /* ----------------------------- conversions ----------------------------- */

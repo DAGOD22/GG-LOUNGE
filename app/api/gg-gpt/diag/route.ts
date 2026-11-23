@@ -119,6 +119,7 @@ function probes(): Probe[] {
   });
   out.push({ name: "image:pollinations", url: "https://image.pollinations.ai/prompt/a%20red%20cube?width=256&height=256&nologo=true", method: "GET", headers: {} });
 
+  out.push({ name: "weather:wttr", url: "https://wttr.in/Adelaide?format=j1", method: "GET", headers: { "user-agent": "curl/8 (GG-GPT)" } });
   out.push({ name: "weather:open-meteo", url: "https://api.open-meteo.com/v1/forecast?latitude=-34.93&longitude=138.6&current=temperature_2m", method: "GET", headers: {} });
   out.push({ name: "crypto:coingecko", url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd", method: "GET", headers: {} });
   out.push({ name: "fx:open.er-api", url: "https://open.er-api.com/v6/latest/USD", method: "GET", headers: {} });
