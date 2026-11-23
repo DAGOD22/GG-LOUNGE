@@ -166,14 +166,26 @@ export default function Page() {
   },[])
 
   // anonymous id for cloud sync + username-linked cloud (favorites sync across devices)
-  const anonIdRef = useRef<string>('')
+  const [guestToken, setGuestToken] = useState('')
   useEffect(()=>{
     try{
       let id = localStorage.getItem('ggl_anon_id')
       if(!id){ id='anon_'+Math.random().toString(36).slice(2,9)+Date.now().toString(36); localStorage.setItem('ggl_anon_id', id) }
-      anonIdRef.current=id
+      // A guest's row is reachable only with a token the server signed for that
+      // id; a bare id would let anyone read anyone else's history.
+      const cached = localStorage.getItem('ggl_guest_token')
+      if(cached && cached.startsWith(id + '.')) setGuestToken(cached)
+      else fetch('/api/user-state/token', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ anonId: id }) })
+        .then(r=> r.ok? r.json(): null)
+        .then((d:any)=>{ if(d?.token){ localStorage.setItem('ggl_guest_token', d.token); setGuestToken(d.token) } })
+        .catch(()=>{})
+    }catch{}
+  },[])
+  useEffect(()=>{
+    if(!guestToken) return
+    try{
       // load cloud state and merge (cloud wins if newer) — anon
-      fetch('/api/user-state?id='+encodeURIComponent(id)).then(r=> r.ok? r.json():null).then((d:any)=>{
+      fetch('/api/user-state', { headers:{ 'x-gg-guest': guestToken } }).then(r=> r.ok? r.json():null).then((d:any)=>{
         if(d?.state){
           const s=d.state
           if(Array.isArray(s.favorites) && s.favorites.length> favorites.length) setFavorites(s.favorites)
@@ -182,11 +194,11 @@ export default function Page() {
         }
       }).catch(()=>{})
     }catch{}
-  },[])
+  },[guestToken])
   // when signed in, also load/merge username cloud state (this is what saves progress across devices with username)
   useEffect(()=>{
     if(!authUser?.id) return
-    fetch('/api/user-state?id='+encodeURIComponent(authUser.id)).then(r=> r.ok? r.json():null).then((d:any)=>{
+    fetch('/api/user-state').then(r=> r.ok? r.json():null).then((d:any)=>{
       if(d?.state){
         const s=d.state
         // merge: union favorites, max playCounts, union recentlyPlayed
@@ -204,14 +216,15 @@ export default function Page() {
   },[authUser?.id])
   // sync to cloud debounced — anon + signed-in user (progress saves across devices via username)
   useEffect(()=>{
-    const anon = anonIdRef.current || (typeof localStorage!=='undefined' ? localStorage.getItem('ggl_anon_id') : '')
-    const ids = [anon, authUser?.id].filter(Boolean) as string[]
-    if(ids.length===0) return
+    // Signed in: the cookie identifies the row. Guest: the signed token does.
+    if(!authUser && !guestToken) return
+    const headers: Record<string,string> = { 'content-type':'application/json' }
+    if(!authUser) headers['x-gg-guest'] = guestToken
     const h = setTimeout(()=>{
-      for(const id of ids) fetch('/api/user-state', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ id, favorites, playCounts, recentlyPlayed })}).catch(()=>{})
+      fetch('/api/user-state', { method:'POST', headers, body: JSON.stringify({ favorites, playCounts, recentlyPlayed })}).catch(()=>{})
     }, 1200)
     return ()=> clearTimeout(h)
-  },[favorites, playCounts, recentlyPlayed, authUser])
+  },[favorites, playCounts, recentlyPlayed, authUser, guestToken])
 
   // keyboard shortcut: '/' focuses search, Esc closes modal (a11y)
   useEffect(()=>{
