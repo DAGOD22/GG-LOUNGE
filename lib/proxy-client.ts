@@ -106,6 +106,23 @@ export async function ensureProxyWorker(): Promise<ServiceWorkerRegistration> {
   return registration;
 }
 
+/** Does this host actually upgrade /api/wisp? One probe, cached. */
+let wispProbe: Promise<boolean> | null = null;
+function wispAvailable(): Promise<boolean> {
+  if (wispProbe) return wispProbe;
+  wispProbe = (async () => {
+    try {
+      const res = await fetch('/api/wisp', { method: 'GET', headers: { accept: 'application/json' } });
+      if (!res.ok) return false;
+      const body = (await res.json()) as { transport?: string };
+      return body?.transport === 'websocket';
+    } catch {
+      return false;
+    }
+  })();
+  return wispProbe;
+}
+
 export function bootProxy(): Promise<ProxyRuntime> {
   if (bootPromise) return bootPromise;
   bootPromise = (async (): Promise<ProxyRuntime> => {
@@ -124,11 +141,24 @@ export function bootProxy(): Promise<ProxyRuntime> {
     const codec = win.Ultraviolet?.codec?.xor;
     if (!codec) throw new Error('The proxy runtime failed to load. Reload and try again.');
 
-    // HTTP-only transport. There is deliberately no Wisp/WebSocket path: the
-    // in-app Bare relay handles every request, so a missing Wisp server can no
-    // longer leave proxied pages stuck on a blank screen.
+    // WebSocket transport, when the host can upgrade. Ultraviolet's own
+    // websocket shim opens a `bare` subprotocol against the configured bare
+    // address, so pointing that address at the Wisp relay is all multiplayer
+    // (CrazyGames, Poki, now.gg, every .io title) needs. Serverless hosts cannot
+    // upgrade, so this is best-effort and silently stays on plain HTTP.
     const transport = 'bare' as const;
-    const notice = 'Connected through the lounge proxy.';
+    let notice = 'Connected through the lounge proxy.';
+    try {
+      if (await wispAvailable()) {
+        const w = window as unknown as { wisp_client?: { client: new (url: string) => unknown } };
+        await loadScript('/wisp/wisp-client.js');
+        if (w.wisp_client?.client) {
+          // Touch the constructor so a broken build fails here, not mid-match.
+          new w.wisp_client.client(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/wisp/`);
+          notice = 'Connected through the lounge proxy, with live multiplayer.';
+        }
+      }
+    } catch { /* HTTP-only is still a working browser */ }
 
     return {
       prefix: PREFIX,
