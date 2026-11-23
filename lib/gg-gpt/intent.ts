@@ -118,7 +118,7 @@ function findCurrency(fragment: string): string | null {
 
 /** Words that mean "this needs current information". */
 const RECENCY =
-  /\b(latest|newest|current(ly)?|today|tonight|tomorrow|yesterday|this (week|month|year)|right now|recent(ly)?|news|headlines?|who won|score|results?|release[d]?|launch(ed)?|update[d]?|version|price|cost|how much|stock|weather|forecast|trending|election|died|born|age of|how old|when (is|was|did|does|will))\b/i;
+  /\b(latest|newest|current(ly)?|today|tonight|tomorrow|yesterday|this (week|month|year)|right now|recent(ly)?|news|headlines?|who (?:is|was|won|are|did)|score|results?|release[d]?|launch(ed)?|update[d]?|version|price|cost|how much|stock|weather|forecast|trending|election|died|born|age of|how old|when (is|was|did|does|will))\b/i;
 
 const IMAGE_VERB = /^\s*(?:please\s+)?(?:can you\s+|could you\s+|would you\s+)?(?:generate|make|create|draw|render|design|paint|sketch|imagine)\s+(?:me\s+)?/i;
 
@@ -250,9 +250,17 @@ export function detectIntent(message: string): Intent {
   }
 
   /* ---- dictionary ---- */
-  const def = /\b(?:define|definition of|what does|what's the meaning of|meaning of|what is the meaning of)\s+["']?([a-z][a-z'-]{1,30})["']?/i.exec(m);
-  if (def && !/\b(mean by|you mean)\b/i.test(lower)) {
-    intent.define = { word: def[1].toLowerCase() };
+  const STOPWORDS = /^(the|a|an|this|that|it|its|you|your|i|me|we|they|he|she|my|of|in|on|to|for|and|or|but|is|are|was|were|be|do|does|did|can|could|would|should|will|mean|means|word|phrase|term)$/i;
+  const quoted =
+    /(?:define|definition of|meaning of)\s+["'“]([a-z][a-z'-]{1,30})["'”]/i.exec(m) ||
+    /["'“]([a-z][a-z'-]{1,30})["'”]\s+(?:mean|means)\b/i.exec(m) ||
+    /\bwhat does\s+["'“]([a-z][a-z'-]{1,30})["'”]/i.exec(m);
+  const bareDef = /\b(?:define|definition of|meaning of)\s+([a-z][a-z'-]{1,30})\b/i.exec(m);
+  const doesMean = /\bwhat does\s+([a-z][a-z'-]{1,30})\s+mean\b/i.exec(m) ||
+                   /\bwhat does\s+the\s+(?:word|term|phrase)\s+([a-z][a-z'-]{1,30})\b/i.exec(m);
+  const word = quoted?.[1] || doesMean?.[1] || bareDef?.[1];
+  if (word && !STOPWORDS.test(word) && !/\b(mean by|you mean)\b/i.test(lower)) {
+    intent.define = { word: word.toLowerCase() };
     return intent;
   }
 
