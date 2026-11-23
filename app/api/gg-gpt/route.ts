@@ -28,6 +28,7 @@ import {
 } from "@/lib/gg-gpt/tools";
 import { detectIntent, titleFromMessage } from "@/lib/gg-gpt/intent";
 import { answerClock } from "@/lib/gg-gpt/clock";
+import { cacheGet, cacheSet } from "@/lib/gg-gpt/cache";
 import { buildSystemPrompt, extractFacts, type GgProfile } from "@/lib/gg-gpt/persona";
 import { games } from "@/lib/games";
 
@@ -305,6 +306,26 @@ export async function POST(req: Request) {
   }
 
   const notes = toolResults.map(r => `[${r.source}] ${r.text}`);
+
+  // Only share answers that cannot contain anything personal. A signed-in user
+  // with memories, favourites or prior turns gets a tailor-made reply, and
+  // handing that to the next person would be both wrong and a privacy leak.
+  const personal =
+    history.length > 0 ||
+    memories.length > 0 ||
+    !!(profile.topGames?.length || profile.favoriteIds?.length || profile.memberSince) ||
+    /\b(my|me|i'm|i am|mine|our|we)\b/i.test(message);
+
+  const cached = personal ? null : cacheGet(message, notes);
+  if (cached) {
+    if (user && chatId) {
+      await addMessage(user.id, chatId, "assistant", cached.text, { cards, provider: cached.provider }).catch(() => undefined);
+      await touchChat(user.id, chatId).catch(() => undefined);
+    }
+    return body.stream
+      ? sseOnce(cached.text, { chatId, provider: cached.provider, cards, cached: true })
+      : NextResponse.json({ text: cached.text, chatId, provider: cached.provider, signedIn: !!user, cards, cached: true });
+  }
   const system = buildSystemPrompt({ profile, memories, now: new Date(), notes });
   const turns: ChatTurn[] = [
     { role: "system", content: system },
@@ -338,6 +359,7 @@ export async function POST(req: Request) {
         }
         if (user) {
           for (const fact of extractFacts(message)) await addMemory(user.id, fact, "chat").catch(() => undefined);
+          if (!personal) cacheSet(message, notes, full, provider);
           if (chatId) {
             await addMessage(user.id, chatId, "assistant", full, { cards, provider }).catch(() => undefined);
             await touchChat(user.id, chatId).catch(() => undefined);
@@ -364,6 +386,8 @@ export async function POST(req: Request) {
     text = deterministic || offlineAnswer(message, profile, attempted);
     provider = "offline";
   }
+
+  if (!personal) cacheSet(message, notes, text, provider);
 
   if (user) {
     for (const fact of extractFacts(message)) await addMemory(user.id, fact, "chat").catch(() => undefined);
