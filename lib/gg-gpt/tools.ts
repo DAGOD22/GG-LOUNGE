@@ -89,27 +89,42 @@ async function duckduckgo(query: string): Promise<SearchHit[]> {
   return hits;
 }
 
-async function bingRss(query: string): Promise<SearchHit[]> {
-  const res = await fetch(`https://www.bing.com/search?format=rss&q=${encodeURIComponent(query)}`, {
-    headers: { "user-agent": UA, accept: "application/rss+xml, application/xml" },
-    signal: AbortSignal.timeout(12000),
-  });
-  if (!res.ok) return [];
-  const xml = await res.text();
+/** Read an RSS/Atom document into search hits. */
+function parseRss(xml: string, limit = 8): SearchHit[] {
   const hits: SearchHit[] = [];
-  for (const item of xml.split("<item>").slice(1)) {
-    const title = item.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? "";
-    const link = item.match(/<link>([\s\S]*?)<\/link>/)?.[1] ?? "";
-    const desc = item.match(/<description>([\s\S]*?)<\/description>/)?.[1] ?? "";
+  const items = xml.includes("<item>") ? xml.split("<item>").slice(1) : xml.split(/<entry[\s>]/).slice(1);
+  for (const item of items) {
+    const title = item.match(/<title[^>]*>([\s\S]*?)<\/title>/)?.[1] ?? "";
+    const link = item.match(/<link[^>]*>([\s\S]*?)<\/link>/)?.[1] ?? item.match(/<link[^>]*href="([^"]+)"/)?.[1] ?? "";
+    const desc = item.match(/<description>([\s\S]*?)<\/description>/)?.[1] ?? item.match(/<summary[^>]*>([\s\S]*?)<\/summary>/)?.[1] ?? "";
     if (!link) continue;
     hits.push({
       title: stripTags(title).slice(0, 180),
       url: link.trim(),
       snippet: stripTags(desc).slice(0, 400),
     });
-    if (hits.length >= 8) break;
+    if (hits.length >= limit) break;
   }
   return hits;
+}
+
+async function bingRss(query: string): Promise<SearchHit[]> {
+  const res = await fetch(`https://www.bing.com/search?format=rss&q=${encodeURIComponent(query)}`, {
+    headers: { "user-agent": UA, accept: "application/rss+xml, application/xml" },
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!res.ok) return [];
+  return parseRss(await res.text());
+}
+
+/** Mojeek has an independent index and does not block datacenter IPs. */
+async function mojeek(query: string): Promise<SearchHit[]> {
+  const res = await fetch(`https://www.mojeek.com/search?fmt=rss&q=${encodeURIComponent(query)}`, {
+    headers: { "user-agent": UA, accept: "application/rss+xml, application/xml, */*" },
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!res.ok) return [];
+  return parseRss(await res.text(), 6);
 }
 
 async function wikipediaSearch(query: string): Promise<SearchHit[]> {
@@ -140,8 +155,12 @@ export async function webSearch(query: string): Promise<{ hits: SearchHit[]; sou
   const clean = query.trim().slice(0, 300);
   if (!clean) return { hits: [], source: "none" };
   const engines: Array<[string, (q: string) => Promise<SearchHit[]>, number]> = [
-    ["duckduckgo", duckduckgo, 3],
-    ["bing", bingRss, 2],
+    // Ranked by whether the engine survives this network, which the
+    // diagnostics measured: Bing RSS and Wikipedia answer; DuckDuckGo returns
+    // a 202 challenge page from datacenter IPs.
+    ["bing", bingRss, 4],
+    ["mojeek", mojeek, 3],
+    ["duckduckgo", duckduckgo, 2],
     ["wikipedia", wikipediaSearch, 1],
   ];
   const settled = await Promise.allSettled(engines.map(([, fn]) => fn(clean)));
