@@ -85,7 +85,8 @@ export function migrate(): Promise<void> {
           "ua" TEXT NOT NULL DEFAULT '',
           "path" TEXT NOT NULL DEFAULT '/',
           "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          "userId" TEXT REFERENCES "auth_user"("id") ON DELETE SET NULL
+          "userId" TEXT REFERENCES "auth_user"("id") ON DELETE SET NULL,
+          "username" TEXT
         );
         CREATE INDEX IF NOT EXISTS "visits_createdAt_idx" ON "visits" ("createdAt" DESC);
         CREATE TABLE IF NOT EXISTS "game_request" (
@@ -178,6 +179,7 @@ export function migrate(): Promise<void> {
       // Tolerate tables created by older schemas.
       await p.query(`ALTER TABLE "banned_user" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMPTZ`);
       await p.query(`ALTER TABLE "visits" ADD COLUMN IF NOT EXISTS "userId" TEXT`);
+      await p.query(`ALTER TABLE "visits" ADD COLUMN IF NOT EXISTS "username" TEXT`);
       await p.query(`CREATE INDEX IF NOT EXISTS "visits_userId_idx" ON "visits" ("userId")`);
       await p.query(`ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'pending'`);
       await p.query(`ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "votes" INTEGER NOT NULL DEFAULT 1`);

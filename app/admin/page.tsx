@@ -34,7 +34,7 @@ import { readFileAsDataUrl, uploadGameHtml } from '@/lib/upload-client';
 type BanRow = { id: string; identifier: string; reason: string | null; createdAt: string; expiresAt: string | null };
 type RequestRow = { id: string; title: string; icon: string | null; status: string; createdAt: string };
 type GameRow = { id: string; title: string; icon: string | null; createdAt: string };
-type VisitRow = { id: string; ip: string; ua: string; path: string; createdAt: string };
+type VisitRow = { id: string; ip: string; ua: string; path: string; createdAt: string; userId?: string | null; username?: string | null };
 type Data = { bans: BanRow[]; requests: RequestRow[]; games: GameRow[]; visits: VisitRow[]; mode: string };
 
 const empty: Data = { bans: [], requests: [], games: [], visits: [], mode: 'local' };
@@ -234,7 +234,11 @@ export default function AdminPage() {
     { icon: <ShieldAlert size={20} />, label: 'Bans', value: data.bans.length, sub: data.bans.length? 'active':'peace', color: 'muted', trend: data.bans.length? 'enforced':'calm' },
   ];
 
-  const filteredVisits = data.visits.filter(v=> !search || v.ip.includes(search) || v.path.toLowerCase().includes(search.toLowerCase()) || shortUa(v.ua).toLowerCase().includes(search.toLowerCase())).slice(0,20)
+  const filteredVisits = data.visits.filter(v=> !search
+    || v.ip.includes(search)
+    || v.path.toLowerCase().includes(search.toLowerCase())
+    || (v.username || 'anonymous').toLowerCase().includes(search.toLowerCase())
+    || shortUa(v.ua).toLowerCase().includes(search.toLowerCase())).slice(0,20)
   const filteredBans = data.bans.filter(b=> !search || b.identifier.includes(search) || (b.reason||'').toLowerCase().includes(search.toLowerCase()))
 
   return (
@@ -308,7 +312,21 @@ export default function AdminPage() {
               {filteredVisits.map((v) => (
                 <div className="visit-row" key={v.id} style={{padding:'12px 14px', borderRadius:14, background:'rgba(0,0,0,.22)', border:'1px solid rgba(255,255,255,.06)', transition:'border-color .2s'}}>
                   <div className="row-main" style={{gap:4}}>
-                    <strong style={{display:'flex',alignItems:'center',gap:8, fontSize:13}}><span style={{width:28, height:28, borderRadius:999, background:'linear-gradient(135deg, #7d6bff, #5a48d6)', color:'#fff', display:'grid', placeItems:'center', fontSize:10, fontWeight:900}}>{v.ip.slice(0,2).toUpperCase()}</span> {v.ip} <span style={{fontSize:10, padding:'2px 7px', borderRadius:999, background:'rgba(215,243,74,.14)', border:'1px solid rgba(215,243,74,.25)', color:'var(--lime)'}}>{v.path}</span></strong>
+                    <strong style={{display:'flex',alignItems:'center',gap:8, fontSize:13, flexWrap:'wrap'}}>
+                      {v.username
+                        ? <>
+                            <span style={{width:28, height:28, borderRadius:999, background:'linear-gradient(135deg, #22c55e, #15803d)', color:'#fff', display:'grid', placeItems:'center', fontSize:10, fontWeight:900}}>{(v.username[0] || '?').toUpperCase()}</span>
+                            <span title="Signed in">{v.username}</span>
+                            <span style={{fontSize:10, padding:'2px 7px', borderRadius:999, background:'rgba(34,197,94,.16)', border:'1px solid rgba(34,197,94,.35)', color:'#22c55e'}}>signed in</span>
+                            <span style={{fontSize:11, opacity:.55, fontFamily:'ui-monospace, monospace'}}>{v.ip}</span>
+                          </>
+                        : <>
+                            <span style={{width:28, height:28, borderRadius:999, background:'linear-gradient(135deg, #7d6bff, #5a48d6)', color:'#fff', display:'grid', placeItems:'center', fontSize:10, fontWeight:900}}>an</span>
+                            <span style={{opacity:.85}}>anonymous</span>
+                            <span style={{fontSize:11, opacity:.7, fontFamily:'ui-monospace, monospace'}} title="IP address — the only identifier for a guest">{v.ip}</span>
+                          </>}
+                      <span style={{fontSize:10, padding:'2px 7px', borderRadius:999, background:'rgba(215,243,74,.14)', border:'1px solid rgba(215,243,74,.25)', color:'var(--lime)'}}>{v.path}</span>
+                    </strong>
                     <span style={{display:'flex',alignItems:'center',gap:6, fontSize:11, opacity:.6}}>
                       {shortUa(v.ua)} • {timeAgo(v.createdAt)} <span style={{width:6,height:6,borderRadius:999,background:'#22c55e', display:'inline-block', boxShadow:'0 0 6px #22c55e'}}/>
                     </span>

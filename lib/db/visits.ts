@@ -6,15 +6,24 @@ import type { Visit } from "./core";
 
 /* ---------------- Visits ---------------- */
 
-export async function logVisit(ip: string, ua: string, visitPath: string, userId?: string | null): Promise<void> {
+/**
+ * Record a page/game view for the moderation console.
+ *
+ * `username` is stored alongside `userId` so the admin panel can show who a
+ * visitor actually is without a join, and so the name survives account
+ * deletion (the FK nulls `userId`, but the historical row still reads
+ * sensibly). Guests pass null and are displayed as "anonymous" + IP.
+ */
+export async function logVisit(ip: string, ua: string, visitPath: string, userId?: string | null, username?: string | null): Promise<void> {
   try {
     if (getMode() === "postgres") {
-      await pgQuery('INSERT INTO "visits" ("id","ip","ua","path","userId") VALUES ($1,$2,$3,$4,$5)', [
+      await pgQuery('INSERT INTO "visits" ("id","ip","ua","path","userId","username") VALUES ($1,$2,$3,$4,$5,$6)', [
         randomUUID(),
         ip.slice(0, 80),
         ua.slice(0, 300),
         visitPath.slice(0, 200),
         userId || null,
+        username ? username.slice(0, 60) : null,
       ]);
       if (Math.random() < 0.02) {
         await pgQuery(
@@ -31,6 +40,7 @@ export async function logVisit(ip: string, ua: string, visitPath: string, userId
         path: visitPath.slice(0, 200),
         createdAt: new Date().toISOString(),
         userId: userId || null,
+        username: username ? username.slice(0, 60) : null,
       } as any);
       s.visits = s.visits.slice(-500);
     });
@@ -42,7 +52,9 @@ export async function logVisit(ip: string, ua: string, visitPath: string, userId
 export async function recentVisits(limit = 60): Promise<Visit[]> {
   if (getMode() === "postgres") {
     return pgQuery<Visit>(
-      'SELECT "id","ip","ua","path","createdAt" FROM "visits" ORDER BY "createdAt" DESC LIMIT $1',
+      // Fall back to the account's current name for rows written before the
+      // username column existed.
+      'SELECT v."id", v."ip", v."ua", v."path", v."createdAt", COALESCE(v."username", u."username") AS "username" FROM "visits" v LEFT JOIN "auth_user" u ON u."id" = v."userId" ORDER BY v."createdAt" DESC LIMIT $1',
       [limit],
     );
   }

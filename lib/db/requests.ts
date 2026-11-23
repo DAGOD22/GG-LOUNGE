@@ -107,10 +107,11 @@ export async function listReports(): Promise<Report[]> {
   const s = await readLocal();
   return (s.reports||[]).slice().reverse().slice(0,100);
 }
-export async function logGamePlay(gameId: string, ip: string, userId?: string | null): Promise<void> {
-  // only signed-in users count for leaderboard — guests are ignored
-  if (!userId) return;
-  await logVisit(ip, "play", "/play/"+gameId, userId);
+export async function logGamePlay(gameId: string, ip: string, userId?: string | null, username?: string | null, ua = ""): Promise<void> {
+  // Every play is recorded so the moderation console can attribute traffic and
+  // ban a guest or a named account. Only signed-in plays count for the
+  // leaderboard; leaderboard() filters on userId itself.
+  await logVisit(ip, ua, "/play/"+gameId, userId, username);
 }
 export async function leaderboard(limit=10): Promise<{gameId:string,count:number}[]>{
   if(getMode()==="postgres"){

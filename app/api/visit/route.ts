@@ -34,12 +34,15 @@ export async function POST(req: Request) {
     // Leaderboard only counts signed-in users (per user request)
     const cookie = req.headers.get("cookie") || "";
     const token = cookie.split(";").find(s=> s.trim().startsWith("ggl_token="))?.split("=")[1]?.trim() || "";
+    const ua = req.headers.get("user-agent") || "";
     const user = token ? await getUserFromToken(token).catch(()=> null) : null;
     if (!user) {
-      // Guest play — still return ok but don't count for leaderboard
+      // Guest play: logged anonymously so the admin console can still show and
+      // ban the IP, but it does not count for the leaderboard.
+      await logGamePlay(gameId, ip, null, null, ua);
       return NextResponse.json({ ok: true, guest: true });
     }
-    await logGamePlay(gameId, ip, user.id);
+    await logGamePlay(gameId, ip, user.id, user.username, ua);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ ok: true });

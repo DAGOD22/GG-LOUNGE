@@ -19,6 +19,11 @@ export interface Visit {
   path: string;
   createdAt: string;
   userId?: string | null;
+  /**
+   * Present when the visitor was signed in. Guests are anonymous: the admin
+   * panel shows "anonymous" next to the IP instead.
+   */
+  username?: string | null;
 }
 export interface GameRequest {
   id: string;
