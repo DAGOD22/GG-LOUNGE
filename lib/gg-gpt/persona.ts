@@ -93,30 +93,52 @@ export function buildSystemPrompt(ctx: PromptContext): string {
  * Pull durable facts out of a user message. Deliberately conservative: only
  * explicit self-disclosure is kept, because a wrong memory is worse than none.
  */
-const PATTERNS: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
-  [/\bmy name is ([A-Z][\w'-]{1,20})/i, m => `Their name is ${m[1]}.`],
-  [/\bcall me ([A-Z][\w'-]{1,20})/i, m => `They prefer to be called ${m[1]}.`],
-  [/\bi'?m (\d{1,2}) (?:years old|yo)\b/i, m => `They are ${m[1]} years old.`],
-  [/\bi am (\d{1,2}) (?:years old|yo)\b/i, m => `They are ${m[1]} years old.`],
-  [/\bi live in ([A-Z][\w\s,'-]{2,40})/i, m => `They live in ${m[1].trim()}.`],
+const PATTERNS: Array<[RegExp, (m: RegExpMatchArray) => string, number?]> = [
+  [/\b(?:my name is|call me|i go by) ([A-Z][\w'-]{1,20})\b/i, m => `Their name is ${m[1]}.`, 2],
+  [/\bi'?m (\d{1,2}) (?:years old|yo)\b/i, m => `They are ${m[1]} years old.`, 1],
+  [/\bi (?:live|am based) in ([A-Z][\w\s,'-]{2,40})/i, m => `They live in ${m[1].trim()}.`],
   [/\bi'?m from ([A-Z][\w\s,'-]{2,40})/i, m => `They are from ${m[1].trim()}.`],
-  [/\bmy fav(?:ou)?rite (game|colour|color|food|band|movie|film|show|animal) is ([^.!?\n]{2,50})/i, m => `Their favourite ${m[1].toLowerCase()} is ${m[2].trim()}.`],
-  [/\bi (?:really )?love ([^.!?\n]{2,50})/i, m => `They love ${m[1].trim()}.`],
-  [/\bi hate ([^.!?\n]{2,50})/i, m => `They dislike ${m[1].trim()}.`],
-  [/\bi(?:'m| am) (?:a|an) ([^.!?\n]{2,50})/i, m => `They describe themselves as ${m[1].trim()}.`],
-  [/\bi work (?:at|for|in) ([^.!?\n]{2,50})/i, m => `They work at/in ${m[1].trim()}.`],
-  [/\bi study ([^.!?\n]{2,50})/i, m => `They study ${m[1].trim()}.`],
-  [/\bi (?:have|own|got) a ([^.!?\n]{2,50})/i, m => `They have a ${m[1].trim()}.`],
-  [/\bremember (?:that )?([^.!?\n]{4,120})/i, m => m[1].trim()],
+  // Capture the whole "favourite game is X" so the durability check sees the
+  // thing disclosed, not the word "game".
+  [/\bmy fav(?:ou)?rite (?:game|colour|color|food|band|movie|film|show|animal|genre) is ([^.!?\n]{2,50})/i,
+    m => `Their favourite is ${m[1].trim()}.`, 2],
+  [/\bi (?:study|major in) ([^.!?\n]{2,50})/i, m => `They study ${m[1].trim()}.`],
+  [/\bi work (?:at|for) ([^.!?\n]{2,50})/i, m => `They work at ${m[1].trim()}.`],
+  [/\b(?:remember|don't forget|keep in mind) (?:that )?([^.!?\n]{4,120})/i, m => m[1].trim()],
+  // "I play <a real game>" is worth keeping; "I play basketball" is not durable.
+  [/\bi (?:really )?play (?:a lot of |lots of )?([^.!?\n]{2,50})/i, m => `They play ${m[1].trim()}.`],
 ];
+
+/**
+ * Phrases that look like self-disclosure but are conversational filler. A wrong
+ * memory is worse than no memory: it gets injected into every future answer and
+ * is very hard for the user to notice, let alone fix.
+ */
+const FILLER = [
+  /^(?:a|an|the)\s+(?:question|bit|lot|little|feeling|moment|minute|second|while|point|clue|look|go|try|guess|chance|break|plane|train|bus|test|theory|hunch|problem|issue)\b/i,
+  /^(?:bit|little|lot|moment|while|question)\b/i,
+  /^(how|why|when|where|who|which|if|whether|that)\b/i,
+  /\b(please|quickly|tonight|right now|already)\b/i,
+];
+
+function isDurable(fact: string, minLength = 6): boolean {
+  if (fact.length < minLength || fact.length > 200) return false;
+  if (FILLER.some(re => re.test(fact))) return false;
+  // A memory should not end in a question mark or read like a request.
+  if (/[?]$/.test(fact)) return false;
+  return true;
+}
 
 export function extractFacts(message: string): string[] {
   const found = new Set<string>();
-  for (const [re, build] of PATTERNS) {
+  for (const [re, build, minLength] of PATTERNS) {
     const m = message.match(re);
     if (!m) continue;
     const fact = build(m).replace(/\s+/g, " ").trim();
-    if (fact.length > 6 && fact.length < 240) found.add(fact);
+    // Test the captured *content*: m[0] is the whole match, m[1] the first
+    // group, which is the thing the user actually disclosed.
+    const captured = (m[1] ?? "").trim();
+    if (captured && isDurable(captured, minLength) && fact.length < 240) found.add(fact);
   }
   return [...found];
 }
