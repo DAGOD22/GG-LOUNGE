@@ -84,7 +84,10 @@ function keyedProviders() {
     parse: (j: Record<string, any>) => string;
   }> = [];
 
-  const openrouter = process.env.GG_GPT_KEY || process.env.OPENROUTER_API_KEY;
+  // `ai_key` is the variable this project already has configured; GG_GPT_KEY
+  // and OPENROUTER_API_KEY are accepted as more explicit aliases.
+  const openrouter =
+    process.env.GG_GPT_KEY || process.env.OPENROUTER_API_KEY || process.env.ai_key;
   if (openrouter) {
     out.push({
       name: "openrouter",
