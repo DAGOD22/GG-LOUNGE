@@ -40,3 +40,20 @@ test('malformed tokens are rejected rather than throwing', () => {
 test('ids that are not shaped like ours are rejected even when signed', () => {
   assert.equal(guestIdFromToken(mintGuestToken('someone-else')), null);
 });
+
+/**
+ * The report endpoint used to double as an unthrottled upvote endpoint, and
+ * its GET listed every report to anyone. isAdmin() needs a live request scope,
+ * so this asserts the shape of the route rather than invoking it.
+ */
+test('report route no longer proxies upvotes and gates its list', async () => {
+  const fs = await import('node:fs/promises');
+  const src = await fs.readFile(new URL('../app/api/report/route.ts', import.meta.url), 'utf8');
+  // Strip comments: the file documents the hole it closed.
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.equal(/upvoteRequestId|upvoteRequest\(/.test(code), false, 'upvotes must go through the rate-limited endpoint');
+  assert.match(code, /isAdmin\(\)/, 'GET must check for an admin session');
+  const mod = await import('../app/api/report/route');
+  assert.equal(typeof mod.POST, 'function');
+  assert.equal(typeof mod.GET, 'function');
+});
