@@ -120,6 +120,8 @@ const SUGGESTIONS = [
   'What should I play tonight?',
   'What\'s the weather in Adelaide?',
   'Convert 180 USD to AUD',
+  'Make a video of a cat surfing',
+  'What\'s 15% off 240?',
   'Explain how raycasting works in Doom',
   'Generate an image of a neon arcade at midnight',
   'Best idle games on here and why',

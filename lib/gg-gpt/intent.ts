@@ -14,6 +14,8 @@
  *   · conversational messages trigger nothing at all
  */
 
+import { solveArithmetic } from "./math";
+
 export interface Intent {
   search?: { query: string };
   weather?: { place: string };
@@ -21,6 +23,7 @@ export interface Intent {
   unit?: { amount: number; from: string; to: string };
   crypto?: { ids: string[] };
   define?: { word: string };
+  math?: { expression: string; value: number; pretty: string };
   catalogue?: { query: string };
   image?: { prompt: string; width?: number; height?: number };
   video?: { prompt: string };
@@ -165,6 +168,13 @@ export function detectIntent(message: string): Intent {
       intent.image = { prompt: verbRest };
       return intent;
     }
+  }
+
+  /* ---- arithmetic (exact, instant, never ask a model to do sums) ---- */
+  const arith = solveArithmetic(m);
+  if (arith) {
+    intent.math = arith;
+    return intent;
   }
 
   /* ---- crypto ---- */

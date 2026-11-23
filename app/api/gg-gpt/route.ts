@@ -213,6 +213,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ text: caption, media, chatId, provider: "pollinations-media", signedIn: !!user });
   }
 
+  /* ---------- arithmetic: answer exactly, instantly, no model needed ---------- */
+  if (intent.math) {
+    const { expression, pretty } = intent.math;
+    const text = `**${expression}** = **${pretty}**`;
+    const cards = [{ label: "calculation", source: "arithmetic", data: intent.math }];
+    const respond = () =>
+      body.stream
+        ? sseOnce(text, { chatId, provider: "arithmetic", cards })
+        : NextResponse.json({ text, chatId, provider: "arithmetic", signedIn: !!user, cards });
+    if (user && chatId) {
+      await addMessage(user.id, chatId, "assistant", text, { cards, provider: "arithmetic" }).catch(() => undefined);
+      await touchChat(user.id, chatId).catch(() => undefined);
+    }
+    return respond();
+  }
+
   /* ---------- tools ---------- */
   const toolResults: ToolResult[] = [];
   const cards: Array<Record<string, unknown>> = [];
@@ -322,6 +338,26 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ text, chatId, provider, signedIn: !!user, cards, attempts: result.attempts });
+}
+
+/** Emit a single already-finished answer as an SSE stream. */
+function sseOnce(text: string, meta: Record<string, unknown>): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: text })}\n\n`));
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, ...meta })}\n\n`));
+      controller.close();
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-store, no-transform",
+      connection: "keep-alive",
+      "x-accel-buffering": "no",
+    },
+  });
 }
 
 /**
