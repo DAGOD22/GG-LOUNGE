@@ -12,6 +12,7 @@
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth";
 import { chatComplete, imageUrl } from "@/lib/gg-gpt/engine";
+import { getWeather, webSearch, renderHits, type ToolResult } from "@/lib/gg-gpt/tools";
 import { detectIntent } from "@/lib/gg-gpt/intent";
 import { buildSystemPrompt } from "@/lib/gg-gpt/persona";
 
@@ -172,9 +173,24 @@ async function probeOne(p: Probe): Promise<ProbeResult> {
 async function selfTest(question = "In one sentence, what is a quokka?"): Promise<Record<string, unknown>> {
   const started = Date.now();
   const intent = detectIntent(question);
+
+  // Run the same tools the route would, so the test exercises the whole
+  // pipeline rather than just the model. Without this, a weather question
+  // reaches the model with no data and the model invents "typically mild".
+  const tools: ToolResult[] = [];
+  if (intent.weather) {
+    const w = await getWeather(intent.weather.place).catch(() => null);
+    if (w) tools.push(w);
+  }
+  if (intent.search) {
+    const s = await webSearch(intent.search.query).catch(() => ({ hits: [], source: "none" }));
+    if (s.hits.length) tools.push({ text: renderHits(s.hits), data: s.hits, source: `search:${s.source}` });
+  }
+  const notes = tools.map(t => `[${t.source}] ${t.text}`);
+
   const result = await chatComplete(
     [
-      { role: "system", content: buildSystemPrompt({ profile: {}, memories: [], now: new Date() }) },
+      { role: "system", content: buildSystemPrompt({ profile: {}, memories: [], now: new Date(), notes }) },
       { role: "user", content: question },
     ],
     { timeoutMs: 30_000 },
@@ -182,6 +198,7 @@ async function selfTest(question = "In one sentence, what is a quokka?"): Promis
   return {
     question,
     intent: Object.keys(intent).filter(k => intent[k as keyof typeof intent]),
+    tools: tools.map(t => ({ source: t.source, text: t.text.slice(0, 300) })),
     provider: result.provider,
     rateLimited: result.rateLimited,
     ms: Date.now() - started,

@@ -226,10 +226,27 @@ async function geocode(place: string): Promise<{ name: string; lat: number; lon:
  * depend on one vendor's counter.
  */
 export async function getWeather(place: string): Promise<ToolResult | null> {
+  // open-meteo's daily allowance is shared and small, so keep the last good
+  // reading for a few minutes. Stale-by-minutes beats both a dead lookup and a
+  // model inventing "typically mild at this time of year".
+  const cached = weatherCache.get(place.toLowerCase());
+  if (cached && Date.now() - cached.at < 10 * 60_000) return cached.result;
+  const fresh = await fetchWeather(place);
+  if (fresh) weatherCache.set(place.toLowerCase(), { at: Date.now(), result: fresh });
+  return fresh;
+}
+
+const weatherCache = new Map<string, { at: number; result: ToolResult }>();
+
+async function fetchWeather(place: string): Promise<ToolResult | null> {
   const geo = await geocode(place);
-  const primary = geo ? await openMeteo(geo).catch(() => null) : null;
-  if (primary) return primary;
-  return wttr(place).catch(() => null);
+  // Race the two providers: if open-meteo is capped it fails in ~200ms and wttr
+  // answers anyway, but there is no reason to pay that latency in series.
+  const [primary, fallback] = await Promise.all([
+    geo ? openMeteo(geo).catch(() => null) : Promise.resolve(null),
+    wttr(place).catch(() => null),
+  ]);
+  return primary ?? fallback;
 }
 
 async function openMeteo(geo: { name: string; lat: number; lon: number }): Promise<ToolResult | null> {
