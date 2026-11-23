@@ -4,7 +4,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Brain, Image as ImageIcon, Loader2, Plus, Search, Send, Sparkles, Trash2, Video, X } from 'lucide-react';
 
 type Chat = { id: string; title: string; updatedAt: string };
-type Msg = { id?: string; role: 'user' | 'assistant'; content: string; meta?: string | null; media?: { kind: string; url: string; prompt: string } };
+type ToolCard = { label: string; source: string; data?: Record<string, unknown> };
+type Msg = {
+  id?: string;
+  role: 'user' | 'assistant';
+  content: string;
+  meta?: string | null;
+  media?: { kind: string; url: string; prompt: string };
+  cards?: ToolCard[];
+};
 type Memory = { id: string; fact: string; createdAt: string };
 
 /** Renders **bold**, `code`, fenced blocks and bullet lists without a dependency. */
@@ -59,8 +67,59 @@ function inline(text: string): React.ReactNode {
   });
 }
 
+/**
+ * Renders whatever a tool returned as a compact card: live game links, the
+ * sources a search actually used, or the raw values behind a lookup. Seeing the
+ * source is what makes a live-data answer trustworthy.
+ */
+function ToolCards({ cards }: { cards: ToolCard[] }) {
+  return (
+    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {cards.map((card, i) => {
+        const games = (card.data?.games as Array<{ id: string; title: string; genre: string }> | undefined) || [];
+        const hits = (card.data?.hits as Array<{ title: string; url: string }> | undefined) || [];
+        if (games.length) {
+          return (
+            <div key={i} style={cardBox}>
+              <span style={cardLabel}>On GG-LOUNGE</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                {games.map(g => (
+                  <a key={g.id} href={`/g/${g.id}`} style={{ ...chip, textDecoration: 'none', cursor: 'pointer' }}>
+                    {g.title} <span style={{ opacity: 0.5 }}>· {g.genre}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          );
+        }
+        if (hits.length) {
+          return (
+            <div key={i} style={cardBox}>
+              <span style={cardLabel}>Sources · {card.source.replace('search:', '')}</span>
+              <ol style={{ margin: '6px 0 0 16px', padding: 0, fontSize: 11.5, lineHeight: 1.5 }}>
+                {hits.slice(0, 5).map((h, n) => (
+                  <li key={n} style={{ marginBottom: 2 }}>
+                    <a href={h.url} target="_blank" rel="noreferrer" style={{ color: 'inherit', opacity: 0.85 }}>{h.title}</a>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          );
+        }
+        return (
+          <div key={i} style={cardBox}>
+            <span style={cardLabel}>{card.label} · {card.source}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const SUGGESTIONS = [
   'What should I play tonight?',
+  'What\'s the weather in Adelaide?',
+  'Convert 180 USD to AUD',
   'Explain how raycasting works in Doom',
   'Generate an image of a neon arcade at midnight',
   'Best idle games on here and why',
@@ -99,11 +158,13 @@ export default function GgGptPage() {
     const data = await res.json().catch(() => ({ messages: [] }));
     const loaded: Msg[] = (data.messages || []).map((m: { id: string; role: string; content: string; meta: string | null }) => {
       let media;
+      let cards;
       try {
         const parsed = m.meta ? JSON.parse(m.meta) : null;
         if (parsed?.kind && parsed?.url) media = parsed;
-      } catch { /* not media */ }
-      return { id: m.id, role: m.role === 'user' ? 'user' : 'assistant', content: m.content, meta: m.meta, media };
+        else if (Array.isArray(parsed?.cards)) cards = parsed.cards;
+      } catch { /* not media or cards */ }
+      return { id: m.id, role: m.role === 'user' ? 'user' : 'assistant', content: m.content, meta: m.meta, media, cards };
     });
     setMessages(loaded);
     scrollDown();
@@ -130,23 +191,93 @@ export default function GgGptPage() {
     setMessages(m => [...m, { role: 'user', content: message }]);
     setBusy(true);
     scrollDown();
+
+    // The assistant's bubble is created empty and filled as tokens arrive, so
+    // the first words appear in about a second instead of after the whole reply.
+    const assistantIndex = { current: -1 };
+    setMessages(m => {
+      assistantIndex.current = m.length;
+      return [...m, { role: 'assistant', content: '' }];
+    });
+
+    const appendDelta = (delta: string) => {
+      setMessages(m => {
+        const next = [...m];
+        const i = assistantIndex.current;
+        if (i >= 0 && next[i]) next[i] = { ...next[i], content: next[i].content + delta };
+        return next;
+      });
+      scrollDown();
+    };
+
     try {
       const res = await fetch('/api/gg-gpt', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'chat', message, chatId }),
+        body: JSON.stringify({ action: 'chat', message, chatId, stream: true }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'GG-GPT could not answer.');
-      setMessages(m => [...m, { role: 'assistant', content: data.text || '', media: data.media }]);
-      if (data.chatId && data.chatId !== chatId) {
-        setChatId(data.chatId);
+
+      // A non-streaming response (media, rate limit, error) still arrives as JSON.
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok || !contentType.includes('text/event-stream') || !res.body) {
+        const data = await res.json().catch(() => ({ error: 'GG-GPT could not answer.' }));
+        if (!res.ok) throw new Error(data.error || 'GG-GPT could not answer.');
+        setMessages(m => {
+          const next = [...m];
+          const i = assistantIndex.current;
+          if (i >= 0) next[i] = { role: 'assistant', content: data.text || '', media: data.media, cards: data.cards };
+          return next;
+        });
+        if (data.chatId && data.chatId !== chatId) {
+          setChatId(data.chatId);
+          const list = await fetch('/api/gg-gpt').then(r => r.json()).catch(() => null);
+          if (list?.chats) setChats(list.chats);
+          if (list?.memories) setMemories(list.memories);
+        }
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let newChatId = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const cut = buffer.lastIndexOf('\n\n');
+        if (cut === -1) continue;
+        const frames = buffer.slice(0, cut).split('\n\n');
+        buffer = buffer.slice(cut + 2);
+        for (const frame of frames) {
+          const line = frame.trim();
+          if (!line.startsWith('data:')) continue;
+          let evt: { delta?: string; done?: boolean; chatId?: string; cards?: never[] } | null = null;
+          try { evt = JSON.parse(line.slice(5).trim()); } catch { continue; }
+          if (evt?.delta) appendDelta(evt.delta);
+          if (evt?.done) {
+            newChatId = evt.chatId || '';
+            if (evt.cards?.length) {
+              setMessages(m => {
+                const next = [...m];
+                const i = assistantIndex.current;
+                if (i >= 0 && next[i]) next[i] = { ...next[i], cards: evt!.cards };
+                return next;
+              });
+            }
+          }
+        }
+      }
+      if (newChatId && newChatId !== chatId) {
+        setChatId(newChatId);
         const list = await fetch('/api/gg-gpt').then(r => r.json()).catch(() => null);
         if (list?.chats) setChats(list.chats);
         if (list?.memories) setMemories(list.memories);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
+      // Drop the empty bubble rather than leaving a blank reply on screen.
+      setMessages(m => m.filter((_, i) => i !== assistantIndex.current));
     } finally {
       setBusy(false);
       scrollDown();
@@ -291,6 +422,7 @@ export default function GgGptPage() {
                       <a href={m.media.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, opacity: 0.6, display: 'inline-block', marginTop: 6 }}>Open full size</a>
                     </div>
                   )}
+                  {!!m.cards?.length && <ToolCards cards={m.cards} />}
                 </div>
               </div>
             ))}
@@ -345,6 +477,22 @@ const ghostBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent',
   border: '1px solid rgba(255,255,255,.16)', color: 'inherit', borderRadius: 9,
   padding: '6px 11px', fontSize: 12, cursor: 'pointer',
+};
+
+const cardBox: React.CSSProperties = {
+  border: '1px solid rgba(255,255,255,.1)',
+  background: 'rgba(0,0,0,.22)',
+  borderRadius: 10,
+  padding: '8px 11px',
+  fontSize: 12,
+};
+
+const cardLabel: React.CSSProperties = {
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '.07em',
+  textTransform: 'uppercase',
+  opacity: 0.5,
 };
 
 const chip: React.CSSProperties = {
