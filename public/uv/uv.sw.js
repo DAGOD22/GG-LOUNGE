@@ -63,10 +63,12 @@ class UVServiceWorker extends EventEmitter {
             // proxied back to that origin — static assets *and* its API. The
             // old check skipped /api/, so every session/game-state call landed
             // on GG-LOUNGE itself, 404'd, and the client showed a network error.
-            const __ownRoute = /^\/(uv|service|app-frames|game-icons|thumbnails|_next)\//.test(__reqUrl.pathname) ||
-              __reqUrl.pathname.startsWith("/api/gg-gpt") || __reqUrl.pathname.startsWith("/api/auth") ||
-              __reqUrl.pathname.startsWith("/api/bare") || __reqUrl.pathname === "/" ||
-              __reqUrl.pathname.startsWith("/games/");
+            // Only prefixes that can *only* be ours. Everything else — including
+            // "/" and "/api/…" — belongs to the destination, because .io clients
+            // and portals (Next-based ones especially) use those paths for their
+            // own auth and state. Some of them call /api/auth; serving our auth
+            // there is both a broken page and a security problem.
+            const __ownRoute = /^\/(uv|wisp|service|app-frames)\/|^\/api\/bare(\/|$)/.test(__reqUrl.pathname);
             if (!__ownRoute) {
               const __target = new URL(__reqUrl.pathname + __reqUrl.search + __reqUrl.hash, __proxiedOrigin).href;
               const __enc = __tmp.encodeUrl(__target);
