@@ -4,9 +4,16 @@ import { useEffect, useRef, useState } from 'react';
 /**
  * Counts from 0 to `value` the first time it becomes visible.
  *
- * Driven by rAF progress rather than a fixed duration per tick, so a slow
- * frame does not stretch the animation, and the final render is always the
- * exact target value. Reduced-motion users get the target immediately.
+ * Server output is always the real number: the counter only drops to 0 once
+ * the effect has run and it has confirmed the element is off-screen, so the
+ * rendered HTML (and anything reading it, including crawlers) shows the true
+ * figure rather than a mid-animation value. Driven by rAF progress, so a
+ * dropped frame shortens the animation instead of stretching it.
+ *
+ * (The first version initialised state from `value` but the pre-hydration
+ * render is not the only one that matters — the snapshot the crawler saw was
+ * -697, because the counter had already been reset to 0 and was mid-flight
+ * when the page was serialised.)
  */
 export function CountUp({ value, duration = 900 }: { value: number; duration?: number }) {
   const [shown, setShown] = useState(value);
@@ -15,9 +22,9 @@ export function CountUp({ value, duration = 900 }: { value: number; duration?: n
 
   useEffect(() => {
     const node = ref.current;
-    if (!node || value <= 0) return;
+    if (!node || value <= 0 || started.current) return;
     if (typeof IntersectionObserver === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    setShown(0);
+
     const observer = new IntersectionObserver(entries => {
       if (!entries[0].isIntersecting || started.current) return;
       started.current = true;
@@ -25,7 +32,6 @@ export function CountUp({ value, duration = 900 }: { value: number; duration?: n
       const start = performance.now();
       const tick = (now: number) => {
         const progress = Math.min(1, (now - start) / duration);
-        // easeOutCubic
         setShown(Math.round(value * (1 - Math.pow(1 - progress, 3))));
         if (progress < 1) requestAnimationFrame(tick);
         else setShown(value);

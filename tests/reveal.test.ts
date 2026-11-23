@@ -42,3 +42,18 @@ test('Reveal does not add the hidden class when motion is reduced', async () => 
   const addClass = src.indexOf("classList.add('reveal-init')");
   assert.ok(guard !== -1 && addClass !== -1 && guard < addClass, 'the reduced-motion check must come before the class is added');
 });
+
+/**
+ * A shipped regression: the deployed page rendered "-697 games" — the counter
+ * had been reset and was mid-animation when the HTML was serialised. The
+ * server render (and any snapshot taken before the effect runs) must be the
+ * real number, and the reset to 0 must happen inside the observer callback.
+ */
+test('CountUp initialises to the real value', async () => {
+  const src = await readFile(new URL('../components/CountUp.tsx', import.meta.url), 'utf8');
+  assert.match(src, /useState\(value\)/, 'initial state must be the real value');
+  assert.equal(/setShown\(0\)/.test(src), false, 'must not reset to 0 during render or on mount');
+  const observer = src.indexOf('new IntersectionObserver');
+  const reset = src.indexOf('const start = performance.now()');
+  assert.ok(observer !== -1 && reset !== -1 && observer < reset, 'counting must start inside the observer');
+});
