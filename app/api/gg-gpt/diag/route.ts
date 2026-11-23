@@ -169,8 +169,7 @@ async function probeOne(p: Probe): Promise<ProbeResult> {
  * assistant uses, so "does it work" is answerable from outside a browser. The
  * chat route is POST-only, which makes it awkward to verify from a terminal.
  */
-async function selfTest(): Promise<Record<string, unknown>> {
-  const question = "In one sentence, what is a quokka?";
+async function selfTest(question = "In one sentence, what is a quokka?"): Promise<Record<string, unknown>> {
   const started = Date.now();
   const intent = detectIntent(question);
   const result = await chatComplete(
@@ -205,7 +204,8 @@ export async function GET(req: Request) {
   }
   const wantsTest = new URL(req.url).searchParams.has("selftest");
   if (wantsTest) {
-    const t = await selfTest();
+    const q = new URL(req.url).searchParams.get("selftest") || undefined;
+    const t = await selfTest(q && q.length > 3 ? q : undefined);
     return NextResponse.json(t, { headers: { "Cache-Control": "no-store, max-age=0" } });
   }
   const list = probes();
