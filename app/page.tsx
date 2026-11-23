@@ -16,6 +16,8 @@ import { CatalogGrid } from '@/components/CatalogGrid'
 import { RequestPanel } from '@/components/RequestPanel'
 const HomeDashboard = dynamic(() => import('@/components/HomeDashboard').then(m => m.HomeDashboard), { ssr: false, loading: () => null })
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { Reveal } from '@/components/Reveal'
+import { CountUp } from '@/components/CountUp'
 import { AuthDialog } from '@/components/AuthDialog'
 const GameModal = dynamic(() => import('@/components/GameModal').then(m => m.GameModal), { ssr: false, loading: () => null })
 const AchievementsHub = dynamic(() => import('@/components/AchievementsHub').then(m => m.AchievementsHub), { ssr: false, loading: () => null })
@@ -566,18 +568,18 @@ export default function Page() {
           </div>
           <div className="hero-stats" style={{gap:18, padding:'12px 16px', borderRadius:999, background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.06)', backdropFilter:'blur(8px)', display:'inline-flex', width:'fit-content', marginTop:22}}>
             <span>
-              <strong>{allGames.length}</strong> games
+              <strong><CountUp value={allGames.length} /></strong> games
             </span>
             <span>
               <strong>∞</strong> replay value
             </span>
-            <span style={{display:'flex',alignItems:'center',gap:6}}><Flame size={12} color={streak>2?'var(--lime)':'inherit'}/> <strong>{streak}</strong> day streak</span>
+            <span style={{display:'flex',alignItems:'center',gap:6}}><Flame size={12} color={streak>2?'var(--lime)':'inherit'}/> <strong><CountUp value={streak} /></strong> day streak</span>
             <span>
               <strong>01</strong> lounge
             </span>
           </div>
         </div>
-        <div className="spotlight">
+        <Reveal className="spotlight" delay={90}>
           <div className="spotlight-top">
             <span>SPOTLIGHT / {(String(spotIdx+1).padStart(2,'0'))}</span>
             <span className="spotlight-tag">FEATURED</span>
@@ -607,11 +609,11 @@ export default function Page() {
           <div style={{display:'flex',gap:6,justifyContent:'center',marginTop:10}}>
             {featuredGames.map((_,i)=> <span key={i} style={{width: i===spotIdx?22:8,height:6,borderRadius:99,background: i===spotIdx?'var(--lime)':'rgba(255,255,255,.22)',transition:'all .3s',display:'block'}}/>)}
           </div>
-        </div>
+        </Reveal>
       </section>
 
       <section className="catalog" id="games">
-        <div className="section-heading">
+        <Reveal className="section-heading">
           <div>
             <p className="eyebrow">THE ARCADE FLOOR</p>
             <h2>Pick your poison<span>.</span></h2>
@@ -620,7 +622,7 @@ export default function Page() {
             <Trophy size={16} />
             <span><strong>{visibleGames.length.toString().padStart(2, '0')}</strong> available now</span>
           </div>
-        </div>
+        </Reveal>
                 <LibraryToolbar query={query} setQuery={setQuery} allGames={allGames} sortBy={sortBy} setSortBy={setSortBy} view={view} setView={setView} hideLow={hideLow} setHideLow={setHideLow} showStaffOnly={showStaffOnly} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} />
         {favorites.length>0 && filter!=='Favorites' && (
           <div style={{marginBottom:12, padding:'10px 14px', borderRadius:12, background:'linear-gradient(135deg, rgba(215,243,74,.14), rgba(125,107,255,.08))', border:'1px solid rgba(215,243,74,.28)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
