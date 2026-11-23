@@ -84,10 +84,10 @@ function keyedProviders() {
     parse: (j: Record<string, any>) => string;
   }> = [];
 
-  // `ai_key` is the variable this project already has configured; GG_GPT_KEY
-  // and OPENROUTER_API_KEY are accepted as more explicit aliases.
-  const openrouter =
-    process.env.GG_GPT_KEY || process.env.OPENROUTER_API_KEY || process.env.ai_key;
+  // Only unambiguous variable names are read here. A generically-named key
+  // must not be forwarded to a guessed provider — that would hand someone's
+  // credential to a host they never chose.
+  const openrouter = process.env.GG_GPT_KEY || process.env.OPENROUTER_API_KEY;
   if (openrouter) {
     out.push({
       name: "openrouter",
