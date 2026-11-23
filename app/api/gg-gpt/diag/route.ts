@@ -82,6 +82,19 @@ function probes(): Probe[] {
     });
   }
 
+  // Unknowns from the first run: the model list, GET streaming support, and
+  // definition APIs that are not behind Cloudflare.
+  out.push({ name: "pollinations:models", url: "https://text.pollinations.ai/models", method: "GET", headers: {} });
+  out.push({
+    name: "pollinations:get-stream",
+    url: `https://text.pollinations.ai/${encodeURIComponent("Count to three")}?stream=true&referrer=gg-lounge`,
+    method: "GET",
+    headers: { accept: "text/event-stream" },
+  });
+  out.push({ name: "dict:wiktionary", url: "https://en.wiktionary.org/api/rest_v1/page/definition/hello", method: "GET", headers: { accept: "application/json" } });
+  out.push({ name: "search:wikipedia-ua", url: "https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=1&srsearch=hello", method: "GET", headers: { "user-agent": "GG-GPT/1.0 (https://gg-lounge.vercel.app)" } });
+
+
   // Non-LLM capabilities, so one call tells us what the assistant can really do.
   out.push({
     name: "search:duckduckgo",
@@ -102,11 +115,20 @@ function probes(): Probe[] {
     headers: {},
   });
   out.push({ name: "image:pollinations", url: "https://image.pollinations.ai/prompt/a%20red%20cube?width=256&height=256&nologo=true", method: "GET", headers: {} });
-  out.push({ name: "video:pollinations", url: "https://video.pollinations.ai/prompt/a%20red%20cube", method: "GET", headers: {} });
+
   out.push({ name: "weather:open-meteo", url: "https://api.open-meteo.com/v1/forecast?latitude=-34.93&longitude=138.6&current=temperature_2m", method: "GET", headers: {} });
   out.push({ name: "crypto:coingecko", url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd", method: "GET", headers: {} });
   out.push({ name: "fx:open.er-api", url: "https://open.er-api.com/v6/latest/USD", method: "GET", headers: {} });
   out.push({ name: "dict:dictionaryapi", url: "https://api.dictionaryapi.dev/api/v2/entries/en/hello", method: "GET", headers: {} });
+  // Second run: can the one working model stream, and does it honour a POST?
+  out.push({
+    name: "pollinations:get-stream",
+    url: `https://text.pollinations.ai/${encodeURIComponent("Count to three")}?stream=true&referrer=gg-lounge`,
+    method: "GET",
+    headers: { accept: "text/event-stream" },
+  });
+  out.push({ name: "dict:wiktionary", url: "https://en.wiktionary.org/api/rest_v1/page/definition/hello", method: "GET", headers: { accept: "application/json", "user-agent": "GG-GPT/1.0 (https://gg-lounge.vercel.app)" } });
+  out.push({ name: "search:wikipedia-ua", url: "https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=1&srsearch=hello", method: "GET", headers: { "user-agent": "GG-GPT/1.0 (https://gg-lounge.vercel.app)" } });
   out.push({ name: "geo:ipapi", url: "https://ipapi.co/json/", method: "GET", headers: {} });
   return out;
 }

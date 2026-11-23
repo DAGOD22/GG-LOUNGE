@@ -13,7 +13,7 @@ import {
   addMemory,
   forgetMemory,
 } from "@/lib/db/gg-gpt";
-import { chatComplete, chatStream, imageUrl, videoUrl, type ChatTurn } from "@/lib/gg-gpt/engine";
+import { chatComplete, chatStream, imageUrl, videoPlan, type ChatTurn } from "@/lib/gg-gpt/engine";
 import {
   webSearch,
   renderHits,
@@ -198,21 +198,26 @@ export async function POST(req: Request) {
   const intent = detectIntent(message);
 
   /* ---------- media ---------- */
-  if (intent.image || intent.video) {
-    const isImage = !!intent.image;
-    const prompt = (intent.image?.prompt ?? intent.video?.prompt ?? "").slice(0, 600);
-    const url = isImage
-      ? imageUrl(prompt, { width: intent.image?.width, height: intent.image?.height })
-      : videoUrl(prompt);
-    const caption = isImage
-      ? `Here's an image of **${prompt}**.`
-      : `Here's a short clip of **${prompt}**. Give it a few seconds to render.`;
-    const media = { kind: isImage ? "image" : "video", url, prompt };
+  if (intent.image) {
+    const prompt = intent.image.prompt.slice(0, 600);
+    const url = imageUrl(prompt, { width: intent.image.width, height: intent.image.height });
+    const caption = `Here's an image of **${prompt}**.`;
+    const media = { kind: "image", url, prompt };
     if (user && chatId) {
-      await addMessage(user.id, chatId, "assistant", caption, media);
-      await touchChat(user.id, chatId);
+      await addMessage(user.id, chatId, "assistant", caption, media).catch(() => undefined);
+      await touchChat(user.id, chatId).catch(() => undefined);
     }
-    return NextResponse.json({ text: caption, media, chatId, provider: "pollinations-media", signedIn: !!user });
+    return NextResponse.json({ text: caption, media, chatId, provider: "pollinations-image", signedIn: !!user });
+  }
+  if (intent.video) {
+    const prompt = intent.video.prompt.slice(0, 600);
+    const plan = videoPlan(prompt);
+    const media = { kind: "image", url: plan.imageUrl, prompt };
+    if (user && chatId) {
+      await addMessage(user.id, chatId, "assistant", plan.text, media).catch(() => undefined);
+      await touchChat(user.id, chatId).catch(() => undefined);
+    }
+    return NextResponse.json({ text: plan.text, media, chatId, provider: "pollinations-image", signedIn: !!user });
   }
 
   /* ---------- clock: the model has no idea what time it is ---------- */
@@ -340,6 +345,7 @@ export async function POST(req: Request) {
       async start(controller) {
         let full = "";
         let provider = "none";
+        let throttled = false;
         try {
           for await (const event of chatStream(turns)) {
             if (event.delta) {
@@ -347,13 +353,16 @@ export async function POST(req: Request) {
               provider = event.provider || provider;
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: event.delta })}\n\n`));
             }
-            if (event.done) break;
+            if (event.done) {
+              if (event.rateLimited) { throttled = true; provider = "rate-limited"; }
+              break;
+            }
           }
         } catch {
           // fall through with whatever text we have
         }
         if (!full.trim()) {
-          full = deterministic || offlineAnswer(message, profile, attempted);
+          full = deterministic || offlineAnswer(message, profile, attempted, throttled);
           provider = "offline";
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: full })}\n\n`));
         }
@@ -383,7 +392,7 @@ export async function POST(req: Request) {
   let text = result.text;
   let provider = result.provider;
   if (!text) {
-    text = deterministic || offlineAnswer(message, profile, attempted);
+    text = deterministic || offlineAnswer(message, profile, attempted, result.rateLimited);
     provider = "offline";
   }
 
@@ -437,13 +446,21 @@ function sseOnce(text: string, meta: Record<string, unknown>): Response {
  * Last-resort responder: never a dead end, honest about being offline, and
  * still able to name real games from the catalogue.
  */
-function offlineAnswer(message: string, profile: GgProfile, attempted: string[] = []): string {
-  // Be specific: if a lookup actually failed, say that rather than blaming the
-  // models, which did nothing wrong.
+function offlineAnswer(
+  message: string,
+  profile: GgProfile,
+  attempted: string[] = [],
+  rateLimited = false,
+): string {
+  // Be specific about *why*. "Everything is down" is wrong when the truth is
+  // "the free tier allows one reply every 45 seconds" — and the second version
+  // tells the user exactly what to do.
   const lines = [
-    attempted.length
-      ? `**I couldn't reach the live ${attempted.join(" / ")} service just now, and the free model endpoints are busy too.** Try again in a moment.`
-      : "**Every free model endpoint is busy or unreachable right now.** Your message is saved — try again in a moment.",
+    rateLimited
+      ? "**The free model is on its one-reply-every-45-seconds budget right now.** Give it a moment and ask again — your message is saved. (Everything that doesn't need a model — maths, conversions, prices, the time — keeps working.)"
+      : attempted.length
+        ? `**I couldn't reach the live ${attempted.join(" / ")} service just now, and the free model endpoints are busy too.** Try again in a moment.`
+        : "**Every free model endpoint is busy or unreachable right now.** Your message is saved — try again in a moment.",
   ];
   const found = searchCatalogue(CATALOGUE, message, 4);
   if (found.length) {

@@ -203,11 +203,14 @@ function providers(): Provider[] {
 
   // ---- keyless, always available ----
   // Pollinations with the (usually) strongest free alias, then the lighter ones.
+  // Measured from production (see /api/gg-gpt/diag): every POST alias answers
+  // 402 FREE_LIMIT from a datacenter IP, and qwen-coder does not exist at all.
+  // They stay as cheap secondary hopes — a shared quota sometimes frees up —
+  // but nothing important may depend on them.
   for (const [alias, tier] of [
-    ["openai", 80],
-    ["openai-fast", 70],
-    ["mistral", 60],
-    ["qwen-coder", 50],
+    ["openai", 55],
+    ["openai-fast", 50],
+    ["mistral", 45],
   ] as const) {
     list.push({
       name: `pollinations:${alias}`,
@@ -273,10 +276,13 @@ function providers(): Provider[] {
     },
   });
 
-  // Last resort: Pollinations' plain GET, which has never required a body.
+  // Pollinations' plain GET is the endpoint that actually answers from a
+  // datacenter IP: the POST/OpenAI-compatible surface returns 402 FREE_LIMIT
+  // there, while this one returns text. Measured, not assumed — see
+  // /api/gg-gpt/diag. It is therefore the primary keyless path, not a fallback.
   list.push({
     name: "pollinations:get",
-    tier: 10,
+    tier: 75,
     model: "openai",
     request: (turns) => {
       // Keep the URL under ~7 KB; long chats fall back to the POST providers.
@@ -290,12 +296,49 @@ function providers(): Provider[] {
       };
     },
     parse: (_p, raw) => raw,
+    // `?stream=true` turns the same endpoint into an SSE stream. If the gateway
+    // ignores it we simply get one big plain-text chunk, which the parser below
+    // treats as a single delta — so this is safe either way.
+    stream: (turns, _o) => {
+      const prompt = turns
+        .map(t => (t.role === "system" ? `[instructions] ${t.content}` : t.role === "user" ? t.content : `[you] ${t.content}`))
+        .join("\n\n")
+        .slice(-6000);
+      return {
+        url: `https://text.pollinations.ai/${encodeURIComponent(prompt)}?stream=true&referrer=gg-lounge`,
+        init: { method: "GET", headers: { accept: "text/event-stream, text/plain" } },
+      };
+    },
+    parseStream: (chunk) => {
+      const deltas = sseDeltas(chunk);
+      if (deltas.length) return deltas;
+      // Not SSE: the whole body arrived at once.
+      const plain = chunk.trim();
+      if (!plain || plain.startsWith("{") || plain.startsWith("<")) return [];
+      return [plain];
+    },
   });
 
   return list.sort((a, b) => b.tier - a.tier);
 }
 
 /* ------------------------------- calling ------------------------------- */
+
+/**
+ * The `.../models` list and the plain GET share one free quota: **one reply
+ * every 45 seconds per IP**, and the gateway answers 402 FREE_LIMIT when it is
+ * spent. That is not an outage, and telling the user "everything is down" would
+ * be a lie. It is also the single most important thing to know about this
+ * provider, because Vercel functions share an egress IP.
+ */
+export class RateLimitedError extends Error {
+  readonly retryAfterMs: number;
+  constructor(retryAfterMs = 45_000) {
+    super("pollinations free tier: one reply every 45s per IP");
+    this.name = "RateLimitedError";
+    this.retryAfterMs = retryAfterMs;
+  }
+}
 
 function looksLikeError(text: string): boolean {
   const t = text.trim();
@@ -304,7 +347,7 @@ function looksLikeError(text: string): boolean {
   return /^\s*\{?\s*"(error|detail|message)"\s*:/i.test(t) && t.length < 400;
 }
 
-async function attempt(p: Provider, turns: ChatTurn[], opts: CallOptions): Promise<{ text: string; log: AttemptLog }> {
+async function attempt(p: Provider, turns: ChatTurn[], opts: CallOptions): Promise<{ text: string; log: AttemptLog; rateLimited?: boolean }> {
   const started = Date.now();
   const { url, init } = p.request(turns, opts);
   try {
@@ -312,7 +355,11 @@ async function attempt(p: Provider, turns: ChatTurn[], opts: CallOptions): Promi
     const raw = await res.text();
     const ms = Date.now() - started;
     if (!res.ok) {
-      return { text: "", log: { provider: p.name, model: p.model, status: res.status, ms, error: raw.slice(0, 160) } };
+      return {
+        text: "",
+        log: { provider: p.name, model: p.model, status: res.status, ms, error: raw.slice(0, 160) },
+        rateLimited: res.status === 402 || /FREE_LIMIT/i.test(raw),
+      };
     }
     const text = p.parse(undefined, raw).trim();
     if (looksLikeError(text)) {
@@ -342,18 +389,22 @@ async function attempt(p: Provider, turns: ChatTurn[], opts: CallOptions): Promi
 export async function chatComplete(
   turns: ChatTurn[],
   opts: CallOptions = {},
-): Promise<ChatResult & { attempts: AttemptLog[] }> {
+): Promise<ChatResult & { attempts: AttemptLog[]; rateLimited: boolean }> {
   const chain = providers();
   const attempts: AttemptLog[] = [];
+  let rateLimited = false;
 
   // Primary: first two candidates raced, so the fastest good answer wins.
   const head = chain.slice(0, 2);
   const headResults = await Promise.all(head.map(p => attempt(p, turns, opts)));
-  for (const r of headResults) attempts.push(r.log);
+  for (const r of headResults) {
+    attempts.push(r.log);
+    if (r.rateLimited) rateLimited = true;
+  }
   const winner = headResults.find(r => r.text);
   if (winner) {
     const log = attempts.find(a => a.provider === winner.log.provider)!;
-    return { text: winner.text, provider: log.provider, model: log.model, attempts };
+    return { text: winner.text, provider: log.provider, model: log.model, attempts, rateLimited };
   }
 
   // Rest of the chain, sequentially with one retry each — cheap and resilient.
@@ -361,15 +412,17 @@ export async function chatComplete(
     for (let attemptNo = 0; attemptNo < 2; attemptNo++) {
       const r = await attempt(p, turns, opts);
       attempts.push(r.log);
+      if (r.rateLimited) rateLimited = true;
       if (r.text) {
-        return { text: r.text, provider: p.name, model: p.model, attempts };
+        return { text: r.text, provider: p.name, model: p.model, attempts, rateLimited };
       }
-      // A hard 4xx will not improve on retry.
+      // A spent quota or a hard 4xx will not improve on retry.
+      if (r.rateLimited) break;
       if (r.log.status >= 400 && r.log.status < 500) break;
     }
   }
 
-  return { text: "", provider: "none", model: "none", attempts };
+  return { text: "", provider: "none", model: "none", attempts, rateLimited };
 }
 
 /**
@@ -379,7 +432,7 @@ export async function chatComplete(
 export async function* chatStream(
   turns: ChatTurn[],
   opts: CallOptions = {},
-): AsyncGenerator<{ delta?: string; provider?: string; model?: string; done?: boolean }> {
+): AsyncGenerator<{ delta?: string; provider?: string; model?: string; done?: boolean; rateLimited?: boolean }> {
   const chain = providers().filter(p => p.stream && p.parseStream);
   for (const p of chain) {
     const started = Date.now();
@@ -421,6 +474,9 @@ export async function* chatStream(
   if (result.text) {
     yield { delta: result.text, provider: result.provider, model: result.model };
     yield { done: true, provider: result.provider, model: result.model };
+  } else if (result.rateLimited) {
+    // Nothing to say, but the reason is known and it is temporary.
+    yield { done: true, provider: "rate-limited", rateLimited: true };
   }
 }
 
@@ -441,11 +497,34 @@ export function imageUrl(
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0, 900))}?width=${w}&height=${h}&seed=${seed}&model=${model}&nologo=true&referrer=gg-lounge`;
 }
 
-/** Pollinations' hosted video endpoint (no API key). */
-export function videoUrl(prompt: string, opts: { seed?: number; model?: string } = {}): string {
-  const seed = opts.seed ?? Math.floor(Math.random() * 1_000_000);
-  const model = opts.model || "veo-3-fast";
-  return `https://video.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0, 700))}?model=${model}&seed=${seed}&referrer=gg-lounge`;
+/**
+ * Video is the one capability with no working free host: `video.pollinations.ai`
+ * does not resolve at all (checked from production — see /api/gg-gpt/diag), and
+ * an <video> tag pointing at a dead host is worse than no feature, because it
+ * looks broken rather than unavailable.
+ *
+ * So a "make me a video" request is answered honestly and usefully: the shot
+ * list plus a frame you can actually look at, generated by the image model that
+ * does work. That is a real answer to "show me this", not a placeholder.
+ */
+export function videoPlan(prompt: string, opts: { width?: number; height?: number } = {}): {
+  text: string;
+  imageUrl: string;
+} {
+  const shot = prompt.trim().slice(0, 500);
+  return {
+    text: `Short video isn't available on a free tier right now — no keyless video host responds. Here's the opening frame instead, plus how I'd shoot it:
+
+**${shot}**
+
+1. Wide establishing shot — set the scene before anything moves.
+2. Slow push in on the subject; hold for two beats.
+3. Cut to a detail nobody expects, then out on the widest frame.`,
+    imageUrl: imageUrl(`${shot}, cinematic film still, 35mm, dramatic lighting`, {
+      width: opts.width ?? 1344,
+      height: opts.height ?? 768,
+    }),
+  };
 }
 
 /** Exposed for the diagnostics route so both use one definition. */

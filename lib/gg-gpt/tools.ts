@@ -19,7 +19,14 @@ export interface ToolResult {
   source: string;
 }
 
+/**
+ * Wikimedia rate-limits generic bot agents with a 429, which is what the
+ * diagnostics caught. Its API etiquette asks for a descriptive agent with a
+ * contact URL, so the two are kept separate: browser-ish for scraping HTML,
+ * honest and specific for documented JSON APIs.
+ */
 const UA = "Mozilla/5.0 (compatible; GG-GPT/1.0; +https://gg-lounge.vercel.app)";
+const API_UA = "GG-GPT/1.0 (https://gg-lounge.vercel.app; contact: gg-lounge.vercel.app)";
 
 function stripTags(html: string): string {
   return html
@@ -108,7 +115,7 @@ async function bingRss(query: string): Promise<SearchHit[]> {
 async function wikipediaSearch(query: string): Promise<SearchHit[]> {
   const res = await fetch(
     `https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=5&srsearch=${encodeURIComponent(query)}`,
-    { headers: { "user-agent": UA }, signal: AbortSignal.timeout(10000) },
+    { headers: { "user-agent": API_UA, accept: "application/json" }, signal: AbortSignal.timeout(10000) },
   );
   if (!res.ok) return [];
   const json = (await res.json()) as { query?: { search?: Array<{ title: string; snippet: string }> } };
@@ -314,8 +321,45 @@ export async function cryptoPrice(ids: string[], vs = "usd"): Promise<ToolResult
   return { text: `Live prices — ${parts.join(" | ")}`, data: j, source: "coingecko" };
 }
 
+/**
+ * Definitions. dictionaryapi.dev sits behind a Cloudflare interstitial that
+ * answers 403 to a server, so it is tried second and Wiktionary (a documented
+ * MediaWiki REST API) is the one that actually works. Two independent sources
+ * also means a rare word is more likely to be found at all.
+ */
 export async function defineWord(word: string): Promise<ToolResult | null> {
+  const fromWiktionary = await wiktionary(word).catch(() => null);
+  if (fromWiktionary) return fromWiktionary;
+  return dictionaryApi(word).catch(() => null);
+}
+
+async function wiktionary(word: string): Promise<ToolResult | null> {
+  const res = await fetch(
+    `https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(word)}`,
+    { headers: { "user-agent": API_UA, accept: "application/json" }, signal: AbortSignal.timeout(10000) },
+  );
+  if (!res.ok) return null;
+  const j = (await res.json()) as Record<string, Array<{
+    partOfSpeech?: string;
+    definitions?: Array<{ definition?: string; examples?: string[] }>;
+  }>>;
+  const english = j?.en;
+  if (!Array.isArray(english) || !english.length) return null;
+  const lines = [word];
+  for (const group of english.slice(0, 3)) {
+    const def = group.definitions?.[0];
+    if (!def?.definition) continue;
+    const clean = stripTags(def.definition);
+    const example = def.examples?.[0] ? stripTags(def.examples[0]).slice(0, 160) : "";
+    lines.push(`(${group.partOfSpeech || "noun"}) ${clean}${example ? ` — e.g. "${example}"` : ""}`);
+  }
+  if (lines.length === 1) return null;
+  return { text: lines.join("\n"), data: { word, source: "wiktionary" }, source: "wiktionary" };
+}
+
+async function dictionaryApi(word: string): Promise<ToolResult | null> {
   const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`, {
+    headers: { "user-agent": UA, accept: "application/json" },
     signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) return null;
