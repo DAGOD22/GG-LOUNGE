@@ -40,6 +40,25 @@ function Prose({ text }: { text: string }) {
       {lines.map((line, i) => {
         const trimmed = line.trim();
         if (!trimmed) return <div key={i} style={{ height: 8 }} />;
+        if (/^#{1,6}\s+/.test(trimmed)) {
+          const level = trimmed.match(/^#+/)?.[0].length ?? 1;
+          return (
+            <div key={i} style={{ fontWeight: 800, fontSize: level <= 2 ? 15 : 13.5, margin: '12px 0 5px', letterSpacing: '-0.01em' }}>
+              {inline(trimmed.replace(/^#{1,6}\s+/, ''))}
+            </div>
+          );
+        }
+        if (/^(?:---+|\*\*\*+)$/.test(trimmed)) {
+          return <div key={i} style={{ height: 1, background: 'rgba(255,255,255,.1)', margin: '10px 0' }} />;
+        }
+        const quote = /^>\s+/.test(trimmed);
+        if (quote) {
+          return (
+            <div key={i} style={{ borderLeft: '2px solid rgba(255,255,255,.22)', paddingLeft: 10, margin: '6px 0', opacity: 0.85 }}>
+              {inline(trimmed.replace(/^>\s+/, ''))}
+            </div>
+          );
+        }
         const bullet = /^[-*•]\s+/.test(trimmed);
         const num = /^\d+\.\s+/.test(trimmed);
         const body = inline(bullet ? trimmed.replace(/^[-*•]\s+/, '') : num ? trimmed.replace(/^\d+\.\s+/, '') : trimmed);
@@ -58,8 +77,25 @@ function Prose({ text }: { text: string }) {
 }
 
 function inline(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g);
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|\[[^\]]+\]\([^)\s]+\))/g);
   return parts.map((p, i) => {
+    const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(p);
+    if (link) {
+      // Only ever render an http(s) link: a model could echo a javascript: URL.
+      const href = /^https?:\/\//i.test(link[2]) ? link[2] : /^\//.test(link[2]) ? link[2] : null;
+      if (!href) return <span key={i}>{link[1]}</span>;
+      const external = /^https?:/i.test(href);
+      return (
+        <a
+          key={i}
+          href={href}
+          {...(external ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
+          style={{ color: 'var(--accent, #d7f34a)', textDecoration: 'underline', textUnderlineOffset: 2 }}
+        >
+          {link[1]}
+        </a>
+      );
+    }
     if (/^\*\*[^*]+\*\*$/.test(p)) return <strong key={i}>{p.slice(2, -2)}</strong>;
     if (/^`[^`]+`$/.test(p)) return <code key={i} style={{ background: 'rgba(255,255,255,.1)', padding: '1px 5px', borderRadius: 5, fontSize: '0.92em' }}>{p.slice(1, -1)}</code>;
     if (/^\*[^*]+\*$/.test(p)) return <em key={i}>{p.slice(1, -1)}</em>;
