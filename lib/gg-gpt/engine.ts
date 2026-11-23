@@ -418,7 +418,10 @@ export async function chatComplete(
       }
       // A spent quota or a hard 4xx will not improve on retry.
       if (r.rateLimited) break;
-      if (r.log.status >= 400 && r.log.status < 500) break;
+      // 401/403 mean "your credentials", 404 can mean "this path is wrong for
+      // this prompt" on the GET endpoint (measured: 404 on one prompt, 200 on
+      // the next) — those still get their one retry. A 429 will not improve.
+      if (r.log.status === 429) break;
     }
   }
 
