@@ -314,18 +314,9 @@ export function curatedRank(id: string): number {
 export const FEATURED_IDS = ['eaglercraftx','geometry-dash','ragdoll-archers','slope','retro-bowl','drive-mad','moto-x3m','among-us','smashkarts','cookie-clicker']
 export const STAFF_PICKS = ['eaglercraftx','geometry-dash','ragdoll-archers','slope','retro-bowl','drive-mad','moto-x3m','basket-random','bloonstd2','2048']
 export const LOW_QUALITY_HINTS = new Set(['spiral-roll','shape-transform','mr-dude','obby-snowboard','spiders','summer','real-pool-3d','gta-mods','cheese-chompers-3d','bad-simulator','volley-random','soccer-random','basket-bros','build-defend','red-vs-blue','gunspin','steep-descent','crazy-crash-landing','cyber-cars','extreme-racing','monster-truck'])
-export const CONTROLS_LEGEND: Record<string,string> = {
-  Arcade: 'Arrows / WASD to move • Space to jump/action • R to restart',
-  Platformer: 'Arrows / WASD • Space to jump • Shift to run • R to restart',
-  Racing: 'Arrows / WASD to steer • Space to brake • R to reset',
-  Puzzle: 'Mouse + keyboard • Arrows to move • R/Enter to restart',
-  Idle: 'Mouse clicks • Space to speed',
-  Simulation: 'Mouse + WASD • Scroll to zoom',
-  Sandbox: 'WASD to move • Space to jump • E to interact',
-  Battle: 'WASD to move • Mouse to aim • Space/Click to shoot',
-  Community: 'WASD / Arrows • Space • Enter',
-  default: 'Arrows / WASD • Space • Enter • R to restart'
-}
+// Controls are per-game now — see lib/game-controls.ts. This keeps the
+// genre-keyed object only as a last-resort fallback for the placeholder text.
+export const CONTROLS_FALLBACK = 'Arrows / WASD • Space • Enter'
 export function hashDay(str:string){ let h=0; for(let i=0;i<str.length;i++) h=(h*31+str.charCodeAt(i))>>>0; return h }
 export function normalizeTitle(s:string){ return s.toLowerCase().replace(/[^a-z0-9]/g,'') }
 export function getHashColor(id:string){ return pubColors[hashDay(id) % pubColors.length] }

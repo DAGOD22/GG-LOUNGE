@@ -2,7 +2,8 @@
 import { useState } from 'react'
 import { Heart, Play, Keyboard } from 'lucide-react'
 import type { Game } from '@/lib/games'
-import { CONTROLS_LEGEND, getGameRating, getRatingColor } from '@/lib/games'
+import { getGameRating, getRatingColor } from '@/lib/games'
+import { getGameControls } from '@/lib/game-controls'
 
 function Highlight({ text, query }: { text:string; query:string }){
   if(!query) return <>{text}</>
@@ -34,7 +35,7 @@ export function GameCard({
   const [imgSrc, setImgSrc] = useState(game.icon || '')
   const [imgError, setImgError] = useState(false)
   const showIcon = !!imgSrc && !imgError
-  const controls = (CONTROLS_LEGEND as any)[game.genre] || CONTROLS_LEGEND.default
+  const controls = getGameControls(game.id, game.genre)
   const rating = getGameRating(game.id)
   const ratingColor = getRatingColor(rating)
 
@@ -127,7 +128,7 @@ export function ShelfCard({
   const [imgSrc, setImgSrc] = useState(game.icon || '')
   const [imgError, setImgError] = useState(false)
   const showIcon = !!imgSrc && !imgError
-  const controls = (CONTROLS_LEGEND as any)[game.genre] || CONTROLS_LEGEND.default
+  const controls = getGameControls(game.id, game.genre)
   const rating2 = getGameRating(game.id)
   const ratingColor2 = getRatingColor(rating2)
   return (

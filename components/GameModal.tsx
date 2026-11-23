@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Heart, Maximize2, X, Copy, ExternalLink, Gamepad2, Keyboard, Monitor, Bug, Flag, AlertCircle, Loader2, Save, Trophy, Star, Lock, Medal, Crown } from 'lucide-react'
 import type { Game } from '@/lib/games'
-import { CONTROLS_LEGEND } from '@/lib/games'
+import { getGameControls } from '@/lib/game-controls'
 import { inferAchievementUpdates } from '@/lib/achievement-tracker'
 import { getAchievementsForGame, RARITY_COLOR } from '@/lib/achievements'
 
@@ -643,7 +643,7 @@ export function GameModal({
             }}
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 800 }}>
-              <Keyboard size={14} /> {CONTROLS_LEGEND[game?.genre || 'default'] || CONTROLS_LEGEND.default}
+              <Keyboard size={14} /> {getGameControls(game?.id, game?.genre)}
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted)' }}>
               <Monitor size={12} /> Tap Fullscreen for best view •{' '}

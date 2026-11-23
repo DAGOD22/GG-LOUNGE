@@ -8,7 +8,7 @@ import { unavailableGames, getGameAssetIssues } from '@/lib/games'
 import Fuse from 'fuse.js'
 import { ArrowUpRight, Gamepad2, Heart, Play, ShieldCheck, Sparkles, Trophy, X, Shuffle, AlertCircle, Sun, Moon, Download, Flame, Gift, Keyboard, WifiOff, Wifi, LogIn, LogOut, User, Cloud, Menu } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, CONTROLS_LEGEND, gameOfDayIndex, isNearDuplicate, curatedRank } from '@/lib/games'
+import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, gameOfDayIndex, isNearDuplicate, curatedRank } from '@/lib/games'
 import type { Game } from '@/lib/games'
 import {  } from '@/components/GameCard'
 import { LibraryToolbar } from '@/components/LibraryToolbar'
@@ -553,7 +553,7 @@ export default function Page() {
             <br />
             <em>Play forever.</em>
           </h1>
-          <p className="hero-text">A handpicked, no-filler collection of browser games for the minutes between everything. <span style={{opacity:.8}}><Keyboard size={12} style={{display:'inline',verticalAlign:'-2px'}}/> {CONTROLS_LEGEND.default} — hover any card to see its controls.</span></p>
+          <p className="hero-text">A handpicked, no-filler collection of browser games for the minutes between everything. <span style={{opacity:.8}}><Keyboard size={12} style={{display:'inline',verticalAlign:'-2px'}}/> Every game lists its own controls — hover any card to see them.</span></p>
           <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:14}}>
             <a className="hero-link" href="#games">
               Enter the lounge <ArrowUpRight size={15} />
