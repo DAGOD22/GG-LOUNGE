@@ -29,6 +29,7 @@ import {
 import { detectIntent, titleFromMessage } from "@/lib/gg-gpt/intent";
 import { answerClock } from "@/lib/gg-gpt/clock";
 import { cacheGet, cacheSet } from "@/lib/gg-gpt/cache";
+import { exclusive, exclusiveStream, backOff, waitEstimate } from "@/lib/gg-gpt/queue";
 import { buildSystemPrompt, extractFacts, type GgProfile } from "@/lib/gg-gpt/persona";
 import { games } from "@/lib/games";
 
@@ -347,16 +348,22 @@ export async function POST(req: Request) {
         let provider = "none";
         let throttled = false;
         try {
-          for await (const event of chatStream(turns)) {
+          for await (const event of exclusiveStream(() => chatStream(turns))) {
             if (event.delta) {
               full += event.delta;
               provider = event.provider || provider;
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: event.delta })}\n\n`));
             }
             if (event.done) {
-              if (event.rateLimited) { throttled = true; provider = "rate-limited"; }
+              if (event.rateLimited) { throttled = true; provider = "rate-limited"; backOff(); }
               break;
             }
+          }
+          if (provider === "none" && !full) {
+            // Nothing produced: either the slot was unavailable or every
+            // provider refused. Say which.
+            throttled = throttled || waitEstimate() > 0;
+            provider = throttled ? "rate-limited" : "none";
           }
         } catch {
           // fall through with whatever text we have
@@ -388,7 +395,16 @@ export async function POST(req: Request) {
     });
   }
 
-  const result = await chatComplete(turns);
+  const budget = waitEstimate();
+  const result = (await exclusive(() => chatComplete(turns))) ?? {
+    text: "",
+    provider: "queued",
+    model: "none",
+    attempts: [],
+    rateLimited: false,
+    queueMs: budget,
+  };
+  if (result.rateLimited) backOff();
   let text = result.text;
   let provider = result.provider;
   if (!text) {
