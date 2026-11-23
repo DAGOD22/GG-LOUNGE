@@ -17,7 +17,6 @@ import { RequestPanel } from '@/components/RequestPanel'
 const HomeDashboard = dynamic(() => import('@/components/HomeDashboard').then(m => m.HomeDashboard), { ssr: false, loading: () => null })
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { Reveal } from '@/components/Reveal'
-import { CountUp } from '@/components/CountUp'
 import { AuthDialog } from '@/components/AuthDialog'
 const GameModal = dynamic(() => import('@/components/GameModal').then(m => m.GameModal), { ssr: false, loading: () => null })
 const AchievementsHub = dynamic(() => import('@/components/AchievementsHub').then(m => m.AchievementsHub), { ssr: false, loading: () => null })
@@ -568,12 +567,12 @@ export default function Page() {
           </div>
           <div className="hero-stats" style={{gap:18, padding:'12px 16px', borderRadius:999, background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.06)', backdropFilter:'blur(8px)', display:'inline-flex', width:'fit-content', marginTop:22}}>
             <span>
-              <strong><CountUp value={allGames.length} /></strong> games
+              <strong className="stat-pop">{allGames.length}</strong> games
             </span>
             <span>
               <strong>∞</strong> replay value
             </span>
-            <span style={{display:'flex',alignItems:'center',gap:6}}><Flame size={12} color={streak>2?'var(--lime)':'inherit'}/> <strong><CountUp value={streak} /></strong> day streak</span>
+            <span style={{display:'flex',alignItems:'center',gap:6}}><Flame size={12} color={streak>2?'var(--lime)':'inherit'}/> <strong className="stat-pop">{streak}</strong> day streak</span>
             <span>
               <strong>01</strong> lounge
             </span>

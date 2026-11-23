@@ -44,30 +44,17 @@ test('Reveal does not add the hidden class when motion is reduced', async () => 
 });
 
 /**
- * A shipped regression: the deployed page rendered "-697 games" — the counter
- * had been reset and was mid-animation when the HTML was serialised. The
- * server render (and any snapshot taken before the effect runs) must be the
- * real number, and the reset to 0 must happen inside the observer callback.
+ * Two shipped regressions, both on the same hero number: production rendered
+ * "-915 games" (an rAF timestamp earlier than the scheduler's now(), giving
+ * negative progress) and then "0", because any snapshot taken mid-animation
+ * captures an in-between value. Animating the digits at all is the hazard.
+ * The stat may animate its scale/opacity; it may never animate its content.
  */
-test('CountUp initialises to the real value', async () => {
-  const src = await readFile(new URL('../components/CountUp.tsx', import.meta.url), 'utf8');
-  assert.match(src, /useState\(value\)/, 'initial state must be the real value');
-  assert.equal(/setShown\(0\)/.test(src), false, 'must not reset to 0 during render or on mount');
-  const observer = src.indexOf('new IntersectionObserver');
-  const reset = src.indexOf('const tick = (now: number)');
-  assert.ok(observer !== -1 && reset !== -1 && observer < reset, 'counting must start inside the observer');
-});
+test('the hero stat animates presentation, never the number', async () => {
+  const css = await read();
+  assert.match(css, /@keyframes stat-pop \{[^@]*from \{[^}]*opacity: 0/, 'stat-pop animates opacity');
 
-/**
- * Second shipped regression, same component: production showed "-915 games".
- * The rAF timestamp is the frame's start, which can precede the now() taken
- * when the loop was scheduled, so `(now - start)` went negative on the first
- * frame and the eased curve produced a negative count. The baseline must be
- * the first frame's own timestamp, and progress must be clamped.
- */
-test('CountUp can never render a value outside 0..value', async () => {
-  const src = await readFile(new URL('../components/CountUp.tsx', import.meta.url), 'utf8');
-  assert.equal(/const start = performance\.now\(\)/.test(src), false, 'must not baseline on a pre-frame timestamp');
-  assert.match(src, /if \(start === null\) start = now/, 'baseline on the first frame');
-  assert.match(src, /Math\.max\(0, \(now - start\) \/ duration\)/, 'progress must be clamped to >= 0');
+  const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  assert.match(page, /<strong className="stat-pop">\{allGames.length\}<\/strong>/, 'the stat renders the real count directly');
+  assert.equal(/CountUp/.test(page), false, 'no component may substitute a value into the digits');
 });

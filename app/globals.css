@@ -2759,6 +2759,37 @@ a:focus-visible {
     height: 72px;
   }
 }
+/* Hero stats settle into place on load. The digits are the real digits at
+   every moment — only their scale/opacity animates — so the page can never
+   render a wrong count, and a snapshot always reads the true figure. */
+.stat-pop {
+  display: inline-block;
+  animation: stat-pop 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.hero-stats > span:nth-child(2) .stat-pop {
+  animation-delay: 60ms;
+}
+.hero-stats > span:nth-child(3) .stat-pop {
+  animation-delay: 120ms;
+}
+.hero-stats > span:nth-child(4) .stat-pop {
+  animation-delay: 180ms;
+}
+@keyframes stat-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stat-pop {
+    animation: none;
+  }
+}
 /* Scroll reveal — the element is visible by default; .reveal-init is only
    added once mounted, so no-JS readers and crawlers see everything. */
 .reveal-init {
