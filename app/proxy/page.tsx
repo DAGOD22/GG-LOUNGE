@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, ExternalLink, Globe, Home, RotateCw, Search } from 'lucide-react';
-import { bootProxy, createFrame, normalizeProxyUrl, type ProxyRuntime, type ScramjetFrame } from '@/lib/proxy-client';
+import { bootProxy, createFrame, normalizeProxyUrl, type ProxyFrame, type ProxyRuntime } from '@/lib/proxy-client';
 
 const shortcuts = [
   ['YouTube', 'https://www.youtube.com/'], ['Bing', 'https://www.bing.com/'],
@@ -12,7 +12,7 @@ const shortcuts = [
 ];
 export default function ProxyPage() {
   const iframe = useRef<HTMLIFrameElement>(null);
-  const controlledFrame = useRef<ScramjetFrame | null>(null);
+  const controlledFrame = useRef<ProxyFrame | null>(null);
   const runtime = useRef<ProxyRuntime | null>(null);
   const [address, setAddress] = useState('');
   const [current, setCurrent] = useState('');
@@ -34,20 +34,29 @@ export default function ProxyPage() {
       setError(''); setLoading(true); setAddress(url); setCurrent(proxied);
       controlledFrame.current.go(proxied);
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => { setLoading(false); setStatus('Upstream response timed out.'); setError('No page response after 35 seconds. Check the Wisp backend and its outbound internet access, or retry. The destination or your network may be blocking it.'); }, 35000);
+      timer.current = setTimeout(() => { setLoading(false); setStatus('Upstream response timed out.'); setError('No page response after 35 seconds. The destination may be unreachable, rate-limiting us, or requiring JavaScript the proxy cannot carry. Try again or open the site directly.'); }, 35000);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not open this address.'); }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
+    let frame: ProxyFrame | null = null;
     setReady(false); setError(''); setStatus('Starting the proxy…');
     bootProxy().then(result => {
       if (cancelled || !iframe.current) return;
       runtime.current = result;
-      const frame = createFrame(iframe.current, result.prefix);
-      controlledFrame.current = frame;
-      frame.addEventListener('urlchange', (event: { url: string }) => {
-        if (!cancelled) { setAddress(String(event.url)); setCurrent(String(event.url)); }
+      frame = createFrame(iframe.current, result.prefix, result.decode);
+      const active = frame;
+      controlledFrame.current = active;
+      // The frame reports the real destination on every navigation, so the
+      // address bar follows redirects and in-page links instead of freezing on
+      // whatever was typed.
+      active.addEventListener('urlchange', (event: { url: string }) => {
+        if (cancelled) return;
+        setAddress(event.url);
+        setCurrent(event.url);
+        setLoading(false);
+        setError('');
       });
       setReady(true); setLimited(false); setStatus(result.notice);
       const requested = new URLSearchParams(location.search).get('url');
@@ -55,7 +64,13 @@ export default function ProxyPage() {
     }).catch(cause => {
       if (!cancelled) { setStatus('Not connected'); setError(cause instanceof Error ? cause.message : 'Proxy startup failed.'); }
     });
-    return () => { cancelled = true; controlledFrame.current = null; if (timer.current) clearTimeout(timer.current); };
+    return () => {
+      cancelled = true;
+      controlledFrame.current = null;
+      if (timer.current) clearTimeout(timer.current);
+      // The effect may re-run (Retry); tear the old frame's polling down.
+      frame?.destroy();
+    };
   }, [attempt, navigate]);
 
   function onLoad() {
@@ -99,7 +114,7 @@ export default function ProxyPage() {
       <p className="eyebrow">ONE BROWSER · ONE CONNECTION</p><h1>Your apps, together.</h1>
       <p>Self-hosted proxy runtime. Every app uses the same launcher and waits for the proxy to be ready.</p>
       <div className="proxy-quick">{shortcuts.map(([name, url]) => <button key={url} disabled={!ready} onClick={() => navigate(url)}>{name}</button>)}</div>
-      <p style={{ maxWidth: 620, margin: '24px auto', fontSize: 13 }}>Roblox experiences need the Roblox app or a compatible cloud gaming service. Browsing its website is not the same as running the game. Video and realtime apps need a reachable Wisp backend.</p>
+      <p style={{ maxWidth: 620, margin: '24px auto', fontSize: 13 }}>Roblox experiences need the Roblox app or a compatible cloud gaming service. Browsing its website is not the same as running the game. Video and realtime apps work through the same connection as everything else, but a site that insists on its own custom protocol can still refuse to load.</p>
     </section>}
     {current && /(?:roblox\.com|now\.gg)/i.test(current) && <p style={{ margin: 0, padding: '8px 18px', fontSize: 12, color: '#ffd18b' }}>Cloud gaming availability, accounts and WebRTC are controlled by the provider. This launcher does not supply a Roblox game server.</p>}
     <iframe ref={iframe} src="about:blank" title="Proxied browser" className="proxy-frame" allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" allowFullScreen onLoad={onLoad} onError={() => { setLoading(false); setError('The proxied page failed to load.'); }} style={{ display: current ? 'block' : 'none', width: '100%', flex: 1, minHeight: 'calc(100dvh - 108px)', border: 0, background: 'white' }} />

@@ -17,12 +17,19 @@ export type ProxyRuntime = {
   transport: 'bare';
   notice: string;
 };
-export type ScramjetFrame = {
+export type ProxyFrame = {
   go: (url: string) => void;
   back: () => void;
   forward: () => void;
+  reload: () => void;
+  /** 'urlchange' fires with the real destination whenever the frame navigates. */
   addEventListener: (type: 'urlchange', listener: (event: { url: string }) => void) => void;
+  removeEventListener: (type: 'urlchange', listener: (event: { url: string }) => void) => void;
+  /** Stop polling and drop every listener attached by this frame. */
+  destroy: () => void;
 };
+/** @deprecated The frame is no longer Scramjet-specific. Use ProxyFrame. */
+export type ScramjetFrame = ProxyFrame;
 
 const PREFIX = '/service/';
 const scripts = new Map<string, Promise<void>>();
@@ -140,12 +147,139 @@ export function bootProxy(): Promise<ProxyRuntime> {
   return bootPromise!;
 }
 
-/** Frame controls backed by same-origin iframe the worker proxies. */
-export function createFrame(iframe: HTMLIFrameElement, prefix: string): ScramjetFrame {
+/** A decoded candidate is only trusted if it is a real http(s) address. */
+function asHttpUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Recover the real destination from whatever the frame currently shows.
+ *
+ * Ultraviolet rewrites `history.pushState` so the frame's own URL becomes the
+ * proxied form of the destination, which means `location.href` alone is enough
+ * for both full loads and in-page (SPA) navigation — no message bridge needed.
+ * Some sites hand the encoder an already-encoded string, so decoding can need
+ * more than one pass; a candidate is only accepted once it parses as http(s).
+ */
+function readDestination(iframe: HTMLIFrameElement, prefix: string, decode: (value: string) => string | null): string | null {
+  let href: string;
+  let state: unknown;
+  try {
+    const win = iframe.contentWindow;
+    if (!win) return null;
+    href = win.location.href;
+    state = win.history.state;
+  } catch {
+    return null;
+  }
+  if (!href || href === 'about:blank' || href.startsWith('about:')) return null;
+
+  // Encoded path: peel off the prefix, then decode until it parses.
+  // `decode` expects a full proxied URL, so each attempt re-wraps the tail.
+  const markerIndex = href.indexOf(prefix);
+  if (markerIndex !== -1) {
+    const absolutePrefix = href.slice(0, markerIndex + prefix.length);
+    let candidate = href.slice(markerIndex + prefix.length).split(/[?#]/)[0];
+    for (let pass = 0; pass < 4 && candidate; pass++) {
+      const direct = asHttpUrl(candidate);
+      if (direct) return direct;
+      // `decode` is origin-aware, so hand it a URL shaped exactly like the one
+      // it produces: origin + prefix + payload.
+      const decoded = decode(`${absolutePrefix}${candidate}`) ?? safeDecode(candidate);
+      if (!decoded || decoded === candidate) break;
+      candidate = decoded;
+    }
+    // Undecodable (or still our own URL): leave the last good address alone
+    // rather than flashing a service-worker path at the user.
+    return asHttpUrl(candidate);
+  }
+
+  // The page may hold its own history state; use it only if it decodes cleanly.
+  if (typeof state === 'string') {
+    const decoded = decode(state) ?? asHttpUrl(state);
+    if (decoded) return decoded;
+  }
+
+  // The worker lost control of this document, so the href is the real address.
+  // Never surface our own proxied URL as if it were the destination.
+  const real = asHttpUrl(href);
+  return real && !real.includes(prefix) ? real : null;
+}
+
+function safeDecode(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
+export function createFrame(
+  iframe: HTMLIFrameElement,
+  prefix: string,
+  decode: (value: string) => string | null,
+): ProxyFrame {
+  const listeners = new Set<(event: { url: string }) => void>();
+  let last = '';
+  let timer: ReturnType<typeof setInterval> | null = null;
+  let onLoad: (() => void) | null = null;
+
+  const report = (value: string | null) => {
+    if (!value || value === last) return;
+    last = value;
+    for (const listener of listeners) listener({ url: value });
+  };
+
+  const poll = () => {
+    try {
+      if (iframe.contentWindow) report(readDestination(iframe, prefix, decode));
+    } catch {
+      // Transient access errors during a navigation are expected.
+    }
+  };
+
+  const attach = () => { if (!timer) timer = setInterval(poll, 400); };
+  const detach = () => { if (timer) clearInterval(timer); timer = null; };
+
   return {
-    go(url: string) { iframe.src = url; },
-    back() { try { iframe.contentWindow?.history.back(); } catch { /* cross-origin after a navigation */ } },
-    forward() { try { iframe.contentWindow?.history.forward(); } catch { /* cross-origin after a navigation */ } },
-    addEventListener() { void prefix; },
+    go(url: string) {
+      last = '';
+      iframe.src = url;
+    },
+    back() {
+      try { iframe.contentWindow?.history.back(); } catch { /* nothing to go back to */ }
+    },
+    forward() {
+      try { iframe.contentWindow?.history.forward(); } catch { /* nothing to go forward to */ }
+    },
+    reload() {
+      try { iframe.contentWindow?.location.reload(); } catch { /* ignore */ }
+    },
+    addEventListener(type, listener) {
+      if (type !== 'urlchange') return;
+      listeners.add(listener);
+      if (!onLoad) { onLoad = poll; iframe.addEventListener('load', onLoad); }
+      attach();
+      poll();
+    },
+    removeEventListener(type, listener) {
+      if (type !== 'urlchange') return;
+      listeners.delete(listener);
+      if (listeners.size === 0) {
+        detach();
+        if (onLoad) { iframe.removeEventListener('load', onLoad); onLoad = null; }
+      }
+    },
+    destroy() {
+      listeners.clear();
+      detach();
+      if (onLoad) { iframe.removeEventListener('load', onLoad); onLoad = null; }
+    },
   };
 }
+

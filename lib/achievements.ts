@@ -97,8 +97,6 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'mx_flip', gameId: 'moto-x3m', title: 'Backflip', description: 'Do a backflip', icon: '🔄', tier: 'silver', target: 1, unit: 'flips', points: 15, rarity: 'rare' },
   { id: 'mx_3_stars', gameId: 'moto-x3m', title: 'Perfection', description: 'Get 3 stars on a level', icon: '⭐', tier: 'gold', target: 1, unit: 'stars', points: 25, rarity: 'rare' },
 
-  // 11. Subway Surfers
-
   // 12. Geometry Dash
   { id: 'gd_first_level', gameId: 'geometry-dash', title: 'First Jump', description: 'Complete first level', icon: '🔷', tier: 'bronze', target: 1, unit: 'levels', points: 10, rarity: 'common' },
   { id: 'gd_10_attempts', gameId: 'geometry-dash', title: 'Persistence', description: 'Attempt a level 10 times', icon: '🔁', tier: 'bronze', target: 10, unit: 'attempts', points: 10, rarity: 'common' },
