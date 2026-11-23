@@ -232,7 +232,7 @@ export async function convertCurrency(amount: number, from: string, to: string):
   const usd = amount / rates[f];
   const value = usd * rates[t];
   return {
-    text: `${amount} ${f} is about ${value.toFixed(2)} ${t} (mid-market rate, ${new Date().toISOString().slice(0, 10)}).`,
+    text: `${amount} ${f} = ${value.toFixed(2)} ${t} (mid-market rate, ${new Date().toISOString().slice(0, 10)})`,
     data: { amount, from: f, to: t, value, rate: value / amount },
     source: "open.er-api",
   };
@@ -259,14 +259,14 @@ export function convertUnit(amount: number, from: string, to: string): ToolResul
     const toC = from.toLowerCase() === "c" ? amount : (amount - 32) * (5 / 9);
     const out = to.toLowerCase() === "c" ? toC : toC * (9 / 5) + 32;
     return {
-      text: `${amount}°${from.toUpperCase()} is ${out.toFixed(1)}°${to.toUpperCase()}.`,
+      text: `${amount}°${from.toUpperCase()} = ${out.toFixed(1)}°${to.toUpperCase()}`,
       data: { amount, from, to, value: out },
       source: "units",
     };
   }
   const value = (amount * f.factor) / t.factor;
   return {
-    text: `${amount} ${from} is ${value.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${to}.`,
+    text: `${amount} ${from} = ${value.toLocaleString("en-AU", { maximumFractionDigits: 6 })} ${to}`,
     data: { amount, from, to, value },
     source: "units",
   };

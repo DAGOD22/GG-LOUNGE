@@ -233,7 +233,9 @@ export async function POST(req: Request) {
   const toolResults: ToolResult[] = [];
   const cards: Array<Record<string, unknown>> = [];
 
+  const attempted: string[] = [];
   const run = async <T extends ToolResult | null>(p: Promise<T>, label: string) => {
+    attempted.push(label);
     try {
       const r = await p;
       if (r) {
@@ -254,6 +256,7 @@ export async function POST(req: Request) {
   ].filter(Boolean) as Array<Promise<void>>);
 
   if (intent.unit) {
+    attempted.push("conversion");
     const r = convertUnit(intent.unit.amount, intent.unit.from, intent.unit.to);
     if (r) { toolResults.push(r); cards.push({ label: "conversion", source: r.source, data: r.data }); }
   }
@@ -268,6 +271,22 @@ export async function POST(req: Request) {
   }
 
   /* ---------- answer ---------- */
+  // Some tools don't need a model at all: a conversion or a coin price is the
+  // answer. Sending it through a model only adds latency and a chance to garble
+  // it — and if every model is down, the answer must still be delivered.
+  const deterministic = directAnswer(toolResults);
+  if (deterministic && !intent.search) {
+    const text = deterministic;
+    const provider = "tools";
+    if (user && chatId) {
+      await addMessage(user.id, chatId, "assistant", text, { cards, provider }).catch(() => undefined);
+      await touchChat(user.id, chatId).catch(() => undefined);
+    }
+    return body.stream
+      ? sseOnce(text, { chatId, provider, cards })
+      : NextResponse.json({ text, chatId, provider, signedIn: !!user, cards });
+  }
+
   const notes = toolResults.map(r => `[${r.source}] ${r.text}`);
   const system = buildSystemPrompt({ profile, memories, now: new Date(), notes });
   const turns: ChatTurn[] = [
@@ -296,7 +315,7 @@ export async function POST(req: Request) {
           // fall through with whatever text we have
         }
         if (!full.trim()) {
-          full = offlineAnswer(message, profile);
+          full = deterministic || offlineAnswer(message, profile, attempted);
           provider = "offline";
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: full })}\n\n`));
         }
@@ -325,7 +344,7 @@ export async function POST(req: Request) {
   let text = result.text;
   let provider = result.provider;
   if (!text) {
-    text = offlineAnswer(message, profile);
+    text = deterministic || offlineAnswer(message, profile, attempted);
     provider = "offline";
   }
 
@@ -338,6 +357,19 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ text, chatId, provider, signedIn: !!user, cards, attempts: result.attempts });
+}
+
+/**
+ * When the tools that ran are self-sufficient, their output *is* the answer.
+ * Anything involving a search hit still goes to the model: it needs to read the
+ * sources and summarise them.
+ */
+function directAnswer(results: ToolResult[]): string | null {
+  if (!results.length) return null;
+  const solid = results.filter(r => r.source !== "search:duckduckgo" && r.source !== "search:bing-rss" && r.source !== "search:wikipedia");
+  if (!solid.length || solid.length !== results.length) return null;
+  const lines = solid.map(r => `**${r.text}**`);
+  return lines.length === 1 ? lines[0] : lines.join("\n\n");
 }
 
 /** Emit a single already-finished answer as an SSE stream. */
@@ -364,9 +396,13 @@ function sseOnce(text: string, meta: Record<string, unknown>): Response {
  * Last-resort responder: never a dead end, honest about being offline, and
  * still able to name real games from the catalogue.
  */
-function offlineAnswer(message: string, profile: GgProfile): string {
+function offlineAnswer(message: string, profile: GgProfile, attempted: string[] = []): string {
+  // Be specific: if a lookup actually failed, say that rather than blaming the
+  // models, which did nothing wrong.
   const lines = [
-    "**Every free model endpoint is busy or unreachable right now.** Your message is saved — try again in a moment.",
+    attempted.length
+      ? `**I couldn't reach the live ${attempted.join(" / ")} service just now, and the free model endpoints are busy too.** Try again in a moment.`
+      : "**Every free model endpoint is busy or unreachable right now.** Your message is saved — try again in a moment.",
   ];
   const found = searchCatalogue(CATALOGUE, message, 4);
   if (found.length) {
