@@ -11,6 +11,9 @@
  */
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth";
+import { chatComplete, imageUrl } from "@/lib/gg-gpt/engine";
+import { detectIntent } from "@/lib/gg-gpt/intent";
+import { buildSystemPrompt } from "@/lib/gg-gpt/persona";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,17 +123,11 @@ function probes(): Probe[] {
   out.push({ name: "crypto:coingecko", url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd", method: "GET", headers: {} });
   out.push({ name: "fx:open.er-api", url: "https://open.er-api.com/v6/latest/USD", method: "GET", headers: {} });
   out.push({ name: "dict:dictionaryapi", url: "https://api.dictionaryapi.dev/api/v2/entries/en/hello", method: "GET", headers: {} });
-  // Second run: can the one working model stream, and does it honour a POST?
-  out.push({
-    name: "pollinations:get-stream",
-    url: `https://text.pollinations.ai/${encodeURIComponent("Count to three")}?stream=true&referrer=gg-lounge`,
-    method: "GET",
-    headers: { accept: "text/event-stream" },
-  });
-  out.push({ name: "dict:wiktionary", url: "https://en.wiktionary.org/api/rest_v1/page/definition/hello", method: "GET", headers: { accept: "application/json", "user-agent": "GG-GPT/1.0 (https://gg-lounge.vercel.app)" } });
-  out.push({ name: "search:wikipedia-ua", url: "https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=1&srsearch=hello", method: "GET", headers: { "user-agent": "GG-GPT/1.0 (https://gg-lounge.vercel.app)" } });
   out.push({ name: "geo:ipapi", url: "https://ipapi.co/json/", method: "GET", headers: {} });
-  return out;
+
+  // One probe per name; duplicates would report contradictory results.
+  const seen = new Set<string>();
+  return out.filter(p => (seen.has(p.name) ? false : (seen.add(p.name), true)));
 }
 
 type ProbeResult = { ok: boolean; status: number; ms: number; preview?: string; error?: string };
@@ -166,6 +163,35 @@ async function probeOne(p: Probe): Promise<ProbeResult> {
   }
 }
 
+/**
+ * End-to-end self test: run a real question through the same engine the
+ * assistant uses, so "does it work" is answerable from outside a browser. The
+ * chat route is POST-only, which makes it awkward to verify from a terminal.
+ */
+async function selfTest(): Promise<Record<string, unknown>> {
+  const question = "In one sentence, what is a quokka?";
+  const started = Date.now();
+  const intent = detectIntent(question);
+  const result = await chatComplete(
+    [
+      { role: "system", content: buildSystemPrompt({ profile: {}, memories: [], now: new Date() }) },
+      { role: "user", content: question },
+    ],
+    { timeoutMs: 30_000 },
+  );
+  return {
+    question,
+    intent: Object.keys(intent).filter(k => intent[k as keyof typeof intent]),
+    provider: result.provider,
+    rateLimited: result.rateLimited,
+    ms: Date.now() - started,
+    chars: result.text.length,
+    answer: result.text.slice(0, 400),
+    attempts: result.attempts.map(a => ({ provider: a.provider, status: a.status, ms: a.ms, error: a.error })),
+    imageSample: imageUrl("a red cube", { width: 256, height: 256 }),
+  };
+}
+
 export async function GET(req: Request) {
   // The admin console already sets the HMAC cookie; reuse it rather than
   // inventing a second gate that could drift out of sync. A dedicated token is
@@ -175,6 +201,11 @@ export async function GET(req: Request) {
   const tokenOk = expected.length > 8 && token === expected;
   if (!tokenOk && !(await isAdmin())) {
     return NextResponse.json({ error: "Admin only." }, { status: 403 });
+  }
+  const wantsTest = new URL(req.url).searchParams.has("selftest");
+  if (wantsTest) {
+    const t = await selfTest();
+    return NextResponse.json(t, { headers: { "Cache-Control": "no-store, max-age=0" } });
   }
   const list = probes();
   const results: Array<{ name: string } & ProbeResult> = await Promise.all(
@@ -188,6 +219,6 @@ export async function GET(req: Request) {
       failed: results.filter(r => !r.ok).map(r => r.name),
       results,
     },
-    { headers: { "Cache-Control": "no-store" } },
+    { headers: { "Cache-Control": "no-store, max-age=0", "CDN-Cache-Control": "no-store" } },
   );
 }
