@@ -54,6 +54,20 @@ test('CountUp initialises to the real value', async () => {
   assert.match(src, /useState\(value\)/, 'initial state must be the real value');
   assert.equal(/setShown\(0\)/.test(src), false, 'must not reset to 0 during render or on mount');
   const observer = src.indexOf('new IntersectionObserver');
-  const reset = src.indexOf('const start = performance.now()');
+  const reset = src.indexOf('const tick = (now: number)');
   assert.ok(observer !== -1 && reset !== -1 && observer < reset, 'counting must start inside the observer');
+});
+
+/**
+ * Second shipped regression, same component: production showed "-915 games".
+ * The rAF timestamp is the frame's start, which can precede the now() taken
+ * when the loop was scheduled, so `(now - start)` went negative on the first
+ * frame and the eased curve produced a negative count. The baseline must be
+ * the first frame's own timestamp, and progress must be clamped.
+ */
+test('CountUp can never render a value outside 0..value', async () => {
+  const src = await readFile(new URL('../components/CountUp.tsx', import.meta.url), 'utf8');
+  assert.equal(/const start = performance\.now\(\)/.test(src), false, 'must not baseline on a pre-frame timestamp');
+  assert.match(src, /if \(start === null\) start = now/, 'baseline on the first frame');
+  assert.match(src, /Math\.max\(0, \(now - start\) \/ duration\)/, 'progress must be clamped to >= 0');
 });

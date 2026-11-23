@@ -29,9 +29,14 @@ export function CountUp({ value, duration = 900 }: { value: number; duration?: n
       if (!entries[0].isIntersecting || started.current) return;
       started.current = true;
       observer.disconnect();
-      const start = performance.now();
+      // The rAF timestamp is the frame's start time, which can be EARLIER than
+      // the performance.now() captured right here — that made the first frame's
+      // delta negative and rendered numbers like "-915 games" in production.
+      // Baseline on the first frame instead, and clamp regardless.
+      let start: number | null = null;
       const tick = (now: number) => {
-        const progress = Math.min(1, (now - start) / duration);
+        if (start === null) start = now;
+        const progress = Math.min(1, Math.max(0, (now - start) / duration));
         setShown(Math.round(value * (1 - Math.pow(1 - progress, 3))));
         if (progress < 1) requestAnimationFrame(tick);
         else setShown(value);
