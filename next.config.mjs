@@ -8,6 +8,13 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  // `next build` was spending minutes running ESLint across the tree on every
+  // deployment (a ~3 minute build on this repo). Lint and `tsc` are gated
+  // locally before every commit and type errors still fail the build, so the
+  // lint pass is pure duplicated latency at deploy time.
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   images: {
     unoptimized: false,
     remotePatterns: [
