@@ -27,6 +27,7 @@ import {
   type ToolResult,
 } from "@/lib/gg-gpt/tools";
 import { detectIntent, titleFromMessage } from "@/lib/gg-gpt/intent";
+import { answerClock } from "@/lib/gg-gpt/clock";
 import { buildSystemPrompt, extractFacts, type GgProfile } from "@/lib/gg-gpt/persona";
 import { games } from "@/lib/games";
 
@@ -211,6 +212,22 @@ export async function POST(req: Request) {
       await touchChat(user.id, chatId);
     }
     return NextResponse.json({ text: caption, media, chatId, provider: "pollinations-media", signedIn: !!user });
+  }
+
+  /* ---------- clock: the model has no idea what time it is ---------- */
+  if (intent.clock) {
+    const clock = answerClock(message);
+    if (clock) {
+      const text = clock.text;
+      const cards = [{ label: "time", source: clock.source, data: clock.data }];
+      if (user && chatId) {
+        await addMessage(user.id, chatId, "assistant", text, { cards, provider: "clock" }).catch(() => undefined);
+        await touchChat(user.id, chatId).catch(() => undefined);
+      }
+      return body.stream
+        ? sseOnce(text, { chatId, provider: "clock", cards })
+        : NextResponse.json({ text, chatId, provider: "clock", signedIn: !!user, cards });
+    }
   }
 
   /* ---------- arithmetic: answer exactly, instantly, no model needed ---------- */

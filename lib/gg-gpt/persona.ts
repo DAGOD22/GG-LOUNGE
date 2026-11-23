@@ -7,6 +7,7 @@
  * and every exchange is scanned for durable facts worth keeping.
  */
 import type { GgMemory } from "@/lib/db/gg-gpt";
+import { clockLine } from "./clock";
 
 export interface GgProfile {
   username?: string | null;
@@ -51,7 +52,7 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     "## This site",
     "- Games live at /games, and each one has its own control legend.",
     "- Accounts save game progress, achievements and this conversation.",
-    `- Today is ${now.toISOString().slice(0, 10)}.`,
+    `- ${clockLine(now)}`,
   );
 
   if (name) {

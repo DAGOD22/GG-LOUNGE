@@ -24,6 +24,7 @@ export interface Intent {
   crypto?: { ids: string[] };
   define?: { word: string };
   math?: { expression: string; value: number; pretty: string };
+  clock?: { place?: string };
   catalogue?: { query: string };
   image?: { prompt: string; width?: number; height?: number };
   video?: { prompt: string };
@@ -168,6 +169,13 @@ export function detectIntent(message: string): Intent {
       intent.image = { prompt: verbRest };
       return intent;
     }
+  }
+
+  /* ---- clock ---- */
+  if (/\b(what(?:'s| is)? the (?:time|date)|what time is it|what day is it|what date is it|current time)\b/i.test(lower)) {
+    const place = /\b(?:in|at)\s+([a-z][a-z .'-]{1,30})/i.exec(m)?.[1]?.replace(/[?.!].*$/, "").trim();
+    intent.clock = { place };
+    return intent;
   }
 
   /* ---- arithmetic (exact, instant, never ask a model to do sums) ---- */
