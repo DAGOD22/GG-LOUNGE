@@ -119,23 +119,40 @@ async function wikipediaSearch(query: string): Promise<SearchHit[]> {
   }));
 }
 
+/**
+ * Search across several engines **at once** rather than one after another.
+ * Sequential fallback means a single fast-but-empty engine costs the whole
+ * latency budget before the useful one is even tried; racing them costs one
+ * round trip and lets us keep the best result set instead of the first.
+ *
+ * Engines are ranked by how well they answer a question (not just keywords),
+ * so a Wikipedia hit never beats a live DuckDuckGo hit, but a DuckDuckGo
+ * challenge page never leaves the user with nothing.
+ */
 export async function webSearch(query: string): Promise<{ hits: SearchHit[]; source: string }> {
   const clean = query.trim().slice(0, 300);
   if (!clean) return { hits: [], source: "none" };
-  const engines: Array<[string, (q: string) => Promise<SearchHit[]>]> = [
-    ["duckduckgo", duckduckgo],
-    ["bing", bingRss],
-    ["wikipedia", wikipediaSearch],
+  const engines: Array<[string, (q: string) => Promise<SearchHit[]>, number]> = [
+    ["duckduckgo", duckduckgo, 3],
+    ["bing", bingRss, 2],
+    ["wikipedia", wikipediaSearch, 1],
   ];
-  for (const [name, fn] of engines) {
-    try {
-      const hits = await fn(clean);
-      if (hits.length) return { hits, source: name };
-    } catch {
-      // next engine
+  const settled = await Promise.allSettled(engines.map(([, fn]) => fn(clean)));
+  let bestHits: SearchHit[] = [];
+  let bestSource = "unreachable";
+  let bestScore = -1;
+  for (let i = 0; i < settled.length; i++) {
+    const r = settled[i];
+    if (r.status !== "fulfilled" || !r.value.length) continue;
+    const [name, , rank] = engines[i];
+    const score = rank * 10 + Math.min(r.value.length, 8);
+    if (score > bestScore) {
+      bestScore = score;
+      bestHits = r.value;
+      bestSource = name;
     }
   }
-  return { hits: [], source: "unreachable" };
+  return { hits: bestHits, source: bestSource };
 }
 
 export function renderHits(hits: SearchHit[]): string {
