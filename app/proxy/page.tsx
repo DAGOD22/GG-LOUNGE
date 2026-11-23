@@ -108,7 +108,13 @@ export default function ProxyPage() {
     {error && <div role="alert" style={{ padding: 20, margin: 16, border: '1px solid #ae5960', borderRadius: 12, background: '#2c1920', color: '#ffd4d8' }}>
       <strong>Couldn’t connect</strong><p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{error}</p>
       <button className="play-button" onClick={() => ready && current ? navigate(address) : setAttempt(value => value + 1)}>Retry connection</button>
-      <p style={{ fontSize: 12 }}>A managed browser may disable service workers or WebSockets. The proxy cannot remove a destination’s login, CAPTCHA, DRM or cloud-streaming restrictions.</p>
+      {address && <a href={address} target="_blank" rel="noreferrer" style={{ marginLeft: 10, fontSize: 12, color: 'inherit' }}>Open directly ↗</a>}
+      <p style={{ fontSize: 12 }}>
+        Some big games portals — CrazyGames, Poki, Coolmath and now.gg — refuse traffic that arrives from a
+        datacenter address, which is what a hosted proxy looks like to them. Nothing on this page can change that:
+        it is their block, not a bug here. The catalogue’s own 250+ self-hosted games are unaffected and always work.
+      </p>
+      <p style={{ fontSize: 12 }}>A managed browser may also disable service workers or WebSockets, and the proxy cannot remove a destination’s login, CAPTCHA, DRM or cloud-streaming restrictions.</p>
     </div>}
     {!current && <section className="proxy-home">
       <p className="eyebrow">ONE BROWSER · ONE CONNECTION</p><h1>Your apps, together.</h1>
