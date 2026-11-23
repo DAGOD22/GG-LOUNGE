@@ -28,7 +28,11 @@ class UVServiceWorker extends EventEmitter {
           "x-powered-by",
           "x-xss-protection",
         ],
-        forward: ["accept-encoding", "connection", "content-length", "accept", "accept-language", "range", "if-range", "referer", "origin", "cache-control", "pragma", "sec-fetch-mode", "sec-fetch-dest", "sec-fetch-site", "authorization", "x-client-data", "x-goog-visitor-id", "x-goog-authuser", "x-goog-page-cl", "x-goog-page-label", "x-youtube-client-name", "x-youtube-client-version", "x-youtube-page-cl", "x-youtube-page-label", "x-youtube-utc-offset", "x-youtube-time-zone", "x-youtube-ad-signals", "x-origin", "x-referer", "x-requested-with", "sec-ch-ua", "sec-ch-ua-mobile", "sec-ch-ua-platform", "sec-ch-ua-arch", "sec-ch-ua-model", "sec-ch-ua-full-version-list", "sec-ch-ua-wow64"],
+        // Forward everything that carries identity or content negotiation.
+        // The .io clients, CrazyGames, Poki and now.gg all authenticate with
+        // bespoke headers; an allowlist that drops them produces a page that
+        // loads and then immediately reports "no internet".
+        forward: ["connection", "content-length", "accept", "accept-language", "range", "if-range", "if-none-match", "if-modified-since", "referer", "origin", "cache-control", "pragma", "sec-fetch-mode", "sec-fetch-dest", "sec-fetch-site", "sec-fetch-user", "authorization", "x-client-data", "x-goog-visitor-id", "x-goog-authuser", "x-goog-page-cl", "x-goog-page-label", "x-youtube-client-name", "x-youtube-client-version", "x-youtube-page-cl", "x-youtube-page-label", "x-youtube-utc-offset", "x-youtube-time-zone", "x-youtube-ad-signals", "x-origin", "x-referer", "x-requested-with", "sec-ch-ua", "sec-ch-ua-mobile", "sec-ch-ua-platform", "sec-ch-ua-arch", "sec-ch-ua-model", "sec-ch-ua-full-version-list", "sec-ch-ua-wow64"],
       }),
       (this.method = { empty: ["GET", "HEAD"] }),
       (this.statusCode = { empty: [204, 304] }),
@@ -55,12 +59,22 @@ class UVServiceWorker extends EventEmitter {
           if (__src) {
             const __proxiedOrigin = new URL(__src).origin;
             const __reqUrl = new URL(e.url);
-            const __isAsset = /\.(js|mjs|cjs|css|json|wasm|png|jpe?g|gif|webp|svg|woff2?|ttf|ico|mp3|mp4|webm)(\b|$)/i.test(__reqUrl.pathname) || __reqUrl.pathname.startsWith("/static/") || __reqUrl.pathname.startsWith("/assets/") || __reqUrl.pathname.startsWith("/chunks/") || __reqUrl.pathname.startsWith("/_next/static/");
-            const __heavyRef = /(now\.gg|discord\.com|twitch\.tv|youtube\.com|youtu\.be|tiktok\.com|spotify\.com|reddit\.com|cloudmoon)/i.test(__src);
-            if ((__isAsset || __heavyRef) && !__reqUrl.pathname.startsWith("/api/") && !__reqUrl.pathname.startsWith("/uv/") && !__reqUrl.pathname.startsWith("/service/") && !__reqUrl.pathname.startsWith("/app-frames/") && !__reqUrl.pathname.startsWith("/games/")) {
+            // Everything a proxied document asks its own origin for has to be
+            // proxied back to that origin — static assets *and* its API. The
+            // old check skipped /api/, so every session/game-state call landed
+            // on GG-LOUNGE itself, 404'd, and the client showed a network error.
+            const __ownRoute = /^\/(uv|service|app-frames|game-icons|thumbnails|_next)\//.test(__reqUrl.pathname) ||
+              __reqUrl.pathname.startsWith("/api/gg-gpt") || __reqUrl.pathname.startsWith("/api/auth") ||
+              __reqUrl.pathname.startsWith("/api/bare") || __reqUrl.pathname === "/" ||
+              __reqUrl.pathname.startsWith("/games/");
+            if (!__ownRoute) {
               const __target = new URL(__reqUrl.pathname + __reqUrl.search + __reqUrl.hash, __proxiedOrigin).href;
               const __enc = __tmp.encodeUrl(__target);
-              const __synthetic = new Request(location.origin + __prefix + __enc, { method: e.method, headers: e.headers, redirect: e.redirect });
+              // Preserve the body: POSTs to a game's API are how sessions and
+              // lobby joins work. Dropping it silently logged everyone out.
+              let __body = null;
+              try { if (e.method !== "GET" && e.method !== "HEAD") __body = await e.clone().arrayBuffer(); } catch (__e2) {}
+              const __synthetic = new Request(location.origin + __prefix + __enc, { method: e.method, headers: e.headers, redirect: e.redirect, body: __body });
               return this.fetch({ request: __synthetic });
             }
           }
@@ -103,7 +117,17 @@ class UVServiceWorker extends EventEmitter {
       const o = new HookEvent(n, null, null);
       if ((this.emit("request", o), o.intercepted)) return o.returnValue;
       const a = await fetch(n.send);
-      if (500 === a.status) return Promise.reject("");
+      if (500 === a.status) {
+        // Do not reject — a rejected fetch inside the SW looks like a dead
+        // network to the page. Hand back an honest, readable error instead.
+        return new Response(
+          "<!doctype html><meta charset=utf-8><title>Proxy connection failed</title>" +
+          "<body style=\"font:14px system-ui;background:#12131a;color:#e6e6ef;padding:40px\">" +
+          "<h1 style=\"font-size:18px\">Upstream did not answer</h1>" +
+          "<p>The destination server refused or timed out. This is the site, not your connection — retry, or open it directly.</p></body>",
+          { status: 502, headers: { "content-type": "text/html; charset=utf-8" } },
+        );
+      }
       const c = new ResponseContext(n, a, this),
         u = new HookEvent(c, null, null);
       if ((this.emit("beforemod", u), u.intercepted)) return u.returnValue;
@@ -249,7 +273,17 @@ class RequestContext {
       (this.method = e.method),
       (this.forward = [...t.headers.forward]),
       // dynamically forward any x-* , authorization, sec-ch-ua* from the real request (fixes YouTube search/watch x-youtube-* etc.)
-      (() => { try { for (const [k] of e.headers.entries()) { const lk=k.toLowerCase(); if ((lk.startsWith("x-") || lk.startsWith("sec-ch-") || lk==="authorization" || lk==="content-type" || lk==="cookie" || lk==="origin" || lk==="referer") && !this.forward.includes(lk)) this.forward.push(lk); } } catch(_){} })(),
+      (() => {
+        try {
+          const HOP = new Set(["host","connection","keep-alive","proxy-authenticate","proxy-authorization","te","trailer","transfer-encoding","upgrade","http2-settings","content-length","accept-encoding"]);
+          for (const [k] of e.headers.keys()) {
+            const lk = k.toLowerCase();
+            // Never strip identity: a dropped cookie/authorization header is
+            // exactly what makes YouTube and now.gg say the network is down.
+            if (!HOP.has(lk) && !this.forward.includes(lk)) this.forward.push(lk);
+          }
+        } catch(_) {}
+      })(),
       (this.address = t.address),
       (this.body = n || null),
       (this.redirect = e.redirect),

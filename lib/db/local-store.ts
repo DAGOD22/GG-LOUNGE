@@ -18,6 +18,7 @@ import type {
   AuthSession,
   GameSave,
 } from "./core";
+import type { GgChat, GgMessage, GgMemory } from "./gg-gpt";
 import { isEphemeralHost } from "./connection";
 
 /**
@@ -41,6 +42,12 @@ interface LocalStore {
   achievements: UserAchievement[];
   gameStats: UserGameStats[];
   gateStates: Record<string, { ip: string; fails: number; banLevel: number; bannedUntil: string | null; updatedAt: string }>;
+  /** GG-GPT conversations, messages and remembered facts. */
+  ggChats: GgChat[];
+  ggMessages: GgMessage[];
+  ggMemory: GgMemory[];
+  /** Notifications queued for a member (e.g. a game request was published). */
+  notifications: Array<{ id: string; userId: string; title: string; body: string; href?: string; read: boolean; createdAt: string }>;
 }
 
 let localDir: string | null = null;
@@ -89,9 +96,13 @@ export async function readLocal(): Promise<LocalStore> {
       achievements: (parsed as any).achievements ?? [],
       gameStats: (parsed as any).gameStats ?? [],
       gateStates: (parsed as any).gateStates ?? {},
+      ggChats: (parsed as any).ggChats ?? [],
+      ggMessages: (parsed as any).ggMessages ?? [],
+      ggMemory: (parsed as any).ggMemory ?? [],
+      notifications: (parsed as any).notifications ?? [],
     };
   } catch {
-    return { bans: [], visits: [], requests: [], games: [], reports: [], userStates: {}, users: [], sessions: [], saves: [], achievements: [], gameStats: [], gateStates: {} };
+    return { bans: [], visits: [], requests: [], games: [], reports: [], userStates: {}, users: [], sessions: [], saves: [], achievements: [], gameStats: [], gateStates: {}, ggChats: [], ggMessages: [], ggMemory: [], notifications: [] };
   }
 }
 

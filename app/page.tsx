@@ -497,6 +497,7 @@ export default function Page() {
         <nav className={`header-nav ${mobileNavOpen?'mobile-open':''}`} aria-label="Primary navigation">
           <a href="#games" onClick={()=> setMobileNavOpen(false)}>Library</a>
           <a href="/apps" onClick={()=> setMobileNavOpen(false)}>Apps</a>
+          <a href="/gg-gpt" onClick={()=> setMobileNavOpen(false)}>GG-GPT</a>
           <a href="/proxy" onClick={()=> setMobileNavOpen(false)}>Proxy</a>
           <button onClick={()=> { setShowAchievementsHub(true); setMobileNavOpen(false) }} style={{background:'none',border:0,cursor:'pointer',font: 'inherit',color:'inherit',display:'flex',alignItems:'center',gap:6,fontWeight:800}}><Trophy size={12}/> Achievements</button>
           <a href="#about" onClick={()=> setMobileNavOpen(false)}>Studio</a>
