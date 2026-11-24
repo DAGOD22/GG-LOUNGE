@@ -83,6 +83,7 @@ export default function GlobalError({
             </button>
             {/* A plain anchor, not <Link>: if the router is what crashed, the
                 router is the wrong tool for getting out. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a
               href="/"
               style={{

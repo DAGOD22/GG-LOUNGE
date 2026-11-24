@@ -33,7 +33,6 @@ import {
   normalizeRoomCode,
   parseRoomMessage,
   shouldForwardKey,
-  type InputFrame,
   type RoomMessage,
 } from '@/lib/coop';
 import { useCustomization } from '@/components/customization/CustomizationProvider';
@@ -68,7 +67,17 @@ export function CoopRoom() {
   const channel = useRef<RTCDataChannel | null>(null);
   const poll = useRef<number | null>(null);
   const lineId = useRef(1);
+  /**
+   * Role is held twice on purpose.
+   *
+   * `roleRef` is what the transport callbacks read (a data-channel handler must
+   * not close over a stale state value), but the *label* has to re-render when
+   * the role is set. Reading `role.current` during render was the original bug:
+   * refs do not trigger a render, so the panel kept saying "Room" for a host,
+   * and React forbids reading a ref mid-render anyway.
+   */
   const role = useRef<'host' | 'guest' | null>(null);
+  const [roleState, setRoleState] = useState<'host' | 'guest' | null>(null);
   const forwardRef = useRef(false);
   const peerNameRef = useRef('');
   const bridgeRef = useRef(bridge);
@@ -133,6 +142,7 @@ export function CoopRoom() {
       channel.current = null;
       connection.current = null;
       role.current = null;
+      setRoleState(null);
       setStatus('off');
       setCode('');
       setPeerName('');
@@ -233,40 +243,15 @@ export function CoopRoom() {
   );
 
   /** Host: create the offer, park it, show the code. */
-  const createRoom = useCallback(async () => {
-    setError('');
-    setStatus('creating');
-    setChat([]);
-    role.current = 'host';
-    try {
-      const pc = buildConnection(myName);
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      // Wait for ICE so the offer in the code already carries candidates; a
-      // trickle-only offer would need a second round trip through the code.
-      await waitForIce(pc);
-      const encoded = encodeOffer(pc.localDescription ?? offer);
-      const response = await fetch('/api/coop', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'create', offer: encoded, name: myName }),
-      });
-      const data = await response.json();
-      if (!response.ok || !data?.code) throw new Error(data?.error || 'Could not open a room');
-      setCode(data.code);
-      setStatus('waiting');
-      push('system', 'Room open. Read the code to your friend.');
-      startHostPolling(data.code);
-    } catch (cause) {
-      setError((cause as Error).message || 'Could not open a room');
-      setStatus('error');
-      teardown(false);
-    }
-    // startHostPolling is defined below and stable for the life of the room.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buildConnection, myName, push, teardown]);
-
-  function startHostPolling(roomCode: string) {
+  /**
+   * Host: poll the signalling row until the guest posts an answer.
+   *
+   * This is a `useCallback` declared *before* `createRoom` uses it. As a plain
+   * function declaration hoisted below the callback that called it, `createRoom`
+   * closed over a binding that only exists later in the same component body —
+   * which React's compiler rejects, and which made the dependency array a lie.
+   */
+  const startHostPolling = useCallback((roomCode: string) => {
     stopPolling();
     poll.current = window.setInterval(async () => {
       try {
@@ -298,7 +283,40 @@ export function CoopRoom() {
         /* transient */
       }
     }, 1500);
-  }
+    }, [stopPolling]);
+
+  const createRoom = useCallback(async () => {
+    setError('');
+    setStatus('creating');
+    setChat([]);
+    role.current = 'host';
+    setRoleState('host');
+    try {
+      const pc = buildConnection(myName);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      // Wait for ICE so the offer in the code already carries candidates; a
+      // trickle-only offer would need a second round trip through the code.
+      await waitForIce(pc);
+      const encoded = encodeOffer(pc.localDescription ?? offer);
+      const response = await fetch('/api/coop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'create', offer: encoded, name: myName }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.code) throw new Error(data?.error || 'Could not open a room');
+      setCode(data.code);
+      setStatus('waiting');
+      push('system', 'Room open. Read the code to your friend.');
+      startHostPolling(data.code);
+    } catch (cause) {
+      setError((cause as Error).message || 'Could not open a room');
+      setStatus('error');
+      teardown(false);
+    }
+  }, [buildConnection, myName, push, teardown, startHostPolling]);
+
 
   /** Guest: fetch the offer by code, answer it. */
   const joinRoom = useCallback(async () => {
@@ -311,6 +329,7 @@ export function CoopRoom() {
     setStatus('connecting');
     setChat([]);
     role.current = 'guest';
+    setRoleState('guest');
     try {
       const lookup = await fetch('/api/coop', {
         method: 'POST',
@@ -514,7 +533,7 @@ export function CoopRoom() {
             </div>
           ) : (
             <div className="gg-coop-code">
-              <span>{role.current === 'host' ? 'Your room code' : 'Room'}</span>
+              <span>{roleState === 'host' ? 'Your room code' : 'Room'}</span>
               <button type="button" onClick={copyCode} className="gg-coop-code-value">
                 {code}
                 {copied ? <Check size={14} /> : <Copy size={14} />}

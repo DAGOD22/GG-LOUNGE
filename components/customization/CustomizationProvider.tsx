@@ -78,6 +78,12 @@ export function CustomizationProvider({children}:{children:ReactNode}) {
       // Most browser games run their whole simulation inside requestAnimationFrame.
       // Parking that loop freezes the game — not just its sound — which is the
       // difference between "paused" and "still playing behind the document".
+      // `react-hooks/immutability` flags the assignments below. They are the
+      // point of the function: the panic path has to reach into the game's
+      // window and replace its animation loop so the game actually freezes.
+      // There is no declarative React equivalent for "stop someone else's rAF",
+      // and this code is deliberately imperative and already try/caught.
+      /* eslint-disable react-hooks/immutability */
       try{
         const win=doc.defaultView as (Window&{__ggParked?:boolean})|null;
         if(win&&!win.__ggParked&&typeof win.requestAnimationFrame==='function'){
@@ -90,6 +96,7 @@ export function CustomizationProvider({children}:{children:ReactNode}) {
           loops.push({win,raf,caf,pending});
         }
       }catch{}
+      /* eslint-enable react-hooks/immutability */
     }
     return ()=>{
       // Resume the loop where it stopped: the parked callback is the game's own
@@ -107,6 +114,15 @@ export function CustomizationProvider({children}:{children:ReactNode}) {
     };
   },[]);
 
+  /**
+   * Undo for `hushGame`, held across renders.
+   *
+   * Declared above `runPanic` because that callback is the first thing to
+   * touch it. It previously sat below, which worked only because the closure
+   * runs late, but it made the read look like a use-before-define.
+   */
+  const resumeRef=useRef<(()=>void)|null>(null);
+
   const runPanic=useCallback(()=>{
     const current=state.current;
     // Every mode closes the floating windows first: a mini-player or a co-op
@@ -123,16 +139,20 @@ export function CustomizationProvider({children}:{children:ReactNode}) {
       return;
     }
     let destination:string;try{destination=normalizeDestination(current.panic.destination,location.origin);}catch{return;}
+    // Same reason as above: silencing a game and tearing the frames down is
+    // exactly the imperative DOM work a panic needs, and React cannot express
+    // "clear another document's onbeforeunload".
+    /* eslint-disable react-hooks/immutability */
     window.onbeforeunload=null;
     for(const doc of documents.current){try{if(doc.defaultView)doc.defaultView.onbeforeunload=null;for(const el of doc.querySelectorAll<HTMLMediaElement>('audio,video'))el.pause();doc.exitPointerLock?.();}catch{}}
     // Remove frames so a game's beforeunload prompt cannot trap a panic redirect.
     for(const frame of document.querySelectorAll('iframe'))frame.remove();
+    /* eslint-enable react-hooks/immutability */
     window.addEventListener('beforeunload',event=>event.stopImmediatePropagation(),{capture:true,once:true});
     if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});
     window.location.replace(destination);
   },[hushGame]);
 
-  const resumeRef=useRef<(()=>void)|null>(null);
   const closePanicDoc=useCallback(()=>{
     setPanicDoc(false);
     resumeRef.current?.();

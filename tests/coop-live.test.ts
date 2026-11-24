@@ -15,7 +15,6 @@ import {
   ROOM_ALPHABET,
   ROOM_CODE_LENGTH,
   REACTION_SET,
-  type InputFrame,
 } from '../lib/coop';
 import { cleanCursor, cleanGameId, cleanName } from '../lib/db/presence';
 import { burstFor, docSlice, essayLength, DOC_ESSAYS, shouldExitOnWord, wordCount } from '../lib/panic-doc';

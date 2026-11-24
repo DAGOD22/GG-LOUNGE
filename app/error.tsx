@@ -58,6 +58,10 @@ export default function Error({
           >
             Try again
           </button>
+          {/* A full page load, not <Link>: this boundary catches render errors
+              in the client tree, and if the router state is what broke, the
+              router is the wrong tool for getting out of it. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a
             href="/"
             style={{

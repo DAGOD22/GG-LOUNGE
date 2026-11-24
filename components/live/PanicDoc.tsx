@@ -23,15 +23,18 @@
  * of a game never gives the page away.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { DOC_ESSAYS, burstFor, docSlice, essayLength, shouldExitOnWord, wordCount } from '@/lib/panic-doc';
 
 export function PanicDoc({ onExit }: { onExit: () => void }) {
   // Pick the essay once, on mount, so a panic does not reshuffle mid-session.
-  const essay = useMemo(() => {
-    const index = Math.floor(Math.random() * DOC_ESSAYS.length);
-    return DOC_ESSAYS[index];
-  }, []);
+  //
+  // This has to be a lazy `useState` initialiser, not `useMemo(() => Math.random())`:
+  // React is free to discard and re-run memo results (StrictMode double-render,
+  // a concurrent re-render, a discarded in-progress tree), so an impure memo is
+  // a shuffle waiting to happen — the user could watch the decoy essay swap
+  // under them mid-read. A state initialiser runs exactly once per mount.
+  const [essay] = useState(() => DOC_ESSAYS[Math.floor(Math.random() * DOC_ESSAYS.length)]);
 
   const [typed, setTyped] = useState(() => Math.floor(essayLength(essay) * 0.18));
   const [caretVisible, setCaretVisible] = useState(true);

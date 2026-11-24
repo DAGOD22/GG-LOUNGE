@@ -87,10 +87,6 @@ export function cleanCursor(input: unknown): PresenceCursorInput {
 
 type LocalPresence = { presence: Record<string, PresenceRow>; events: LiveEventRow[] };
 
-function localStore(): LocalPresence {
-  return { presence: {}, events: [] };
-}
-
 /**
  * Record a heartbeat and return everyone else who is still online.
  *
