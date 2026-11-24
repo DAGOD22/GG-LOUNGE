@@ -465,7 +465,9 @@ export async function POST(req: Request) {
  */
 function directAnswer(results: ToolResult[]): string | null {
   if (!results.length) return null;
-  const solid = results.filter(r => r.source !== "search:duckduckgo" && r.source !== "search:bing-rss" && r.source !== "search:wikipedia");
+  // A search result is raw material for a model, never the answer itself.
+  // Matching source names by hand missed every engine added later.
+  const solid = results.filter(r => !r.source.startsWith("search:"));
   if (!solid.length || solid.length !== results.length) return null;
   const lines = solid.map(r => `**${r.text}**`);
   return lines.length === 1 ? lines[0] : lines.join("\n\n");

@@ -189,7 +189,7 @@ async function selfTest(question = "In one sentence, what is a quokka?"): Promis
    * answer, do not hand it to a model. Asking a model to repeat a list of
    * games is how it invents "Zen Garden Escape", a game we do not have.
    */
-  const solid = tools.filter(t => t.source !== "search:bing" && t.source !== "search:mojeek" && t.source !== "search:duckduckgo" && t.source !== "search:wikipedia" && t.source !== "search:wikipedia-ua");
+  const solid = tools.filter(t => !t.source.startsWith("search:"));
   const toolOnly = solid.length === tools.length && tools.length > 0 ? tools.map(t => t.text).join("\n\n") : null;
 
   const result = toolOnly

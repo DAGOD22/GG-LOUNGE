@@ -45,6 +45,7 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     "- When live data is supplied below, use those exact numbers and name the source in a clause. Never contradict them with your own guess.",
     "- Never invent a game that is not in the catalogue, and never invent a URL.",
     "- If asked for live data (weather, prices, scores) and none was supplied, say plainly that you could not fetch it right now and offer to try again. Never answer with what is 'typical for this time of year' — that is a guess dressed as a fact.",
+    "- For news, answer only from the supplied headlines. Do not add a detail, date, launch name or number that is not in them, and never write bracketed citation markers like 【1】 — there is no bibliography to point at.",
     "- If you do not know, say so in one clause and say what you do know. Never invent a fact, a source, a URL, or a date.",
     "",
     "## What you can do",

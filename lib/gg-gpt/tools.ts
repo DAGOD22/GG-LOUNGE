@@ -98,9 +98,21 @@ function parseRss(xml: string, limit = 8): SearchHit[] {
     const link = item.match(/<link[^>]*>([\s\S]*?)<\/link>/)?.[1] ?? item.match(/<link[^>]*href="([^"]+)"/)?.[1] ?? "";
     const desc = item.match(/<description>([\s\S]*?)<\/description>/)?.[1] ?? item.match(/<summary[^>]*>([\s\S]*?)<\/summary>/)?.[1] ?? "";
     if (!link) continue;
+    // Google News points at a redirect blob megabytes long; the <source url>
+    // element names the publisher's own site instead.
+    const publisher = item.match(/<source[^>]*url="([^"]+)"[^>]*>([\s\S]*?)<\/source>/);
+    const raw = link.trim();
+    const url = raw.length > 400 ? (publisher?.[1] || "") : raw;
+    if (!url) continue;
+    let clean = stripTags(title).replace(/\s+-\s+[^-]{2,40}$/, "").trim();
+    if (publisher?.[2]) {
+      const name = stripTags(publisher[2]).trim();
+      // Keep the masthead: it tells the model (and the user) who is reporting.
+      if (name && !clean.toLowerCase().includes(name.toLowerCase())) clean = `${clean} (${name})`;
+    }
     hits.push({
-      title: stripTags(title).slice(0, 180),
-      url: link.trim(),
+      title: clean.slice(0, 180),
+      url,
       snippet: stripTags(desc).slice(0, 400),
     });
     if (hits.length >= limit) break;
