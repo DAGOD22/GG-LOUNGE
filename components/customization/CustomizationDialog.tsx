@@ -5,6 +5,7 @@ import { X, Palette, Image as ImageIcon, MousePointer2, Keyboard, EyeOff, Upload
 import { useCustomization } from './CustomizationProvider';
 import { THEMES, WALLPAPERS, RELEASE_NAME, bindingFromEvent, bindingLabel, iconHref, normalizeDestination, type Colors, type KeyBinding } from '@/lib/customization/settings';
 import { saveMedia, deleteMedia, imageData } from '@/lib/customization/media';
+import { FAVICON_PRESETS, presetIcon, BLANK_FAVICON } from '@/lib/customization/favicon-presets';
 const tabs=[{id:'tab',label:'Tab cloak',icon:EyeOff},{id:'panic',label:'Panic key',icon:Keyboard},{id:'theme',label:'Themes',icon:Palette},{id:'background',label:'Background',icon:ImageIcon},{id:'cursor',label:'Cursor',icon:MousePointer2},{id:'reactive',label:'Key effects',icon:Sparkles}];
 function Toggle({label,description,checked,onChange}:{label:string;description?:string;checked:boolean;onChange:(v:boolean)=>void}){return <label className="gg-toggle"><span><strong>{label}</strong>{description&&<small>{description}</small>}</span><input type="checkbox" role="switch" checked={checked} onChange={e=>onChange(e.target.checked)}/></label>;}
 function Section({title,children,description}:{title:string;description?:string;children:ReactNode}){return <section className="gg-settings-section"><h3>{title}</h3>{description&&<p className="gg-help">{description}</p>}{children}</section>;}
@@ -39,12 +40,38 @@ export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onC
         <Section title="A tab that looks how you want" description="Choose any tab name and an icon. This changes the browser tab—not the address, history or network visibility.">
           <Toggle label="Enable tab cloaking" checked={settings.cloak.enabled} onChange={enabled=>update(s=>({...s,cloak:{...s.cloak,enabled}}))}/>
           <label className="gg-field">Tab name<input maxLength={120} value={settings.cloak.title} onChange={e=>update(s=>({...s,cloak:{...s.cloak,title:e.target.value}}))} placeholder="Type any tab name"/></label>
-          <label className="gg-field">Favicon URL or emoji<input value={iconDraft} onChange={e=>setIconDraft(e.target.value)} placeholder={settings.cloak.icon.startsWith('data:')?'Uploaded image is active':'https://example.com/favicon.ico or 📚'} autoComplete="off" spellCheck={false}/></label>
+          <label className="gg-field">Favicon URL<input value={iconDraft} onChange={e=>setIconDraft(e.target.value)} placeholder={settings.cloak.icon.startsWith('data:')?'An uploaded or preset icon is active':'https://example.com/favicon.ico'} autoComplete="off" spellCheck={false}/></label>
           <div className="gg-action-row"><button className="gg-primary" onClick={applyIcon}>Apply favicon</button><label className="gg-file-button"><Upload size={15}/> Upload favicon<input aria-label="Upload favicon" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/x-icon,image/vnd.microsoft.icon" disabled={busy} onChange={e=>{void uploadImage(e.target.files?.[0],'favicon');e.target.value='';}}/></label></div>
           <div className="gg-tab-preview"><img alt="Favicon preview" src={iconHref(settings.cloak.icon)}/><span>{settings.cloak.title||'Untitled tab'}</span><X size={13}/></div>
           <p className="gg-help">Uploads become a local 64 × 64 icon. A remote favicon URL must be reachable from your browser; upload the image if it is blocked.</p>
         </Section>
-        <Section title="Quick starts"><div className="gg-chip-row">{[{name:'Workspace',title:'My workspace',icon:'📚'},{name:'Notes',title:'Notes',icon:'📝'},{name:'Calendar',title:'Calendar',icon:'📅'},{name:'Blank',title:' ',icon:'⬜'}].map(p=><button key={p.name} className="gg-chip" onClick={()=>update(s=>({...s,cloak:{enabled:true,title:p.title,icon:p.icon}}))}>{p.icon} {p.name}</button>)}</div></Section>
+        <Section title="about:blank cloaking" description="Makes this tab look like a blank page: no title, no icon. Useful when a tab name would give the game away.">
+          <div className="gg-action-row">
+            <button className="gg-primary" onClick={()=>{update(s=>({...s,cloak:{enabled:true,title:'about:blank',icon:BLANK_FAVICON}}));setIconDraft(BLANK_FAVICON);}}>Apply about:blank cloak</button>
+            <button className="gg-secondary" onClick={()=>{update(s=>({...s,cloak:{...s.cloak,title:'New Tab',icon:BLANK_FAVICON}}));setIconDraft(BLANK_FAVICON);}}>New Tab look</button>
+          </div>
+          <p className="gg-help">The address bar still shows the real URL — browsers do not let a page change that. This changes only the title and icon.</p>
+        </Section>
+        <Section title="Favicon presets" description="Real favicons drawn as vector icons, so they stay sharp at 16 px and need no network request.">
+          <div className="gg-favicon-grid">
+            {FAVICON_PRESETS.map(preset=>{
+              const src = presetIcon(preset);
+              const active = settings.cloak.icon === src;
+              return (
+                <button
+                  key={preset.id}
+                  className={'gg-favicon-tile' + (active ? ' active' : '')}
+                  title={preset.name}
+                  aria-pressed={active}
+                  onClick={()=>{update(s=>({...s,cloak:{enabled:true,title:preset.name,icon:src}}));setIconDraft(src);}}
+                >
+                  <img alt="" src={src} width={28} height={28}/>
+                  <span>{preset.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </Section>
       </>}
       {tab==='panic'&&<>
         <Section title="One shortcut. A different page." description="Redirect this tab instantly, including from same-origin game frames. Browser and operating-system reserved shortcuts cannot be overridden.">

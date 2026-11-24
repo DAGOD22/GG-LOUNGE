@@ -48,6 +48,14 @@ html[data-gg-background=true] .site-header,html[data-gg-background=true] .catalo
 .gg-tab-preview img{width:18px;height:18px;object-fit:contain}
 .gg-tab-preview span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gg-chip-row{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+/* Favicon presets: a real picker, not a row of emoji. Each tile shows the icon
+   exactly as the browser will render it at tab size. */
+.gg-favicon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:12px}
+.gg-favicon-tile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);cursor:pointer;color:var(--text);font:inherit;font-size:11px;font-weight:700}
+.gg-favicon-tile:hover{background:rgba(255,255,255,.07)}
+.gg-favicon-tile.active{border-color:var(--accent);background:rgba(215,243,74,.12)}
+.gg-favicon-tile img{width:28px;height:28px;display:block;border-radius:6px}
+.gg-favicon-tile span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .gg-chip[aria-pressed=true]{border-color:var(--lime);background:color-mix(in srgb,var(--lime) 12%,var(--panel));color:var(--lime)}
 .gg-key-recorder{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:10px;font-size:11px;margin:16px 0}
 .gg-key-recorder kbd{padding:7px 12px;border:1px solid var(--line);border-bottom-width:3px;border-radius:7px;font:700 12px ui-monospace,monospace;margin-left:auto}

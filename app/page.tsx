@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useGameUrl } from '@/lib/use-game-url'
 import { useCustomization } from '@/components/customization/CustomizationProvider'
 import { THEMES } from '@/lib/customization/settings'
 import { dedupeGames } from '@/lib/game-identity'
@@ -59,7 +60,22 @@ export default function Page() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [dbMode, setDbMode] = useState<'postgres'|'local'|null>(null)
   const [streak, setStreak] = useState(1)
-  const [showDashboard, setShowDashboard] = useState(false)
+  // Open on first paint: the leaderboard, game of the day and Your Lounge are
+  // the reason to visit, and a collapsed panel nobody opens is a feature nobody
+  // has. The chevron closes it, and the choice is remembered.
+  const [showDashboard, setShowDashboardRaw] = useState(true)
+  // Remember a deliberate collapse across visits, but always start expanded for
+  // a first-time visitor — that is the whole point of surfacing the board.
+  const setShowDashboard = useCallback((next: boolean | ((v: boolean) => boolean)) => {
+    setShowDashboardRaw(prev => {
+      const value = typeof next === 'function' ? next(prev) : next
+      try { localStorage.setItem('ggl_dashboard_collapsed', value ? '0' : '1') } catch {}
+      return value
+    })
+  }, [])
+  useEffect(() => {
+    try { if (localStorage.getItem('ggl_dashboard_collapsed') === '1') setShowDashboardRaw(false) } catch {}
+  }, [])
 
   const featuredGames = useMemo(()=> games.filter(g=> FEATURED_IDS.includes(g.id)), [])
 
@@ -227,13 +243,17 @@ export default function Page() {
     return ()=> clearTimeout(h)
   },[favorites, playCounts, recentlyPlayed, authUser, guestToken])
 
+  // The Escape handler lives above the URL hook for historical reasons, so it
+  // reaches the push function through a ref rather than a stale closure.
+  const pushHomeRef = useRef<() => void>(() => {})
+
   // keyboard shortcut: '/' focuses search, Esc closes modal (a11y)
   useEffect(()=>{
     const onKey = (e: KeyboardEvent)=>{
       const tag = (e.target as HTMLElement)?.tagName
       if(tag==='INPUT' || tag==='TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
       if(e.key==='/' && !e.ctrlKey && !e.metaKey){ e.preventDefault(); const el=document.getElementById('main-search'); el?.focus() }
-      if(e.key==='Escape'){ setActiveGame(null); setShowAuth(null); setShowAchievementsHub(false); setMobileNavOpen(false) }
+      if(e.key==='Escape'){ setActiveGame(null); pushHomeRef.current(); setShowAuth(null); setShowAchievementsHub(false); setMobileNavOpen(false) }
     }
     window.addEventListener('keydown', onKey)
     return ()=> window.removeEventListener('keydown', onKey)
@@ -253,20 +273,32 @@ export default function Page() {
   },[])
 
   const allGames = useMemo(() => dedupeGames([...games, ...published]), [published])
-  // PROD: handle ?play= id from /g/[id] SEO landing (auto-open modal)
-  useEffect(()=>{
-    try{
-      const sp = new URLSearchParams(window.location.search)
-      const pid = sp.get('play')
-      if(pid){
-        const g = allGames.find(x=> x.id===pid)
-        if (g) {
-          launch(g)
-          const url = new URL(window.location.href); url.searchParams.delete('play'); history.replaceState(null,'', url.toString())
-        } // Keep the ID until asynchronously loaded community games are available.
-      }
-    }catch{}
+  // Open a game without any history side effects. Deep links, Back and the
+  // initial restore all replay through here so they never stack extra entries.
+  const openGameById = useCallback((id: string) => {
+    const g = allGames.find(x => x.id === id)
+    if (!g) return
+    setActiveGame(g)
+    setRecentlyPlayed(prev => [g.id, ...prev.filter(x => x !== g.id)].slice(0, 12))
   }, [allGames])
+
+  const closeGame = useCallback(() => setActiveGame(null), [])
+
+  const isProxyGame = useCallback((id: string) => Boolean(allGames.find(g => g.id === id)?.proxy), [allGames])
+  const knowsGame = useCallback((id: string) => allGames.some(g => g.id === id), [allGames])
+
+  /* URL ⇄ game. A launch is a page view, so each one pushes its own history
+     entry: analytics sees N launches, Back closes the game, and the address
+     bar becomes a shareable link. */
+  const { pushGame, pushHome } = useGameUrl({
+    openGameId: activeGame?.id ?? null,
+    openGame: openGameById,
+    closeGame,
+    ready: allGames.length > 0,
+    known: knowsGame,
+    isProxy: isProxyGame,
+  })
+  useEffect(() => { pushHomeRef.current = pushHome }, [pushHome])
   // Fix 1: precomputed search index to avoid re-concatting strings on every keystroke
   const searchIndex = useMemo(() => new Map(allGames.map((g) => [g.id, `${g.title} ${g.genre} ${g.tone} ${g.description}`.toLowerCase()] as const)), [allGames])
   const fuse = useMemo(() => new Fuse(allGames, { keys: [{ name: 'title', weight: 0.5 }, { name: 'genre', weight: 0.2 }, { name: 'tone', weight: 0.15 }, { name: 'description', weight: 0.15 }], threshold: 0.3, distance: 100, ignoreLocation: true, minMatchCharLength: 2, includeScore: true }), [allGames])
@@ -405,6 +437,7 @@ export default function Page() {
 
   function launch(game: Game) {
     setActiveGame(game)
+    pushGame(game)
     setRecentlyPlayed(prev=> [game.id, ...prev.filter(x=> x!==game.id)].slice(0,12))
     setPlayCounts(prev=> ({ ...prev, [game.id]: (prev[game.id]||0)+1 }))
     try{ fetch('/api/visit', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ gameId: game.id }) }).catch(()=>{}) }catch{}
@@ -623,6 +656,15 @@ export default function Page() {
             <span><strong>{visibleGames.length.toString().padStart(2, '0')}</strong> available now</span>
           </div>
         </Reveal>
+        <HomeDashboard
+          gameOfDay={gameOfDay} allGames={allGames} leaderboard={leaderboard}
+          favorites={favorites} recentlyPlayed={recentlyPlayed}
+          authUser={authUser} achSummary={achSummary}
+          showDashboard={showDashboard} setShowDashboard={setShowDashboard}
+          leaderTab={leaderTab} setLeaderTab={setLeaderTab}
+          launch={launch} openProxyTile={openProxyTile}
+          setShowAchievementsHub={setShowAchievementsHub} setRecentlyPlayed={setRecentlyPlayed}
+        />
                 <LibraryToolbar query={query} setQuery={setQuery} allGames={allGames} sortBy={sortBy} setSortBy={setSortBy} view={view} setView={setView} hideLow={hideLow} setHideLow={setHideLow} showStaffOnly={showStaffOnly} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} />
         {favorites.length>0 && filter!=='Favorites' && (
           <div style={{marginBottom:12, padding:'10px 14px', borderRadius:12, background:'linear-gradient(135deg, rgba(215,243,74,.14), rgba(125,107,255,.08))', border:'1px solid rgba(215,243,74,.28)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
@@ -645,16 +687,6 @@ export default function Page() {
           <a href="/request-game" style={{ fontSize: 12, color: 'var(--lime)' }}>View game requests</a>
         </details>}
         <CatalogGrid view={view} filter={filter} query={query} visibleGames={visibleGames} paginatedGames={paginatedGames} grouped={grouped} staffGames={staffGames} allGames={allGames} favorites={favorites} toggleFavorite={toggleFavorite} launch={launch} loadMoreRef={loadMoreRef} visibleCount={visibleCount} setVisibleCount={setVisibleCount} setQuery={setQuery} setFilter={setFilter} setHideLow={setHideLow} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} />
-            <HomeDashboard
-        gameOfDay={gameOfDay} allGames={allGames} leaderboard={leaderboard}
-        favorites={favorites} recentlyPlayed={recentlyPlayed}
-        authUser={authUser} achSummary={achSummary}
-        showDashboard={showDashboard} setShowDashboard={setShowDashboard}
-        leaderTab={leaderTab} setLeaderTab={setLeaderTab}
-        launch={launch} openProxyTile={openProxyTile}
-        setShowAchievementsHub={setShowAchievementsHub} setRecentlyPlayed={setRecentlyPlayed}
-      />
-
       {/* Requests + Upvotes */}
                 <RequestPanel requests={requests} requestVotes={requestVotes} newReqTitle={newReqTitle} setNewReqTitle={setNewReqTitle} submitRequest={submitRequest} upvoteRequest={upvoteRequest} />
       </section>
@@ -685,7 +717,7 @@ export default function Page() {
           game={activeGame}
           isFavorite={favorites.includes(activeGame.id)}
           onToggleFavorite={toggleFavorite}
-          onClose={() => { setActiveGame(null); if(authUser) fetch('/api/achievements/stats').then(r=> r.ok? r.json():null).then((d:any)=>{ if(d?.signedIn) setAchSummary({ total:d.total||0, unlocked:d.totalUnlocked||0, points:d.totalPoints||0 }) }).catch(()=>{}) }}
+          onClose={() => { closeGame(); pushHome(); if(authUser) fetch('/api/achievements/stats').then(r=> r.ok? r.json():null).then((d:any)=>{ if(d?.signedIn) setAchSummary({ total:d.total||0, unlocked:d.totalUnlocked||0, points:d.totalPoints||0 }) }).catch(()=>{}) }}
           authUser={authUser}
         />
       )}
