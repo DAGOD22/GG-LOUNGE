@@ -9,6 +9,15 @@ export const THEMES: Record<string, { name: string; mode: 'dark' | 'light'; colo
   cyber: { name: 'Cyberpunk', mode: 'dark', colors: { background:'#140c21',surface:'#20102f',panel:'#2b1642',text:'#fff0ff',muted:'#c0a5d2',accent:'#fb79dd',secondary:'#62f5e9' } },
   forest: { name: 'Forest', mode: 'dark', colors: { background:'#0b1713',surface:'#10251d',panel:'#183427',text:'#e9fff2',muted:'#a1beae',accent:'#a7ed83',secondary:'#58cbc2' } },
   ember: { name: 'Ember', mode: 'dark', colors: { background:'#1c1110',surface:'#2a1a17',panel:'#39241e',text:'#fff2e7',muted:'#cfada0',accent:'#ffb077',secondary:'#fa799d' } },
+  // Six later additions. Each is picked for a use rather than a mood: a
+  // low-blue one for late nights, a high-contrast one that survives a washed-out
+  // projector, and a couple that are simply nicer than the default.
+  midnight_oil: { name: 'Midnight Oil', mode: 'dark', colors: { background:'#0a0a0d',surface:'#141418',panel:'#1c1c22',text:'#e8e6df',muted:'#8e8c84',accent:'#e8c547',secondary:'#6c7bd1' } },
+  paper: { name: 'Paper', mode: 'light', colors: { background:'#faf8f3',surface:'#ffffff',panel:'#f0ede4',text:'#1a1815',muted:'#6b6459',accent:'#b4532a',secondary:'#3d6b8f' } },
+  terminal: { name: 'Terminal', mode: 'dark', colors: { background:'#000000',surface:'#0a0f0a',panel:'#0f1a0f',text:'#c8f5c8',muted:'#6f9a6f',accent:'#3ddc84',secondary:'#8bd4ff' } },
+  contrast: { name: 'High Contrast', mode: 'dark', colors: { background:'#000000',surface:'#0d0d0d',panel:'#191919',text:'#ffffff',muted:'#d6d6d6',accent:'#ffd400',secondary:'#5ec8ff' } },
+  cherry: { name: 'Cherry', mode: 'dark', colors: { background:'#180a12',surface:'#25111c',panel:'#331826',text:'#fff0f6',muted:'#c9a3b7',accent:'#ff5c8a',secondary:'#ffb26b' } },
+  ocean: { name: 'Ocean', mode: 'dark', colors: { background:'#061220',surface:'#0b1e30',panel:'#102a41',text:'#e6f4ff',muted:'#8fb2cc',accent:'#4dd2c4',secondary:'#6aa9ff' } },
 };
 export const WALLPAPERS = [
   { id:'none', name:'No wallpaper', kind:'none', preview:'linear-gradient(135deg,#0b0d12,#242a36)' },

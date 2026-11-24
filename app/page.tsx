@@ -24,6 +24,24 @@ import { AuthDialog } from '@/components/AuthDialog'
 import { AnnouncementBanner } from '@/components/AnnouncementBanner'
 import { SiteHeader } from '@/components/SiteHeader'
 import { HeroSection } from '@/components/HeroSection'
+import { CommandPalette, ShortcutSheet, buildShortcuts, useShortcuts, type Command } from '@/components/CommandPalette'
+import { SiteExtras } from '@/components/SiteExtras'
+import { NextUpRail } from '@/components/NextUpRail'
+
+/**
+ * Navigation and randomness are side effects, so they live at module scope
+ * rather than inline in the component: the React compiler is right to refuse a
+ * `window.location` assignment or a `Math.random()` call written in the render
+ * body, even when the value is only ever read from an event handler.
+ */
+function navigateTo(path: string) {
+  window.location.assign(path)
+}
+
+function pickRandom<T>(pool: T[]): T | undefined {
+  if (!pool.length) return undefined
+  return pool[Math.floor(Math.random() * pool.length)]
+}
 const GameModal = dynamic(() => import('@/components/GameModal').then(m => m.GameModal), { ssr: false, loading: () => null })
 const AchievementsHub = dynamic(() => import('@/components/AchievementsHub').then(m => m.AchievementsHub), { ssr: false, loading: () => null })
 
@@ -65,6 +83,8 @@ export default function Page() {
   const [hideLow, setHideLow] = useState(true)
   const [showStaffOnly, setShowStaffOnly] = useState(false)
   const [showAchievementsHub, setShowAchievementsHub] = useState(false)
+  const [showPalette, setShowPalette] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const [achSummary, setAchSummary] = useState<{total:number, unlocked:number, points:number} | null>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [dbMode, setDbMode] = useState<'postgres'|'local'|null>(null)
@@ -486,11 +506,76 @@ export default function Page() {
     setFavorites((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
   }
   function shufflePick(){
-    const pool = visibleGames.length? visibleGames: allGames
-    const pick = pool[Math.floor(Math.random()*pool.length)]
+    const pick = pickRandom(visibleGames.length? visibleGames: allGames)
     if(pick) launch(pick)
   }
   function toggleTheme(){ const id=theme==='dark'?'arctic':'lounge'; const preset=THEMES[id]; customization.update(s=>({...s,theme:{preset:id,mode:preset.mode,colors:{...preset.colors}}})) }
+
+  /**
+   * The shortcut table and the command palette share one set of actions, so a
+   * shortcut and the matching palette entry can never drift apart.
+   *
+   * Only things this page can actually do are here. Anything that would need a
+   * full navigation is a real link in the palette instead, so a command never
+   * pretends to be available when it is not.
+   */
+  function focusSearch(){
+    const el = document.getElementById('main-search') as HTMLInputElement | null
+    el?.focus(); el?.select()
+  }
+  function closeEverything(){
+    // `pushHome` directly, not the ref: this function is defined after the URL
+    // hook, so it can close over the real thing. Reading `pushHomeRef.current`
+    // here would be a ref read on a path the render body reaches.
+    setActiveGame(null); pushHome(); setShowAuth(null)
+    setShowAchievementsHub(false); setMobileNavOpen(false); setShowPalette(false); setShowShortcuts(false)
+  }
+  function goToGames(){
+    document.getElementById('games')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  function openTools(){ navigateTo('/tools') }
+  const paletteCommands: Command[] = [
+    { id: 'go-library', label: 'Go to the library', hint: 'All 250 games', group: 'Go', run: () => { closeEverything(); scrollTo({ top: 0, behavior: 'smooth' }) } },
+    { id: 'go-games', label: 'Jump to the game list', hint: 'Skip the hero', group: 'Go', run: () => { closeEverything(); goToGames() } },
+    { id: 'go-apps', label: 'Open apps', hint: 'Ten proxied sites', group: 'Go', run: () => { navigateTo('/apps') } },
+    { id: 'go-proxy', label: 'Open the proxy', hint: 'Browse any address', group: 'Go', run: () => { navigateTo('/proxy') } },
+    { id: 'go-tools', label: 'Open the tools page', hint: '100 utilities', group: 'Tools', run: openTools },
+    { id: 'go-gpt', label: 'Ask GG-GPT', hint: 'Games assistant', group: 'Go', run: () => { navigateTo('/gg-gpt') } },
+    { id: 'go-requests', label: 'Request a game', hint: 'Or report a broken one', group: 'Go', run: () => { navigateTo('/request-game') } },
+    { id: 'go-youtube', label: 'Open the YouTube player', hint: 'Same-origin video', group: 'Go', run: () => { navigateTo('/youtube') } },
+    { id: 'go-doc', label: 'Open the link directory', hint: 'Every link on one page', group: 'Go', run: () => { navigateTo('/secret-link-doc') } },
+    { id: 'play-random', label: 'Play something random', hint: 'From what is on screen', group: 'Play', run: () => { closeEverything(); shufflePick() } },
+    { id: 'play-game-of-day', label: 'Play the game of the day', group: 'Play', run: () => { closeEverything(); if(gameOfDay) launch(gameOfDay) } },
+    { id: 'play-first', label: 'Play the first result', hint: visibleGames[0]?.title, group: 'Play', run: () => { closeEverything(); if(visibleGames[0]) launch(visibleGames[0]) } },
+    { id: 'view-theme', label: 'Switch light and dark', group: 'View', run: () => { toggleTheme() } },
+    { id: 'view-dashboard', label: showDashboard ? 'Collapse the dashboard' : 'Open the dashboard', group: 'View', run: () => { setShowDashboard(v => !v) } },
+    { id: 'view-achievements', label: 'Show achievements', hint: 'Your progress', group: 'View', run: () => { closeEverything(); setShowAchievementsHub(true) } },
+    { id: 'view-shortcuts', label: 'Show keyboard shortcuts', group: 'Help', run: () => { setShowPalette(false); setShowShortcuts(true) } },
+    { id: 'acct-signin', label: authUser ? `Signed in as ${authUser.username}` : 'Sign in', group: 'Account', run: () => { if(!authUser) { closeEverything(); setShowAuth('login') } } },
+    { id: 'acct-favourites', label: `Favourites (${favorites.length})`, hint: 'Filter the catalogue', group: 'Account', run: () => { closeEverything(); setFilter('Favorites'); goToGames() } },
+    { id: 'search-games', label: 'Search the catalogue', hint: 'Focus the search box', group: 'Go', run: () => { focusSearch() } },
+  ]
+  const shortcuts = buildShortcuts({
+    focusSearch,
+    openPalette: () => setShowPalette(true),
+    openShortcuts: () => setShowShortcuts(true),
+    openTools,
+    openAchievements: () => setShowAchievementsHub(true),
+    openAuth: () => setShowAuth('login'),
+    toggleTheme,
+    toggleDashboard: () => setShowDashboard(v => !v),
+    shuffle: shufflePick,
+    // The panic screen has its own shortcut inside the panic document.
+    panic: () => window.dispatchEvent(new CustomEvent('ggl:panic')),
+    goHome: () => { closeEverything(); scrollTo({ top: 0, behavior: 'smooth' }) },
+    goLibrary: () => { closeEverything(); goToGames() },
+    goApps: () => { navigateTo('/apps') },
+    goProxy: () => { navigateTo('/proxy') },
+    goRequests: () => { navigateTo('/request-game') },
+    goGames: () => { closeEverything(); goToGames() },
+    closeAll: closeEverything,
+  })
+  useShortcuts(shortcuts)
   const [installHint, setInstallHint] = useState<string|null>(null)
   async function doInstall(){
     const dp:any = installPrompt || (window as any).__gglDeferredPrompt
@@ -612,6 +697,15 @@ export default function Page() {
         onLaunch={launch}
       />
 
+      <SiteExtras
+        games={allGames}
+        genres={filters.filter(filter => filter !== 'All games' && filter !== 'Favorites')}
+        onLaunch={game => { const found = allGames.find(candidate => candidate.id === game.id); if (found) launch(found) }}
+        playCounts={playCounts}
+        shareTitle="GG-Lounge — 250 browser games, no installs"
+        sharePath="/"
+      />
+
       <section className="catalog" id="games">
         <Reveal className="section-heading">
           <div>
@@ -654,6 +748,12 @@ export default function Page() {
           <a href="/request-game" style={{ fontSize: 12, color: 'var(--lime)' }}>View game requests</a>
         </details>}
         <CatalogGrid view={view} filter={filter} query={query} visibleGames={visibleGames} paginatedGames={paginatedGames} grouped={grouped} staffGames={staffGames} allGames={allGames} favorites={favorites} toggleFavorite={toggleFavorite} launch={launch} loadMoreRef={loadMoreRef} visibleCount={visibleCount} setVisibleCount={setVisibleCount} setQuery={setQuery} setFilter={setFilter} setHideLow={setHideLow} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} />
+      <NextUpRail
+        games={allGames}
+        playCounts={playCounts}
+        recentlyPlayed={recentlyPlayed}
+        onLaunch={game => { const found = allGames.find(candidate => candidate.id === game.id); if (found) launch(found) }}
+      />
       {/* Requests + Upvotes */}
                 <RequestPanel requests={requests} requestVotes={requestVotes} newReqTitle={newReqTitle} setNewReqTitle={setNewReqTitle} submitRequest={submitRequest} upvoteRequest={upvoteRequest} />
       </section>
@@ -679,6 +779,8 @@ export default function Page() {
         <span>Admin</span>
       </a>
       <WelcomeTour />
+      <CommandPalette commands={paletteCommands} open={showPalette} onClose={() => setShowPalette(false)} />
+      <ShortcutSheet shortcuts={shortcuts} open={showShortcuts} onClose={() => setShowShortcuts(false)} />
       {showAchievementsHub && <AchievementsHub open={showAchievementsHub} onClose={()=> setShowAchievementsHub(false)} authUser={authUser} onPlayGame={(id)=> { const g=allGames.find(x=> x.id===id); if(g){ setShowAchievementsHub(false); launch(g) } }} />}
       {activeGame && (
         <ErrorBoundary resetKey={activeGame.id}>

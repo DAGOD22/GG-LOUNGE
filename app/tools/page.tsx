@@ -14,7 +14,9 @@ import './tools.css'
  * client-rendered page tends to lose.
  */
 export const metadata: Metadata = {
-  title: 'Free Browser Tools — QR Generator, Calculator & 98 More | GG-Lounge',
+  // The layout appends " | GG-Lounge", so putting it here too would print it
+  // twice — which is exactly what the first deploy of this page did.
+  title: 'Free Browser Tools — QR Generator, Calculator & 98 More',
   description: `One hundred utilities that run entirely in your browser: a QR code generator, calculator, unit and colour converters, timers, hashers, text tools and more. Nothing you type is uploaded.`,
   keywords: [
     'qr code generator', 'online calculator', 'unit converter', 'color picker',

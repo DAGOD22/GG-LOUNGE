@@ -366,6 +366,42 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'lbr_1m_leaves', gameId: 'leaf-blower-revolution', title: 'Leaf Baron', description: 'Blow 1,000,000 leaves', icon: '💰', tier: 'gold', target: 1000000, unit: 'leaves', points: 50, rarity: 'epic' },
   { id: 'lbr_1b_leaves', gameId: 'leaf-blower-revolution', title: 'Leaf Universe', description: 'Blow 1,000,000,000 leaves', icon: '🌌', tier: 'diamond', target: 1000000000, unit: 'leaves', points: 100, rarity: 'legendary' },
 
+  // ---- Sitewide achievements (a11y + attention spend) ----
+  // These are not tied to one game: they reward exploring the site itself. A
+  // separate gameId keeps them out of the per-game lists while still letting
+  // the hub and the tracker treat them like everything else.
+  { id: 'site_first_game', gameId: 'gg-lounge', title: 'First Steps', description: 'Launch your first game', icon: '🚪', tier: 'bronze', target: 1, unit: 'games', points: 5, rarity: 'common' },
+  { id: 'site_10_games', gameId: 'gg-lounge', title: 'Arcade Regular', description: 'Play 10 different games', icon: '🎟️', tier: 'bronze', target: 10, unit: 'games', points: 20, rarity: 'common' },
+  { id: 'site_25_games', gameId: 'gg-lounge', title: 'Tourist', description: 'Play 25 different games', icon: '🗺️', tier: 'silver', target: 25, unit: 'games', points: 35, rarity: 'rare' },
+  { id: 'site_50_games', gameId: 'gg-lounge', title: 'Completionist', description: 'Play 50 different games', icon: '🧭', tier: 'gold', target: 50, unit: 'games', points: 60, rarity: 'epic' },
+  { id: 'site_100_games', gameId: 'gg-lounge', title: 'The Whole Floor', description: 'Play 100 different games', icon: '🏛️', tier: 'platinum', target: 100, unit: 'games', points: 90, rarity: 'epic' },
+  { id: 'site_all_genres', gameId: 'gg-lounge', title: 'No Favourites', description: 'Play a game from every category', icon: '🎲', tier: 'silver', target: 8, unit: 'categories', points: 40, rarity: 'rare' },
+  { id: 'site_streak_7', gameId: 'gg-lounge', title: 'One Whole Week', description: 'Visit 7 days in a row', icon: '📅', tier: 'silver', target: 7, unit: 'days', points: 40, rarity: 'rare' },
+  { id: 'site_streak_30', gameId: 'gg-lounge', title: 'A Habit', description: 'Visit 30 days in a row', icon: '🗓️', tier: 'gold', target: 30, unit: 'days', points: 80, rarity: 'epic' },
+  { id: 'site_tools_5', gameId: 'gg-lounge', title: 'Utility Player', description: 'Use 5 different tools', icon: '🧰', tier: 'bronze', target: 5, unit: 'tools', points: 15, rarity: 'common' },
+  { id: 'site_tools_25', gameId: 'gg-lounge', title: 'Toolbelt', description: 'Use 25 different tools', icon: '🛠️', tier: 'silver', target: 25, unit: 'tools', points: 35, rarity: 'rare' },
+  { id: 'site_tools_50', gameId: 'gg-lounge', title: 'Fifty Shades of Utility', description: 'Use half of the tools page', icon: '⚙️', tier: 'gold', target: 50, unit: 'tools', points: 60, rarity: 'epic' },
+  { id: 'site_tools_all', gameId: 'gg-lounge', title: 'Every Drawer', description: 'Open all 100 tools', icon: '🗄️', tier: 'diamond', target: 100, unit: 'tools', points: 110, rarity: 'legendary' },
+  { id: 'site_favourite_5', gameId: 'gg-lounge', title: 'Shortlist', description: 'Save 5 games as favourites', icon: '💚', tier: 'bronze', target: 5, unit: 'favourites', points: 15, rarity: 'common' },
+  { id: 'site_share', gameId: 'gg-lounge', title: 'Word of Mouth', description: 'Copy a share link', icon: '📣', tier: 'bronze', target: 1, unit: 'shares', points: 10, rarity: 'common' },
+  { id: 'site_request', gameId: 'gg-lounge', title: 'Ask and You Might Receive', description: 'Request a game', icon: '📝', tier: 'bronze', target: 1, unit: 'requests', points: 10, rarity: 'common' },
+  { id: 'site_upvote_10', gameId: 'gg-lounge', title: 'Democracy', description: 'Upvote 10 requests', icon: '🗳️', tier: 'silver', target: 10, unit: 'votes', points: 25, rarity: 'common' },
+  { id: 'site_report', gameId: 'gg-lounge', title: 'Bug Hunter', description: 'Report a broken game', icon: '🐛', tier: 'bronze', target: 1, unit: 'reports', points: 15, rarity: 'common' },
+  { id: 'site_gg_gpt_1', gameId: 'gg-lounge', title: 'Said Hello', description: 'Ask GG-GPT anything', icon: '🤖', tier: 'bronze', target: 1, unit: 'questions', points: 10, rarity: 'common' },
+  { id: 'site_gg_gpt_25', gameId: 'gg-lounge', title: 'In Conversation', description: 'Ask GG-GPT 25 questions', icon: '💬', tier: 'silver', target: 25, unit: 'questions', points: 30, rarity: 'rare' },
+  { id: 'site_proxy_first', gameId: 'gg-lounge', title: 'Through the Door', description: 'Open something through the proxy', icon: '🌐', tier: 'bronze', target: 1, unit: 'sites', points: 10, rarity: 'common' },
+  { id: 'site_apps_5', gameId: 'gg-lounge', title: 'App Taster', description: 'Launch 5 different apps', icon: '📲', tier: 'silver', target: 5, unit: 'apps', points: 25, rarity: 'common' },
+  { id: 'site_theme_dark', gameId: 'gg-lounge', title: 'Night Owl', description: 'Switch to the light theme and back', icon: '🌗', tier: 'bronze', target: 2, unit: 'switches', points: 10, rarity: 'common' },
+  { id: 'site_customise', gameId: 'gg-lounge', title: 'Interior Design', description: 'Change the theme colours', icon: '🎨', tier: 'bronze', target: 1, unit: 'themes', points: 15, rarity: 'common' },
+  { id: 'site_cursor', gameId: 'gg-lounge', title: 'Signature Cursor', description: 'Pick a custom cursor', icon: '🖱️', tier: 'bronze', target: 1, unit: 'cursors', points: 10, rarity: 'common' },
+  { id: 'site_tour', gameId: 'gg-lounge', title: 'Shown Around', description: 'Finish the welcome tour', icon: '🧑‍🏫', tier: 'bronze', target: 1, unit: 'tours', points: 10, rarity: 'common' },
+  { id: 'site_shortcut_10', gameId: 'gg-lounge', title: 'Keyboard Native', description: 'Use 10 keyboard shortcuts', icon: '⌨️', tier: 'silver', target: 10, unit: 'shortcuts', points: 30, rarity: 'rare' },
+  { id: 'site_palette', gameId: 'gg-lounge', title: 'Command Centre', description: 'Open the command palette and run something', icon: '🕹️', tier: 'bronze', target: 1, unit: 'commands', points: 15, rarity: 'common' },
+  { id: 'site_offline', gameId: 'gg-lounge', title: 'Plane Mode', description: 'Play a game while offline', icon: '✈️', tier: 'gold', target: 1, unit: 'sessions', points: 45, rarity: 'epic' },
+  { id: 'site_install', gameId: 'gg-lounge', title: 'Installed', description: 'Install GG Lounge as an app', icon: '📥', tier: 'silver', target: 1, unit: 'installs', points: 30, rarity: 'rare' },
+  { id: 'site_daily', gameId: 'gg-lounge', title: 'Same Time Tomorrow', description: 'Claim a daily pick', icon: '🌅', tier: 'bronze', target: 1, unit: 'dailies', points: 10, rarity: 'common' },
+  { id: 'site_2am', gameId: 'gg-lounge', title: 'Two in the Morning', description: 'Play a game between 2 and 4 am', icon: '🌚', tier: 'silver', target: 1, unit: 'nights', points: 25, rarity: 'rare' },
+
 ]
 
 export function getAchievementsForGame(gameId: string): Achievement[] {
