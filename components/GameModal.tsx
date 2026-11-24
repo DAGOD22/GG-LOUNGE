@@ -1,10 +1,15 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Heart, Maximize2, X, Copy, ExternalLink, Gamepad2, Keyboard, Monitor, Bug, Flag, AlertCircle, Loader2, Save, Trophy, Star, Lock, Medal, Crown } from 'lucide-react'
+import { Heart, Maximize2, X, Copy, ExternalLink, Gamepad2, Keyboard, Monitor, Bug, Flag, AlertCircle, Loader2, Save, Trophy, Star, Lock, Medal, Crown, Columns2, Volume2, VolumeX } from 'lucide-react'
 import type { Game } from '@/lib/games'
 import { getGameControls } from '@/lib/game-controls'
 import { inferAchievementUpdates } from '@/lib/achievement-tracker'
 import { getAchievementsForGame, RARITY_COLOR } from '@/lib/achievements'
+import { MiniPlayer } from '@/components/live/MiniPlayer'
+import { SplitScreen } from '@/components/live/SplitScreen'
+import { useRegisterGameBridge } from '@/components/live/GameBridge'
+import { useLivePresence } from '@/components/live/PresenceProvider'
+import { dispatchKey, type InputFrame } from '@/lib/coop'
 
 export function GameModal({
   game,
@@ -21,6 +26,41 @@ export function GameModal({
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  // Split screen and pane mute. `splitGame` is the *right* pane; the left pane
+  // is this modal's own frame, so the save and achievement code keeps working
+  // exactly as it did before split screen existed.
+  const [splitGame, setSplitGame] = useState<Game | null>(null)
+  const [splitPercent, setSplitPercent] = useState(50)
+  const [leftMuted, setLeftMuted] = useState(false)
+  const live = useLivePresence()
+  // `allGames` is needed by the split-screen picker; the modal only receives the
+  // one game, so the catalogue is imported lazily from the same module the rest
+  // of the site uses rather than threaded through every prop in between.
+  const [catalogue, setCatalogue] = useState<Game[]>([])
+  useEffect(() => { import('@/lib/games').then(m => setCatalogue(m.games)).catch(() => {}) }, [])
+
+  // Tell the room what is playing, and let a friend's "send this game" open it.
+  useRegisterGameBridge({
+    activeGameId: () => game.id,
+    launchGame: (gameId: string) => {
+      const target = catalogue.find(entry => entry.id === gameId)
+      if (target) setSplitGame(target)
+    },
+    applyRemoteInput: (frame: InputFrame) => {
+      try { dispatchKey(frameRef.current?.contentWindow, frame) } catch { /* cross-origin */ }
+    },
+    onPeerGame: () => {},
+  })
+
+  // Report the launch once, both to the Most Played counter (already handled by
+  // the launcher) and to the live feed, which is what other players see.
+  useEffect(() => {
+    live.setActiveGame(game.id)
+    live.announce('launch', game.id)
+    // On close, drop the "playing …" tag from this player's ghost cursor so the
+    // room stops advertising a game that is no longer on screen.
+    return () => live.setActiveGame(null)
+  }, [game.id])
   const inspectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (inspectionTimer.current) clearTimeout(inspectionTimer.current) }, [])
 
@@ -596,6 +636,29 @@ export function GameModal({
           <button onClick={() => onToggleFavorite(game.id)} title={isFavorite ? 'Remove favorite' : 'Add favorite'} aria-label="Favorite">
             <Heart size={16} fill={isFavorite ? 'currentColor' : 'none'} />
           </button>
+          <MiniPlayer frameRef={frameRef} />
+          <button
+            className={`controls-toggle ${splitGame ? 'active' : ''}`}
+            onClick={() => setSplitGame(current => (current ? null : catalogue[0] ?? null))}
+            title={splitGame ? 'Close split screen' : 'Run two games side by side'}
+            aria-pressed={Boolean(splitGame)}
+            style={{
+              width: 'auto',
+              padding: '0 10px',
+              fontSize: 11,
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              border: splitGame ? '1px solid var(--lime)' : '1px solid var(--line)',
+              background: splitGame ? 'var(--lime)' : 'rgba(255,255,255,.06)',
+              color: splitGame ? '#0b0d12' : 'var(--foreground)',
+              borderRadius: 999,
+              cursor: 'pointer',
+            }}
+          >
+            <Columns2 size={14} /> Split
+          </button>
           <button
             onClick={() => {
               const el = wrapRef.current || frameRef.current
@@ -611,6 +674,43 @@ export function GameModal({
           </button>
         </div>
       </div>
+      {splitGame && (
+        <div className="gg-split-leftbar">
+          <span>{game.title} <em>· left pane</em></span>
+          <button
+            type="button"
+            onClick={() => {
+              setLeftMuted(value => {
+                const next = !value
+                try {
+                  const doc = frameRef.current?.contentDocument
+                  for (const element of doc?.querySelectorAll<HTMLMediaElement>('audio,video') ?? []) element.muted = next
+                } catch {}
+                return next
+              })
+            }}
+            aria-pressed={leftMuted}
+            title={leftMuted ? 'Unmute the left pane' : 'Mute the left pane'}
+          >
+            {leftMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+            {leftMuted ? 'Muted' : 'Sound on'}
+          </button>
+        </div>
+      )}
+      <div
+        className={`gg-split-area${splitGame ? ' is-split' : ''}`}
+        style={splitGame ? ({ ['--gg-split' as string]: `${splitPercent}%` }) : undefined}
+      >
+      {splitGame && (
+        <SplitScreen
+          games={catalogue}
+          rightGame={splitGame}
+          split={splitPercent}
+          onSplit={setSplitPercent}
+          onPick={setSplitGame}
+          onClose={() => setSplitGame(null)}
+        />
+      )}
       <div
         className="frame-wrap"
         ref={wrapRef}
@@ -741,6 +841,7 @@ export function GameModal({
             </button>
           </div>
         </div>
+      </div>
 
         {/* Achievements drawer */}
         {showAchievements && (

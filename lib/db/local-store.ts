@@ -48,6 +48,15 @@ interface LocalStore {
   ggMemory: GgMemory[];
   /** Notifications queued for a member (e.g. a game request was published). */
   notifications: Array<{ id: string; userId: string; title: string; body: string; href?: string; read: boolean; createdAt: string }>;
+  /**
+   * Live presence, declared as `unknown` on purpose: this module must not import
+   * the presence/coop row types, because those import this one. The owners of
+   * these slices read and write them through their own typed accessors; the
+   * store only has to stop erasing them between writes.
+   */
+  presence?: unknown;
+  events?: unknown;
+  coopRooms?: unknown;
 }
 
 let localDir: string | null = null;
@@ -100,6 +109,9 @@ export async function readLocal(): Promise<LocalStore> {
       ggMessages: (parsed as any).ggMessages ?? [],
       ggMemory: (parsed as any).ggMemory ?? [],
       notifications: (parsed as any).notifications ?? [],
+      presence: (parsed as any).presence,
+      events: (parsed as any).events,
+      coopRooms: (parsed as any).coopRooms,
     };
   } catch {
     return { bans: [], visits: [], requests: [], games: [], reports: [], userStates: {}, users: [], sessions: [], saves: [], achievements: [], gameStats: [], gateStates: {}, ggChats: [], ggMessages: [], ggMemory: [], notifications: [] };

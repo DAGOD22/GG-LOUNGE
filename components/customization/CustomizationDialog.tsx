@@ -2,7 +2,8 @@
 import { CursorGallery } from './CursorGallery';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { X, Palette, Image as ImageIcon, MousePointer2, Keyboard, EyeOff, Upload, Check, RotateCcw, Sparkles } from 'lucide-react';
-import { useCustomization } from './CustomizationProvider';
+import { useCustomization } from './CustomizationProvider'
+import { PanicDoc } from '@/components/live/PanicDoc';
 import { THEMES, WALLPAPERS, RELEASE_NAME, bindingFromEvent, bindingLabel, iconHref, normalizeDestination, type Colors, type KeyBinding } from '@/lib/customization/settings';
 import { saveMedia, deleteMedia, imageData } from '@/lib/customization/media';
 import { FAVICON_PRESETS, presetIcon, BLANK_FAVICON } from '@/lib/customization/favicon-presets';
@@ -11,7 +12,7 @@ function Toggle({label,description,checked,onChange}:{label:string;description?:
 function Section({title,children,description}:{title:string;description?:string;children:ReactNode}){return <section className="gg-settings-section"><h3>{title}</h3>{description&&<p className="gg-help">{description}</p>}{children}</section>;}
 export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onClose:()=>void;onPlayVideo:()=>void}) {
   const {settings,update,reset,capturing,setCapturing,saveError,mediaError,runPanic}=useCustomization();
-  const dialog=useRef<HTMLDialogElement>(null),[tab,setTab]=useState('tab'),[error,setError]=useState(''),[busy,setBusy]=useState(false),[iconDraft,setIconDraft]=useState(settings.cloak.icon),[destination,setDestination]=useState(settings.panic.destination),[resetConfirm,setResetConfirm]=useState(false);
+  const dialog=useRef<HTMLDialogElement>(null),[tab,setTab]=useState('tab'),[error,setError]=useState(''),[busy,setBusy]=useState(false),[iconDraft,setIconDraft]=useState(settings.cloak.icon),[destination,setDestination]=useState(settings.panic.destination),[resetConfirm,setResetConfirm]=useState(false),[previewDoc,setPreviewDoc]=useState(false);
   useEffect(()=>setIconDraft(settings.cloak.icon.startsWith('data:')?'':settings.cloak.icon),[settings.cloak.icon]);
   useEffect(()=>setDestination(settings.panic.destination),[settings.panic.destination]);
   useEffect(()=>{const el=dialog.current;if(!el)return;if(open&&!el.open)el.showModal();if(!open&&el.open)el.close();if(open){const old=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=old;};}},[open]);
@@ -74,15 +75,32 @@ export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onC
         </Section>
       </>}
       {tab==='panic'&&<>
-        <Section title="One shortcut. A different page." description="Redirect this tab instantly, including from same-origin game frames. Browser and operating-system reserved shortcuts cannot be overridden.">
+        <Section title="One shortcut. A different page." description="Pick what the shortcut does. Both modes work from same-origin game frames; browser and operating-system reserved shortcuts cannot be overridden.">
           <Toggle label="Enable panic shortcut" checked={settings.panic.enabled} onChange={enabled=>update(s=>({...s,panic:{...s.panic,enabled}}))}/>
+          <div className="gg-mode-choice" role="radiogroup" aria-label="Panic mode">
+            <button role="radio" aria-checked={settings.panic.mode==='redirect'} className={settings.panic.mode==='redirect'?'is-active':''} onClick={()=>update(s=>({...s,panic:{...s.panic,mode:'redirect'}}))}>
+              <strong>Redirect to URL</strong>
+              <small>Leaves this page instantly for your destination.</small>
+            </button>
+            <button role="radio" aria-checked={settings.panic.mode==='doc'} className={settings.panic.mode==='doc'?'is-active':''} onClick={()=>update(s=>({...s,panic:{...s.panic,mode:'doc'}}))}>
+              <strong>Fake Google Doc</strong>
+              <small>Stays on this tab: the game pauses and a document you can type into takes over. The same shortcut returns you to the game exactly where it stopped.</small>
+            </button>
+          </div>
           <div className="gg-key-recorder"><span>Current shortcut</span><kbd>{bindingLabel(settings.panic.binding)}</kbd><button className="gg-primary" onClick={()=>setCapturing(!capturing)}>{capturing?'Cancel recording':'Record a key'}</button></div>
           {capturing&&<p role="status" className="gg-recording">Press a key or key combination now. To bind a modifier alone, press and release it. Escape can be recorded too.</p>}
-          <label className="gg-field">Panic destination<input value={destination} onChange={e=>setDestination(e.target.value)} onBlur={()=>{if(destination!==settings.panic.destination)applyDestination();}} placeholder="https://example.com or about:blank" autoComplete="off" spellCheck={false}/></label>
+          <label className="gg-field" style={{opacity:settings.panic.mode==='doc'?.45:1}}>Panic destination<input value={destination} onChange={e=>setDestination(e.target.value)} onBlur={()=>{if(destination!==settings.panic.destination)applyDestination();}} placeholder="https://example.com or about:blank" autoComplete="off" spellCheck={false}/></label>
           <div className="gg-action-row"><button className="gg-primary" onClick={applyDestination}>Save destination</button><button className="gg-secondary" onClick={()=>{setDestination('about:blank');update(s=>({...s,panic:{...s.panic,destination:'about:blank'}}));}}>Use a blank page</button></div>
           <Toggle label="Also trigger while typing" description="Off by default to avoid accidental redirects in search boxes, chat and forms." checked={settings.panic.whileTyping} onChange={whileTyping=>update(s=>({...s,panic:{...s.panic,whileTyping}}))}/>
           <p className="gg-help">Escape may first release a game’s mouse lock. Cross-origin embedded pages cannot forward their keys. Panic does not erase browser history. Unsaved progress may be lost.</p>
-          <button className="gg-secondary" onClick={()=>{if(applyDestination())setTimeout(runPanic,0);}}>Test redirect — leaves this page</button>
+          {settings.panic.mode==='redirect'
+            ? <button className="gg-secondary" onClick={()=>{if(applyDestination())setTimeout(runPanic,0);}}>Test redirect — leaves this page</button>
+            : <>
+                <button className="gg-secondary" onClick={()=>setPreviewDoc(true)}>Preview the fake document</button>
+                <button className="gg-secondary" onClick={()=>{dialog.current?.close();setTimeout(runPanic,0)}}>Test it now — the shortcut brings you back</button>
+              </>}
+          <p className="gg-help">In fake-document mode the shortcut pauses and mutes the game instead of leaving the tab. Type <kbd>ggout</kbd>, click the word count seven times, or press the shortcut again to return.</p>
+          {previewDoc&&<PanicDoc onExit={()=>setPreviewDoc(false)}/>}
         </Section>
       </>}
       {tab==='theme'&&<>
@@ -106,6 +124,13 @@ export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onC
           <CursorGallery />
           <label className="gg-slider"><span>Size <b>{settings.cursor.size}px</b></span><input type="range" min={16} max={64} step={2} value={settings.cursor.size} onChange={e=>update(s=>({...s,cursor:{...s.cursor,size:Number(e.target.value)}}))} aria-label="Cursor size"/></label>
           <label className="gg-slider"><span>Follow speed <b>{Math.round(settings.cursor.speed*100)}%</b></span><input type="range" min={0} max={1} step={0.05} value={settings.cursor.speed} onChange={e=>update(s=>({...s,cursor:{...s.cursor,speed:Number(e.target.value)}}))} aria-label="Cursor follow speed"/></label>
+        </Section>
+        <Section title="Other players on the lounge" description="Ghost cursors show where everyone else is pointing, in their own custom cursor style. The activity feed reports launches and unlocks as they happen. Nothing here is shared with anyone outside GG-LOUNGE, and your real cursor is never affected.">
+          <Toggle label="Show live layer" description="Off hides every ghost, toast and co-op button and stops all presence traffic." checked={settings.live.enabled} onChange={enabled=>update(s=>({...s,live:{...s.live,enabled}}))}/>
+          <Toggle label="Ghost cursors" checked={settings.live.ghosts} onChange={ghosts=>update(s=>({...s,live:{...s.live,ghosts}}))}/>
+          <label className="gg-slider"><span>Ghost opacity <b>{settings.live.ghostOpacity}%</b></span><input type="range" min={15} max={100} step={5} value={settings.live.ghostOpacity} onChange={e=>update(s=>({...s,live:{...s.live,ghostOpacity:Number(e.target.value)}}))} aria-label="Ghost cursor opacity"/></label>
+          <Toggle label="Activity popups" description="Short toasts, bottom right: who launched what, who unlocked something, how many players are online." checked={settings.live.feed} onChange={feed=>update(s=>({...s,live:{...s.live,feed}}))} />
+          <p className="gg-help">Presence is a heartbeat every couple of seconds and only while this tab is visible. Nothing is stored after 30 seconds of silence.</p>
           <Toggle label="Ribbon trail" description="A tapered light ribbon behind the pointer. Respects reduced motion." checked={settings.cursor.trail} onChange={trail=>update(s=>({...s,cursor:{...s.cursor,trail}}))}/>
           <Toggle label="GPU afterglow" description="WebGL motion-blur light streaks under the pointer. Auto-off with reduced motion or without WebGL." checked={settings.cursor.glow} onChange={glow=>update(s=>({...s,cursor:{...s.cursor,glow}}))}/>
         </Section>

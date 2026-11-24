@@ -6,6 +6,8 @@ import './globals.css'
 import './customization.css'
 import './banner.css'
 import { CustomizationProvider } from '@/components/customization/CustomizationProvider'
+import { PresenceProvider } from '@/components/live/PresenceProvider'
+import { GameBridgeProvider } from '@/components/live/GameBridge'
 import GlobalSW from './global-sw'
 
 /**
@@ -129,7 +131,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             __html: `window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__gglDeferredPrompt=e;window.dispatchEvent(new CustomEvent('ggl:installable'));});`,
           }}
         />
-        <CustomizationProvider>{children}</CustomizationProvider>
+        <CustomizationProvider><GameBridgeProvider><PresenceProvider>{children}</PresenceProvider></GameBridgeProvider></CustomizationProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

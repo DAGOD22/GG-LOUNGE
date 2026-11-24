@@ -175,6 +175,57 @@ export function migrate(): Promise<void> {
           PRIMARY KEY ("ip", "request_id")
         );
         CREATE INDEX IF NOT EXISTS "upvote_cooldown_last_idx" ON "upvote_cooldown" ("last_at");
+
+        /* ---- live presence ----------------------------------------------
+           Ghost cursors and the activity feed. Both tables are written to on
+           nearly every page view, so they are kept deliberately small: a
+           presence row is replaced wholesale rather than appended to, and the
+           feed is capped below. seen_at is indexed because every read is
+           "who was here in the last N seconds". */
+        CREATE TABLE IF NOT EXISTS "live_presence" (
+          "id" TEXT PRIMARY KEY,
+          "username" TEXT,
+          "x" REAL NOT NULL DEFAULT 50,
+          "y" REAL NOT NULL DEFAULT 50,
+          "cursor_preset" TEXT NOT NULL DEFAULT 'system',
+          "cursor_image" TEXT NOT NULL DEFAULT '',
+          "cursor_size" INTEGER NOT NULL DEFAULT 40,
+          "accent" TEXT NOT NULL DEFAULT '#d7f34a',
+          "game" TEXT,
+          "seen_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS "live_presence_seen_idx" ON "live_presence" ("seen_at" DESC);
+        CREATE TABLE IF NOT EXISTS "live_event" (
+          "id" BIGSERIAL PRIMARY KEY,
+          "kind" TEXT NOT NULL,
+          "name" TEXT NOT NULL,
+          "message" TEXT NOT NULL,
+          "game" TEXT,
+          "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS "live_event_created_idx" ON "live_event" ("created_at" DESC);
+        CREATE TABLE IF NOT EXISTS "live_budget" (
+          "key" TEXT PRIMARY KEY,
+          "count" INTEGER NOT NULL DEFAULT 0,
+          "resetAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS "live_budget_reset_idx" ON "live_budget" ("resetAt");
+        /* ---- co-op signalling -------------------------------------------
+           Six-character room codes are a lookup key for the WebRTC handshake,
+           not the transport: the offer/answer is parked here for a couple of
+           minutes, then the game traffic is peer to peer. Rows are deleted on
+           join and aged out, so this never accumulates dead rooms. */
+        CREATE TABLE IF NOT EXISTS "coop_room" (
+          "code" TEXT PRIMARY KEY,
+          "offer" TEXT NOT NULL DEFAULT '',
+          "answer" TEXT NOT NULL DEFAULT '',
+          "host_name" TEXT NOT NULL DEFAULT '',
+          "guest_name" TEXT NOT NULL DEFAULT '',
+          "status" TEXT NOT NULL DEFAULT 'waiting',
+          "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "touched_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS "coop_room_touched_idx" ON "coop_room" ("touched_at" DESC);
       `);
       // Tolerate tables created by older schemas.
       await p.query(`ALTER TABLE "banned_user" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMPTZ`);
