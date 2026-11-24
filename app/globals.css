@@ -3158,6 +3158,67 @@ h4,
   from { opacity: 0; transform: translateY(8px) scale(.98); }
   to { opacity: 1; transform: none; }
 }
+
+/* ---- recent activity list -------------------------------------------- */
+/*
+ * Shown in place of toasts when nothing has happened since the page opened.
+ * Without it the corner was simply empty for every new visitor, which is why
+ * the feature looked fake rather than quiet.
+ */
+.gg-live-history {
+  pointer-events: auto;
+  width: min(280px, 78vw);
+  border-radius: 14px;
+  background: rgba(14,17,24,.92);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(0,0,0,.42);
+  backdrop-filter: blur(10px);
+  padding: 9px 11px;
+  animation: gg-live-in .28s ease-out both;
+}
+.gg-live-history-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.gg-live-history-head .gg-live-hide { margin-left: auto; }
+.gg-live-history ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.gg-live-history li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--foreground);
+  line-height: 1.35;
+}
+.gg-live-history li .gg-live-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gg-live-history li time {
+  flex: none;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.gg-live-history .gg-live-icon { color: var(--lime); flex: none; }
 @media (max-width: 640px) {
   .gg-live-feed { right: 10px; bottom: 74px; max-width: 78vw; }
   .gg-live-toast, .gg-live-pill { font-size: 11px; padding: 7px 10px; }
@@ -3419,12 +3480,26 @@ body.gg-split-dragging iframe { pointer-events: none; }
 .gg-split-pick-text small { font-size: 10.5px; color: var(--muted); font-weight: 700; }
 .gg-split-current { font-size: 10px; font-weight: 800; color: var(--lime); display: flex; align-items: center; gap: 2px; }
 
-/* ---- co-op trigger sits clear of the feed ---------------------------- */
+/* ---- co-op trigger sits clear of Customize and of the feed ----------- */
+/*
+ * There are three floating things in the two bottom corners:
+ *
+ *   bottom-left : Customize (20px) then "Play with a friend" to its right
+ *   bottom-right: the live activity pill / toasts
+ *
+ * They used to collide: Customize was at left:20/bottom:20 z-index 60 and
+ * co-op at left:18/bottom:18 z-index 62 — two pills in the same place, and
+ * the one underneath was unclickable. Co-op now starts after Customize's
+ * width instead of on top of it, so both are reachable and the co-op panel
+ * opens into clear space rather than behind the Customize button.
+ *
+ * 190px is Customize at its widest label ("Customize" + icon at 12px/800).
+ */
 .gg-coop-trigger {
   position: fixed;
-  left: 18px;
-  bottom: 18px;
-  z-index: 62;
+  left: 190px;
+  bottom: 22px;
+  z-index: 63;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -3447,13 +3522,19 @@ body.gg-split-dragging iframe { pointer-events: none; }
 }
 @keyframes gg-coop-pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
 @media (max-width: 640px) {
-  .gg-coop-trigger { left: 10px; bottom: 74px; font-size: 11px; padding: 9px 12px; }
+  /* Customize collapses to an icon-only pill at this width (its label is
+     hidden in customization.css), so co-op can start much further left. */
+  .gg-coop-trigger { left: 62px; bottom: 14px; font-size: 11px; padding: 9px 12px; }
 }
 .gg-coop-panel {
   position: fixed;
   left: 18px;
-  bottom: 68px;
-  z-index: 63;
+  bottom: 74px;
+  /* Above the Customize trigger (60) and the co-op trigger (63): the panel is
+     the thing the user is reading, so nothing else may sit on top of it. It
+     used to be 63 with `bottom: 68px`, i.e. exactly level with the Customize
+     button it opens above. */
+  z-index: 64;
   width: min(340px, 92vw);
   max-height: min(560px, 76vh);
   display: flex;
@@ -3464,7 +3545,7 @@ body.gg-split-dragging iframe { pointer-events: none; }
   box-shadow: 0 26px 70px rgba(0,0,0,.6);
   overflow: hidden;
 }
-@media (max-width: 640px) { .gg-coop-panel { left: 10px; bottom: 124px; } }
+@media (max-width: 640px) { .gg-coop-panel { left: 10px; bottom: 66px; max-height: min(520px, 68vh); } }
 .gg-coop-panel > header {
   display: flex;
   align-items: center;

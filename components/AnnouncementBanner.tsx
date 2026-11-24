@@ -14,13 +14,21 @@
  *   · it must survive a theme change, so every colour comes from the site's
  *     own custom properties rather than hard-coded hex.
  *
- * The CTA is a real anchor with `rel="noopener noreferrer"`, so opening the
- * doc cannot hand this page's window to the destination.
+ * The CTA is a real link, never a button with a handler: it has to survive a
+ * middle-click, a copy-link and a crawler. When the destination is one of our
+ * own pages it is a router `Link` that navigates in the same tab — opening our
+ * own doc in a new tab was the other half of why this never felt like it
+ * "went anywhere". An external override still gets `rel="noopener noreferrer"`
+ * so it cannot hand this page's window to the destination.
  */
 
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import Link from 'next/link';
 import { X, ArrowUpRight, Sparkles } from 'lucide-react';
 import { ANNOUNCEMENT_DOC_URL } from '@/lib/site-links';
+
+/** Anything that is not one of our own paths is treated as an external doc. */
+const IS_INTERNAL = ANNOUNCEMENT_DOC_URL.startsWith('/');
 
 const STORAGE_KEY = 'ggl_summer_banner_dismissed_v1';
 
@@ -72,14 +80,20 @@ export function AnnouncementBanner() {
           <strong>👀 HUGE THINGS ARE DROPPING OVER SUMMER:</strong> We&apos;re adding insane unreleased
           games, secret features, private proxies &amp; crazy new themes — and all the new links &amp;
           drops will ONLY go inside{' '}
-          <a
-            className="gg-banner-cta"
-            href={ANNOUNCEMENT_DOC_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            THIS DOC <ArrowUpRight size={12} />
-          </a>
+          {IS_INTERNAL ? (
+            <Link className="gg-banner-cta" href={ANNOUNCEMENT_DOC_URL}>
+              THIS DOC <ArrowUpRight size={12} />
+            </Link>
+          ) : (
+            <a
+              className="gg-banner-cta"
+              href={ANNOUNCEMENT_DOC_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              THIS DOC <ArrowUpRight size={12} />
+            </a>
+          )}
           . Save it before break or miss everything!
         </p>
         <button className="gg-banner-close" onClick={dismiss} aria-label="Dismiss announcement">

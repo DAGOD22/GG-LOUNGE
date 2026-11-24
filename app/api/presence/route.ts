@@ -61,7 +61,7 @@ export async function POST(req: Request) {
   if (!id) {
     // No identity, no presence. Watching anonymously would let one browser tab
     // appear as unlimited players.
-    return NextResponse.json({ online: 0, peers: [], events: [] });
+    return NextResponse.json({ online: 0, others: 0, peers: [], events: [] });
   }
 
   const cursor = cleanCursor(body?.cursor);
@@ -71,23 +71,37 @@ export async function POST(req: Request) {
   const { peers, online } = await touchPresence(id, { username, cursor, game });
   const events = await recentLiveEvents().catch(() => []);
 
+  // `online` includes the caller, so it is always at least 1. Everything a
+  // person reads is built from the other players instead.
+  const others = peers.filter(peer => peer.id !== id);
+
   return NextResponse.json(
     {
       online,
+      others: others.length,
       self: id,
-      peers: peers
-        .filter(peer => peer.id !== id)
-        .map(peer => ({
-          id: peer.id,
-          username: peer.username,
-          // Resolved here so every client shows the same name for the same
-          // player, signed in or not, instead of each one inventing its own.
-          name: displayName(peer),
-          cursor: peer.cursor,
-          game: peer.game,
-          seen: peer.seenAt,
-        })),
-      events,
+      peers: others.map(peer => ({
+        id: peer.id,
+        username: peer.username,
+        // Resolved here so every client shows the same name for the same
+        // player, signed in or not, instead of each one inventing its own.
+        name: displayName(peer),
+        cursor: peer.cursor,
+        game: peer.game,
+        seen: peer.seenAt,
+      })),
+      // The store speaks `createdAt`, the client type speaks `at`. Sending both
+      // means a consumer can use either without silently reading `undefined` —
+      // which is what happened when only the store's field name went out.
+      events: events.map(event => ({
+        id: event.id,
+        kind: event.kind,
+        name: event.name,
+        message: event.message,
+        game: event.game,
+        at: event.createdAt,
+        createdAt: event.createdAt,
+      })),
     },
     { headers: { 'cache-control': 'no-store' } },
   );
@@ -114,7 +128,20 @@ export async function GET() {
   const mode = getMode();
   const live = await countPresence().catch(() => null);
   return NextResponse.json(
-    { events, mode, online: live, live: live !== null },
+    {
+      events: events.map(event => ({
+        id: event.id,
+        kind: event.kind,
+        name: event.name,
+        message: event.message,
+        game: event.game,
+        at: event.createdAt,
+        createdAt: event.createdAt,
+      })),
+      mode,
+      online: live,
+      live: live !== null,
+    },
     { headers: { 'cache-control': 'no-store' } },
   );
 }

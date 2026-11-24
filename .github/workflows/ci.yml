@@ -5,21 +5,33 @@ on:
     branches: [main, 'arena/*']
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
         with:
+          # Must match the pnpm that generated pnpm-lock.yaml (lockfileVersion 9.0
+          # with the allowBuilds schema). 12.5.1 was pinned here before but the
+          # real failure was the placeholder allowBuilds map in
+          # pnpm-workspace.yaml, fixed in the same commit as this file.
           version: 12.5.1
-      - uses: actions/setup-node@v4
+          run_install: false
+      - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - name: Install
+        run: pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
       - name: Unit tests
         run: pnpm test
       - name: Production build

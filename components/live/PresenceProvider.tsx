@@ -40,6 +40,9 @@ const POINTER_MS = 260;
 type LiveContext = {
   peers: PresencePeer[];
   events: PresenceEvent[];
+  /** Players here *excluding* this one. Zero means you are alone. */
+  others: number;
+  /** Total including this one. Never display this as "players online". */
   online: number;
   /** Announce an event to everyone else. Fire-and-forget by design. */
   announce: (kind: 'launch' | 'achievement' | 'room' | 'join', gameId: string) => void;
@@ -63,6 +66,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const [peers, setPeers] = useState<PresencePeer[]>([]);
   const [events, setEvents] = useState<PresenceEvent[]>([]);
   const [online, setOnline] = useState(0);
+  const [others, setOthers] = useState(0);
 
   const ghostCursors = settings.live.ghosts;
   const activityFeed = settings.live.feed;
@@ -151,15 +155,16 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
       if (!response.ok) return;
       const data = (await response.json()) as {
         online?: number;
+        others?: number;
         peers?: PresencePeer[];
         events?: PresenceEvent[];
       };
       if (!alive.current) return;
       setPeers(data.peers ?? []);
       setOnline(data.online ?? 0);
-      // The wire carries `seen`/`at` (epoch ms); the components use `seen` and
-      // `at` on the typed shapes, so keep exactly what the server sent rather
-      // than half-mapping it here.
+      // Prefer the server's `others`. An older deployment does not send it, so
+      // fall back to the peer count rather than to `online`, which includes us.
+      setOthers(data.others ?? data.peers?.length ?? 0);
       if (data.events) setEvents(data.events);
     } catch {
       /* offline: keep the last known room rather than blanking the screen */
@@ -173,6 +178,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     if (!ready || !settings.live.enabled) {
       setPeers([]);
       setOnline(0);
+      setOthers(0);
       return;
     }
     alive.current = true;
@@ -248,8 +254,8 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   }, [update]);
 
   const value = useMemo<LiveContext>(
-    () => ({ peers, events, online, announce, setActiveGame, ghostCursors, activityFeed, hideFeed }),
-    [peers, events, online, announce, setActiveGame, ghostCursors, activityFeed, hideFeed],
+    () => ({ peers, events, others, online, announce, setActiveGame, ghostCursors, activityFeed, hideFeed }),
+    [peers, events, others, online, announce, setActiveGame, ghostCursors, activityFeed, hideFeed],
   );
 
   return (
@@ -258,7 +264,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
       {ready && settings.live.enabled && (
         <>
           <GhostCursors peers={peers} enabled={ghostCursors} />
-          <ActivityFeed events={events} online={online} enabled={activityFeed} onDismiss={hideFeed} />
+          <ActivityFeed events={events} others={others} enabled={activityFeed} onDismiss={hideFeed} />
           <CoopRoom />
         </>
       )}

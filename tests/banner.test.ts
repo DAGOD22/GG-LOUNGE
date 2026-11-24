@@ -28,6 +28,24 @@ function installDom() {
   const g = globalThis as any;
   g.window = dom.window;
   g.document = dom.window.document;
+  // `next/link` reaches for `self` (and `requestIdleCallback`) while
+  // prefetching, which a browser has and a bare node process does not.
+  g.self = dom.window;
+  if (!g.requestIdleCallback) {
+    g.requestIdleCallback = (cb: (idle: unknown) => void) => setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 0 }), 0);
+    g.cancelIdleCallback = (id: number) => clearTimeout(id);
+  }
+  if (!dom.window.requestIdleCallback) {
+    (dom.window as any).requestIdleCallback = g.requestIdleCallback;
+    (dom.window as any).cancelIdleCallback = g.cancelIdleCallback;
+  }
+  g.IntersectionObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() { return []; }
+  };
+  dom.window.IntersectionObserver = g.IntersectionObserver as any;
   Object.defineProperty(g, 'navigator', { value: dom.window.navigator, configurable: true });
   g.localStorage = dom.window.localStorage;
   g.HTMLElement = dom.window.HTMLElement;
@@ -65,12 +83,18 @@ test('the banner is inert until localStorage has been consulted', async () => {
   assert.match(copy, /ONLY go inside/);
   assert.match(copy, /Save it before break or miss everything/);
 
-  // The CTA is a real link with the safe rel pair.
+  // The CTA is a real link to the doc the copy promises.
+  //
+  // It used to be asserted as `target="_blank"` pointing at an absolute URL,
+  // which is how the dead end went unnoticed: an absolute env-var fallback that
+  // was never set, opening the site's own request form in a new tab. For one of
+  // our own pages the correct behaviour is an in-tab navigation, which is what
+  // Next's `Link` renders — no `target`, and a site-relative `href`.
   const cta = container.querySelector('.gg-banner-cta') as any;
-  assert.equal(cta.getAttribute('target'), '_blank');
-  assert.equal(cta.getAttribute('rel'), 'noopener noreferrer');
+  assert.ok(cta, 'the CTA must render');
   assert.equal(cta.getAttribute('href'), ANNOUNCEMENT_DOC_URL);
-  assert.match(cta.getAttribute('href') || '', /^https?:\/\//);
+  assert.equal(cta.getAttribute('href'), '/secret-link-doc');
+  assert.equal(cta.getAttribute('target'), null, 'an internal doc opens in the same tab');
 
   await act(async () => {
     root.unmount();

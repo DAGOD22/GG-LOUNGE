@@ -16,7 +16,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Sparkles, Trophy, Gamepad2, Users, Rocket, X } from 'lucide-react';
-import type { PresenceEvent } from '@/lib/presence';
+import { roomLabel, type PresenceEvent } from '@/lib/presence';
 
 const KIND_ICON: Record<string, typeof Gamepad2> = {
   launch: Gamepad2,
@@ -33,12 +33,12 @@ type Toast = PresenceEvent & { dying?: boolean };
 
 export function ActivityFeed({
   events,
-  online,
+  others,
   enabled,
   onDismiss,
 }: {
   events: PresenceEvent[];
-  online: number;
+  others: number;
   enabled: boolean;
   onDismiss: () => void;
 }) {
@@ -51,9 +51,10 @@ export function ActivityFeed({
       setVisible([]);
       return;
     }
-    // The first snapshot is history, not news: showing eight "just launched"
-    // toasts the moment someone opens the site would be noise, so the existing
-    // ids are marked read and only genuinely new ones become toasts.
+    // The first snapshot is the *existing* feed: it is real history, but
+    // replaying it as eight simultaneous "just launched" toasts the moment
+    // someone opens the site is noise. Mark it read so only genuinely new
+    // events become toasts — the history itself is shown in the panel below.
     if (!initialised.current) {
       initialised.current = true;
       for (const event of events) seen.current.add(event.id);
@@ -75,9 +76,14 @@ export function ActivityFeed({
     return () => timers.forEach(clearTimeout);
   }, [visible]);
 
-  // The online count is derived, not stored: it is shown on the pill and
-  // updated by the same poll that moves the ghosts.
-  const pill = useMemo(() => (online > 0 ? `${online} player${online === 1 ? '' : 's'} online` : ''), [online]);
+  // Only *other* players count. Showing `online` here meant every visitor was
+  // told "1 player online" — themselves — which read as fake because it was
+  // permanent and said nothing. A lone visitor now gets no pill at all.
+  const pill = useMemo(() => roomLabel(others), [others]);
+
+  // The newest few real events, for the case where nothing has happened since
+  // this visitor arrived.
+  const history = useMemo(() => events.slice(0, MAX_VISIBLE), [events]);
 
   if (!enabled) return null;
 
@@ -101,6 +107,46 @@ export function ActivityFeed({
           </div>
         );
       })}
+
+      {/*
+        The recent-activity list.
+        Toasts only fire for events that arrive *after* you open the page, so a
+        visitor who landed a minute after everyone else saw a permanently empty
+        corner and concluded the feed was fake. This shows the server's actual
+        last few events, which are real and already filtered server-side.
+      */}
+      {!visible.length && history.length > 0 && (
+        <div className="gg-live-history">
+          <p className="gg-live-history-head">
+            <span className="gg-live-pulse" aria-hidden="true" /> Recent
+            <button type="button" className="gg-live-hide" onClick={onDismiss} aria-label="Hide the live feed">
+              <X size={11} />
+            </button>
+          </p>
+          <ul>
+            {history.map(event => {
+              const Icon = KIND_ICON[event.kind] ?? Sparkles;
+              return (
+                <li key={event.id}>
+                  <span className="gg-live-icon" aria-hidden="true"><Icon size={11} /></span>
+                  <span className="gg-live-text">{event.message}</span>
+                  <time dateTime={new Date(event.at).toISOString()}>{sinceLabel(event.at)}</time>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   );
+}
+
+/** "just now" / "4m" — the feed is short-lived, so coarse is enough. */
+function sinceLabel(at: number): string {
+  const seconds = Math.max(0, Math.round((Date.now() - at) / 1000));
+  if (seconds < 45) return 'just now';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  return `${hours}h`;
 }

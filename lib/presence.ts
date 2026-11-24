@@ -49,14 +49,41 @@ export type PresenceEvent = {
   name: string;
   message: string;
   game: string | null;
+  /** ms epoch. The wire field is `createdAt`; `at` is kept for older callers. */
   at: number;
+  createdAt?: number;
 };
 
 export type PresenceSnapshot = {
+  /**
+   * How many players are in the room *including this one*. Kept because it is
+   * the honest total, but never display it as "N players online" — see
+   * `others`, which is the number a person actually cares about.
+   */
   online: number;
+  /**
+   * How many *other* players are here right now.
+   *
+   * This exists because `online` counting the caller made every single visitor
+   * see "1 player online", which is always true and therefore told nobody
+   * anything. A lone visitor is now told they are alone.
+   */
+  others: number;
   peers: PresencePeer[];
   events: PresenceEvent[];
 };
+
+/**
+ * The line to show for the room.
+ *
+ * Returns null when there is nothing worth saying, so the pill disappears
+ * instead of showing a permanent, meaningless "1".
+ */
+export function roomLabel(others: number): string | null {
+  if (others <= 0) return null;
+  return others === 1 ? '1 other player here' : `${others} other players here`;
+}
+
 
 /**
  * Anonymous display name.
