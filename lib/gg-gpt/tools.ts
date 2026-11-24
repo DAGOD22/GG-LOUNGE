@@ -151,8 +151,35 @@ async function wikipediaSearch(query: string): Promise<SearchHit[]> {
  * so a Wikipedia hit never beats a live DuckDuckGo hit, but a DuckDuckGo
  * challenge page never leaves the user with nothing.
  */
+/**
+ * Search engines are keyword matchers, not readers. Sending Bing the whole
+ * sentence "what is the latest news about Indian Space Research Organisation"
+ * earns you bing.com's own homepage links; sending it "Indian Space Research
+ * Organisation news" earns you ISRO articles. Strip the question scaffolding
+ * before the query leaves the building.
+ */
+export function searchQuery(sentence: string): string {
+  let q = sentence
+    .replace(/^\s*(?:hey|hi|hello|ok|okay|so|and|but|please|pls)[,\s]+/i, "")
+    .replace(/^\s*(?:can|could|would)\s+you\s+(?:please\s+)?/i, "")
+    .replace(/^\s*(?:tell me|let me know|i want to know|i'd like to know|do you know)\s+(?:about\s+)?/i, "")
+    .replace(/\?+\s*$/, "")
+    .trim();
+  // "what is the latest news about X" -> "X news"
+  const newsAbout = /^(?:what(?:'s| is| are)?\s+)?(?:the\s+)?(latest|newest|current|recent|today'?s?)\s+(news|headlines?|updates?)(?:\s+(?:about|on|regarding|for))?\s+(.+)$/i.exec(q);
+  if (newsAbout) return `${newsAbout[3].trim()} ${newsAbout[1].toLowerCase()} ${newsAbout[2].toLowerCase()}`.slice(0, 200);
+  const aboutX = /^(?:what(?:'s| is| are)?\s+)?(?:tell me about|about)\s+(.+)$/i.exec(q);
+  if (aboutX) q = aboutX[1];
+  // Drop leading question words that carry no search signal.
+  q = q.replace(/^(?:what|who|when|where|why|how|which|is|are|was|were|does|did|do|can)\s+/i, "");
+  q = q.replace(/\s+/g, " ").trim();
+  // Keyword engines work best without little words, but keep it readable.
+  q = q.replace(/\b(?:the|a|an|of|in|on|at|to|for|about|please)\b/gi, " ").replace(/\s+/g, " ").trim();
+  return (q || sentence.trim()).slice(0, 200);
+}
+
 export async function webSearch(query: string): Promise<{ hits: SearchHit[]; source: string }> {
-  const clean = query.trim().slice(0, 300);
+  const clean = searchQuery(query);
   if (!clean) return { hits: [], source: "none" };
   const engines: Array<[string, (q: string) => Promise<SearchHit[]>, number]> = [
     // Ranked by whether the engine survives this network, which the
@@ -164,6 +191,7 @@ export async function webSearch(query: string): Promise<{ hits: SearchHit[]; sou
     ["wikipedia", wikipediaSearch, 1],
   ];
   const settled = await Promise.allSettled(engines.map(([, fn]) => fn(clean)));
+  const terms = clean.toLowerCase().split(/\s+/).filter(w => w.length > 2);
   let bestHits: SearchHit[] = [];
   let bestSource = "unreachable";
   let bestScore = -1;
@@ -171,14 +199,40 @@ export async function webSearch(query: string): Promise<{ hits: SearchHit[]; sou
     const r = settled[i];
     if (r.status !== "fulfilled" || !r.value.length) continue;
     const [name, , rank] = engines[i];
-    const score = rank * 10 + Math.min(r.value.length, 8);
+    const hits = relevant(r.value, terms);
+    if (!hits.length) continue;
+    const score = rank * 10 + Math.min(hits.length, 8);
     if (score > bestScore) {
       bestScore = score;
-      bestHits = r.value;
+      bestHits = hits;
       bestSource = name;
     }
   }
   return { hits: bestHits, source: bestSource };
+}
+
+/**
+ * Drop the results that answer nothing.
+ *
+ * A search for "ISRO news" returns Fox News' homepage and CNN's homepage first,
+ * because those pages mention news constantly. Feeding them to the model is
+ * how an assistant ends up saying "I could not find anything about ISRO" when
+ * the index was fine and the filter was missing.
+ */
+function relevant(hits: SearchHit[], terms: string[]): SearchHit[] {
+  if (!terms.length) return hits;
+  const scored = hits.map(h => {
+    const hay = `${h.title} ${h.snippet}`.toLowerCase();
+    const matched = terms.filter(t => hay.includes(t)).length;
+    let pathDepth = 0;
+    try { pathDepth = new URL(h.url).pathname.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean).length; } catch { /* leave 0 */ }
+    // A homepage is a directory, not an answer.
+    const isHomepage = pathDepth === 0;
+    return { h, matched, isHomepage, score: matched * 2 + Math.min(pathDepth, 3) - (isHomepage ? 3 : 0) };
+  });
+  const decent = scored.filter(s => s.matched > 0 && !s.isHomepage);
+  const pool = decent.length ? decent : scored.filter(s => s.matched > 0);
+  return pool.sort((a, b) => b.score - a.score).map(s => s.h).slice(0, 6);
 }
 
 export function renderHits(hits: SearchHit[]): string {
