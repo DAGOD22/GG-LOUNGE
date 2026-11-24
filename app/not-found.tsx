@@ -19,7 +19,7 @@ export default function NotFound() {
   const [term, setTerm] = useState('')
 
   return (
-    <main className="lounge-shell">
+    <main className="lounge-shell" id="main-content">
       <div className="noise" aria-hidden="true" />
       <section
         className="catalog"

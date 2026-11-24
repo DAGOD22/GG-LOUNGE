@@ -45,7 +45,8 @@ export function GameCard({
       <button
         className="favorite-button"
         onClick={() => onToggle(game.id)}
-        aria-label={`${isFavorite ? 'Remove' : 'Add'} ${game.title}`}
+        aria-label={`${isFavorite ? 'Remove' : 'Add'} ${game.title} ${isFavorite ? 'from' : 'to'} favourites`}
+        aria-pressed={isFavorite}
       >
         <Heart size={17} fill={isFavorite ? 'currentColor' : 'none'} />
       </button>
@@ -55,14 +56,24 @@ export function GameCard({
         role="button"
         tabIndex={0}
         aria-label={`Play ${game.title}`}
-        onKeyDown={(e) => e.key === 'Enter' && onLaunch(game)}
+        onKeyDown={(e) => {
+          // A role="button" is expected to fire on Space as well as Enter. Only
+          // Enter did, which made the biggest target on the page half-broken for
+          // anybody navigating by keyboard.
+          if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+            e.preventDefault()
+            onLaunch(game)
+          }
+        }}
         style={{ cursor: 'pointer' }}
       >
         {showIcon ? (
           <img
             className="game-icon game-icon--cover"
             src={imgSrc}
-            alt={`${game.title} icon`}
+            /* Decorative: the surrounding role="button" already says "Play X".
+               Repeating the title here made a screen reader say it twice. */
+            alt=""
             loading={priority ? 'eager' : 'lazy'}
             decoding="async"
             fetchPriority={priority ? 'high' : 'auto' as any}
@@ -134,7 +145,12 @@ export function ShelfCard({
   return (
     <article className={`shelf-card-art ${game.color}`} style={{ contentVisibility: 'auto' as any }}>
       <span aria-label={`Rating ${rating2}`} title={rating2==='M'?'Mature 17+': rating2==='T'?'Teen 13+':'Everyone'} style={{position:'absolute', top:8, left:8, zIndex:3, fontSize:8, fontWeight:900, letterSpacing:'.06em', padding:'2px 5px', borderRadius:999, background: ratingColor2, color: rating2==='M'?'#fff':'#0b0d12', border:'1px solid rgba(0,0,0,.12)', lineHeight:1}}>{rating2}</span>
-      <button className="favorite-button" onClick={() => onToggle(game.id)} aria-label={`${isFavorite ? 'Remove' : 'Add'} ${game.title}`}>
+      <button
+        className="favorite-button"
+        onClick={() => onToggle(game.id)}
+        aria-label={`${isFavorite ? 'Remove' : 'Add'} ${game.title} ${isFavorite ? 'from' : 'to'} favourites`}
+        aria-pressed={isFavorite}
+      >
         <Heart size={15} fill={isFavorite ? 'currentColor' : 'none'} />
       </button>
       <div
@@ -143,13 +159,20 @@ export function ShelfCard({
         role="button"
         tabIndex={0}
         aria-label={`Play ${game.title}`}
-        onKeyDown={(e) => e.key === 'Enter' && onLaunch(game)}
+        onKeyDown={(e) => {
+          // Same Enter-or-Space rule as the grid card: one of the two missing
+          // makes the card feel broken rather than simply incomplete.
+          if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+            e.preventDefault()
+            onLaunch(game)
+          }
+        }}
       >
         {showIcon ? (
           <img
             className="game-icon game-icon--cover"
             src={imgSrc}
-            alt={`${game.title} icon`}
+            alt=""
             loading={priority ? 'eager' : 'lazy'}
             decoding="async"
             fetchPriority={priority ? 'high' : 'auto' as any}
@@ -176,7 +199,9 @@ export function ShelfCard({
         <p className="card-kicker" style={{ fontSize: 9 }}>
           {game.genre} · {game.tone}
         </p>
-        <h4 onClick={() => onLaunch(game)} style={{ cursor: 'pointer' }}>
+        {/* The heading is not the control — the art above and the Play button
+            below are — so it does not pretend to be clickable to a keyboard. */}
+        <h4>
           <Highlight text={game.title} query={query} />
         </h4>
         <p><Highlight text={game.description} query={query} /></p>

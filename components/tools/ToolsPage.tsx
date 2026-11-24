@@ -12,9 +12,10 @@
  * behaviour people expect from a page with a hundred destinations.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
-import { ArrowLeft, Search, Shuffle, X } from 'lucide-react'
+import { ArrowLeft, Check, Link2, Search, Shuffle, X } from 'lucide-react'
 
 import { DEFAULT_TOOL, TOOLS, searchTools, toolsByCategory, type Tool } from '@/lib/tools/registry'
+import { RecentTools, PrivacyChip, rememberTool } from '@/components/SiteKit'
 import { CalculatorTool, QrTool } from './featured'
 import {
   AcronymTool, BinaryTextTool, CaseTool, DiffTool, DuplicateTool, FancyTextTool,
@@ -181,6 +182,8 @@ export function ToolsPage() {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<string>('all')
   const panelRef = useRef<HTMLDivElement>(null)
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const [copied, setCopied] = useState(false)
 
   // The hash is the source of truth for which tool is open, so a shared link
   // and a browser back button both land in the right place.
@@ -193,11 +196,29 @@ export function ToolsPage() {
 
   const open = useCallback((id: string) => {
     setSelected(id)
+    // The strip under the hero is the fastest way back into a tool you used a
+    // minute ago, which on a hundred-tool page is most of the navigation problem.
+    rememberTool(id)
     // replaceState with the hash keeps the history clean: opening twenty tools
     // should not mean pressing back twenty times to leave the page.
     window.history.replaceState(null, '', `#${id}`)
     panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // Move the reading position, not just the viewport: a keyboard user who
+    // picked a tool from the rail should land in the panel, not at the top.
+    headingRef.current?.focus({ preventScroll: true })
   }, [])
+
+  const copyLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/tools#${selected}`)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
+    } catch {
+      // Clipboard blocked: the hash is already in the address bar, so say that
+      // rather than pretending the copy worked.
+      setCopied(false)
+    }
+  }, [selected])
 
   const results = useMemo(() => searchTools(query), [query])
   const visible = useMemo(
@@ -215,6 +236,8 @@ export function ToolsPage() {
       <section className="tools-hero">
         <p className="tools-eyebrow">100 things, all in the browser</p>
         <h1>GG Tools</h1>
+        <PrivacyChip />
+        <RecentTools labels={RECENT_LABELS} />
         <p className="tools-lede">
           A hundred small utilities — QR codes, a calculator, converters, timers, colour work and the odd
           genuinely useful developer panel. Nothing here sends what you type anywhere: every tool runs in this
@@ -275,12 +298,17 @@ export function ToolsPage() {
           <header className="tools-main-head">
             <div>
               <span className="tools-main-category">{current.category}</span>
-              <h2>{current.name}</h2>
+              <h2 ref={headingRef} tabIndex={-1}>{current.name}</h2>
               <p>{current.blurb}</p>
             </div>
-            <button type="button" className="tools-back" onClick={() => open(DEFAULT_TOOL)}>
-              <ArrowLeft size={13} /> Start over
-            </button>
+            <span className="tools-main-actions">
+              <button type="button" className="tools-back" onClick={copyLink} title="Copy a link straight to this tool">
+                {copied ? <Check size={13} /> : <Link2 size={13} />} {copied ? 'Copied' : 'Copy link'}
+              </button>
+              <button type="button" className="tools-back" onClick={() => open(DEFAULT_TOOL)}>
+                <ArrowLeft size={13} /> Start over
+              </button>
+            </span>
           </header>
 
           {Panel ? <Panel /> : (
@@ -314,6 +342,9 @@ export function ToolsPage() {
     </main>
   )
 }
+
+/** id → display name, built once so the recent strip cannot drift from the registry. */
+const RECENT_LABELS: Record<string, string> = Object.fromEntries(TOOLS.map(tool => [tool.id, tool.name]))
 
 /** Which registry entries have no panel yet — surfaced in tests, not the UI. */
 export function missingPanels(): string[] {

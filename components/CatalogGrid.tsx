@@ -1,13 +1,22 @@
 'use client'
+import { useRef } from 'react'
 import { GameCard, ShelfCard } from '@/components/GameCard'
 import { Shuffle, Zap } from 'lucide-react'
 import type { Game } from '@/lib/games'
+import { gridNavigationHandler } from '@/components/SiteTools'
+import { noResultsHint } from '@/lib/site-extras'
 
 export function CatalogGrid({
   view, filter, query, visibleGames, paginatedGames, grouped, staffGames, allGames,
-  favorites, toggleFavorite, launch, loadMoreRef, setVisibleCount,
+  favorites, toggleFavorite, launch, loadMoreRef, setVisibleCount, newIds,
   setQuery, setFilter, setHideLow, setShowStaffOnly, shufflePick
 }: any){
+  // Arrow keys move between cards. Tab still works and is still the only way to
+  // reach everything; this is an addition, not a replacement.
+  const gridRef = useRef<HTMLDivElement>(null)
+  // Built from the live element inside the handler, not from a ref read during
+  // render — which the compiler rightly refuses.
+  const gridKeyDown = (event: React.KeyboardEvent) => gridNavigationHandler(gridRef.current)(event)
   if(view==='shelves' && filter==='All games' && !query.trim()){
     return (
       <div className="shelves">
@@ -40,8 +49,16 @@ export function CatalogGrid({
   }
   return (
     <>
-      <div className="game-grid" style={{contentVisibility:'auto',containIntrinsicSize:'0 600px'}}>
-        {paginatedGames.map((g:Game,i:number)=> <GameCard key={g.id} game={g} index={i} isFavorite={favorites.includes(g.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} priority={i<4} />)}
+      {/* data-grid-item on each card is what the arrow-key navigator walks.
+          The container carries the handler so the logic lives in one place. */}
+      <div ref={gridRef} className="game-grid" role="grid" aria-label="Game catalogue" onKeyDown={gridKeyDown} style={{contentVisibility:'auto',containIntrinsicSize:'0 600px'}}>
+        {paginatedGames.map((g:Game,i:number)=> (
+          <div key={g.id} data-grid-item role="gridcell" style={{ position: 'relative' }}>
+            <GameCard game={g} index={i} isFavorite={favorites.includes(g.id)} onToggle={toggleFavorite} onLaunch={launch} query={query} priority={i<4} />
+            {/* "New" means recently added to the catalogue, not recently played. */}
+            {newIds?.has?.(g.id) ? <span className="new-badge card-new-badge">New</span> : null}
+          </div>
+        ))}
       </div>
       {visibleGames.length===0 && (
         <div className="empty-state" role="status" aria-live="polite">
@@ -52,7 +69,7 @@ export function CatalogGrid({
               // Search that found nothing is the one case where a generic
               // "try again" is useless: the likely cause is a typo, a plural,
               // or a genre word rather than a title, so say that.
-              ? `Nothing in the catalogue matches “${query.trim()}”. Check the spelling, or try a shorter word — “racing”, “idle”, “2 player”.`
+              ? noResultsHint(query.trim(), allGames.map((game: Game) => game.genre))
               : 'Nothing on this shelf is currently available. Clearing the filters shows the whole library.'}
           </p>
           <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center',marginTop:12}}>

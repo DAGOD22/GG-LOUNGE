@@ -125,6 +125,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         />
       </head>
       <body className="antialiased">
+        {/* First tab stop on every page. Without it, a keyboard user has to
+            tab through the whole header — nav, account, theme, install — before
+            reaching the catalogue, on every single navigation. */}
+        <a className="skip-link" href="#main-content">Skip to the games</a>
         <GlobalSW />
         <script
           dangerouslySetInnerHTML={{

@@ -11,6 +11,8 @@ import { SplitScreen } from '@/components/live/SplitScreen'
 import { useRegisterGameBridge } from '@/components/live/GameBridge'
 import { useLivePresence } from '@/components/live/PresenceProvider'
 import { dispatchKey, type InputFrame } from '@/lib/coop'
+import { sessionLabel } from '@/lib/site-kit'
+import { estimatedSessionMinutes } from '@/lib/site-extras'
 
 export function GameModal({
   game,
@@ -599,7 +601,9 @@ export function GameModal({
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
           <span className={`game-badge ${game.color}`}>{game.mark}</span>
           <div style={{ minWidth: 0, overflow: 'hidden' }}>
-            <span className="modal-kicker">NOW PLAYING — {game.genre.toUpperCase()} / {game.tone.toUpperCase()}</span>
+            <span className="modal-kicker">
+              NOW PLAYING — {game.genre.toUpperCase()} / {game.tone.toUpperCase()} · {sessionLabel(estimatedSessionMinutes(game.genre)).toUpperCase()}
+            </span>
             <strong style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {game.title} {isFavorite && <Heart size={14} fill="var(--coral)" color="var(--coral)" />}
             </strong>

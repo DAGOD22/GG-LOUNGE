@@ -227,7 +227,8 @@ test('the favourite button is labelled by what it will do', async () => {
     onLaunch: () => {},
   }));
   const button = card.host.querySelector('.favorite-button');
-  assert.equal(button?.getAttribute('aria-label'), 'Add Cookie Clicker');
+  assert.equal(button?.getAttribute('aria-label'), 'Add Cookie Clicker to favourites');
+  assert.equal(button?.getAttribute('aria-pressed'), 'false', 'the toggle reports its state');
 
   await card.click(button);
   assert.deepEqual(toggled, ['cookie-clicker']);
@@ -240,7 +241,9 @@ test('the favourite button is labelled by what it will do', async () => {
     onToggle: () => {},
     onLaunch: () => {},
   }));
-  assert.equal(fav.host.querySelector('.favorite-button')?.getAttribute('aria-label'), 'Remove Cookie Clicker');
+  const favButton = fav.host.querySelector('.favorite-button');
+  assert.equal(favButton?.getAttribute('aria-label'), 'Remove Cookie Clicker from favourites');
+  assert.equal(favButton?.getAttribute('aria-pressed'), 'true');
   await fav.unmount();
 });
 
@@ -262,8 +265,11 @@ test('a card launches on click and on Enter, not on other keys', async () => {
   assert.equal(launches, 0, 'other keys do nothing');
   await card.press(art, 'Enter');
   assert.equal(launches, 1, 'Enter launches');
+  // Space is the other key a role="button" promises to honour.
+  await card.press(art, ' ');
+  assert.equal(launches, 2, 'Space launches');
   await card.click(art);
-  assert.equal(launches, 2, 'click launches');
+  assert.equal(launches, 3, 'click launches');
   await card.unmount();
 });
 

@@ -22,7 +22,10 @@
 [data-theme="light"] {
   --background: #ffffff;
   --foreground: #111118;
-  --muted: #6b7280;
+  /* #6b7280 measured 4.40:1 on the light panel — just under the 4.5 AA floor
+     for body text, which is where small captions actually live. #656b78 is
+     4.86:1 on the panel and 5.35:1 on white. */
+  --muted: #656b78;
   --line: rgba(17, 17, 24, 0.12);
   --panel: #f4f4f5;
   /* --ink is the colour of text that sits ON lime buttons and badges. It has
@@ -188,6 +191,15 @@ footer {
 }
 .header-nav a:hover {
   color: var(--foreground);
+}
+/* The page you are already on. An underline rather than a colour alone, so the
+   distinction survives a colour-blind reader and forced-colors mode. */
+.header-nav a[aria-current='page'] {
+  color: var(--foreground);
+  text-decoration: underline;
+  text-decoration-color: var(--lime);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
 }
 .header-status {
   color: var(--muted);
@@ -780,6 +792,11 @@ footer {
   .search-wrap {
     width: 100%;
     margin-bottom: 12px;
+  }
+  /* The result count is the first thing that should go when the toolbar
+     stacks — on a phone it is the least useful of the four rows. */
+  .toolbar-count {
+    display: none;
   }
   .filter-tabs {
     justify-content: start;
@@ -2095,10 +2112,8 @@ footer {
   margin: 0;
   font-size: 15px;
   letter-spacing: -0.04em;
-  cursor: pointer;
-}
-.shelf-info h4:hover {
-  color: var(--lime);
+  /* The heading is no longer a click target (the art and the Play button are),
+     so it does not get a pointer or a hover colour that promises one. */
 }
 .shelf-info p {
   margin: 0;
@@ -4528,4 +4543,716 @@ a.extras-chip:hover {
   margin: 10px 0 0;
   color: var(--muted);
   font-size: 11px;
+}
+
+/* ==================================================================
+   Accessibility layer
+   ==================================================================
+
+   These are not decoration. Each rule below fixes a case where a person
+   using a keyboard, a screen reader, or a display with poor contrast could
+   not use the site at all.
+   ================================================================== */
+
+/* A skip link that is invisible until it is focused. Hidden with clip rather
+   than display:none, because a display:none link cannot receive focus. */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 200;
+  padding: 10px 14px;
+  border-radius: 9px;
+  background: var(--lime);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 120ms ease;
+}
+
+.skip-link:focus-visible,
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+/* One focus ring, everywhere, and never removed without a replacement.
+   `outline: none` was set in three places; each of those left a keyboard user
+   with no idea where they were. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Firefox draws its own inner ring; keeping both is noisy. */
+:where(button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
+/* Forced-colours mode (Windows High Contrast) throws away our palette, so the
+   things that carry meaning by colour alone need a border to survive. */
+@media (forced-colors: active) {
+  .filter-tabs button.active,
+  .palette-item.is-active,
+  .tool-badge,
+  .nextup-genre {
+    border: 1px solid CanvasText;
+  }
+
+  .tool-verdict.good,
+  .tool-verdict.bad,
+  .tool-error {
+    border: 2px solid CanvasText;
+  }
+
+  .extras-bar-fill,
+  .tool-bar-fill,
+  .extras-progress span {
+    background: Highlight;
+  }
+}
+
+/* Reduced motion already covers most of the site; this catches the handful of
+   components added since, and makes the rule global rather than per-file. */
+@media (prefers-reduced-motion: reduce) {
+  .skip-link,
+  .extras-progress span,
+  .nextup-card,
+  .palette,
+  .shortcut-sheet {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Screen-reader-only text: available to assistive tech, invisible on screen.
+   Used for the labels that a sighted visitor gets from layout. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Make a target announce its pressed state to assistive tech even when it is a
+   plain button with a visual class. */
+[aria-pressed='true'] {
+  font-weight: 800;
+}
+
+/* Long words in headings (a game called "Supercalifragilistic") must not push
+   the layout wider than the viewport. */
+h1, h2, h3, .game-card h2, .nextup-card h3 {
+  overflow-wrap: anywhere;
+}
+
+/* ---------------- scratchpad ---------------- */
+
+.scratch-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(4, 5, 9, 0.66);
+  backdrop-filter: blur(6px);
+}
+
+.scratch {
+  width: min(640px, 100%);
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.scratch-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.scratch-head h2 {
+  margin: 0 0 2px;
+  font-size: 16px;
+}
+
+.scratch-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.scratch-head button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+
+.scratch-area {
+  flex: 1;
+  min-height: 220px;
+  padding: 14px 16px;
+  border: 0;
+  outline: 0;
+  resize: vertical;
+  background: transparent;
+  color: var(--foreground);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.scratch-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.scratch-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.scratch-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.scratch-clear,
+.scratch-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.scratch-clear {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+}
+
+.scratch-save {
+  border: 1px solid var(--lime);
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.scratch-save:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---------------- misc small surfaces ---------------- */
+
+.reading-time {
+  display: inline-block;
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* The single polite live region. It is visually hidden when empty and a small
+   pill when it has something to say, so it never shifts the layout. */
+.status-line {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: 140;
+  transform: translateX(-50%) translateY(8px);
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 140ms ease, transform 140ms ease;
+  pointer-events: none;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+}
+
+.status-line:not(:empty) {
+  padding: 9px 16px;
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.status-line[data-status='error'] {
+  border-color: var(--coral);
+  color: var(--coral);
+}
+
+.status-line[data-status='saved'] {
+  border-color: var(--lime);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-line,
+  .scratch-overlay {
+    transition: none;
+  }
+}
+
+.new-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--lime);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* Cards get a visible focus ring when navigated with the arrow keys, because
+   the focus has moved to an element that is not naturally focusable. */
+[data-grid-item]:focus-within {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+  border-radius: 14px;
+}
+
+/* ---------------- storage panel ---------------- */
+
+.storage-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 135;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(4, 5, 9, 0.66);
+  backdrop-filter: blur(6px);
+}
+
+.storage-panel {
+  width: min(560px, 100%);
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.storage-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.storage-head h2 {
+  margin: 0 0 3px;
+  font-size: 15px;
+}
+
+.storage-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.storage-head button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.storage-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  overflow-y: auto;
+}
+
+.storage-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'name size' 'key size';
+  gap: 1px 10px;
+  padding: 7px 16px;
+}
+
+.storage-list li + li {
+  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+
+.storage-name {
+  grid-area: name;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.storage-key {
+  grid-area: key;
+  color: var(--muted);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10px;
+}
+
+.storage-size {
+  grid-area: size;
+  align-self: center;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.storage-empty {
+  grid-template-areas: none !important;
+  grid-template-columns: 1fr !important;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 18px 16px !important;
+}
+
+.storage-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.storage-wipe {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border: 1px solid var(--coral);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--coral);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.storage-wipe:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---------------- back to top ---------------- */
+
+.back-to-top {
+  position: fixed;
+  right: 18px;
+  bottom: 76px;
+  z-index: 90;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--foreground);
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.back-to-top:hover {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+/* The ring is a conic gradient clipped to a border, so it shows progress
+   without a second element or a canvas. */
+.back-to-top-ring {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(var(--lime) var(--progress, 0%), transparent 0);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .back-to-top {
+    right: 12px;
+    bottom: 68px;
+    width: 38px;
+    height: 38px;
+  }
+}
+
+.greeting {
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.privacy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.section-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--lime);
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.section-link:hover {
+  text-decoration: underline;
+}
+
+.recent-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 10px 0 0;
+}
+
+.recent-tools-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.recent-tools-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--foreground);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.recent-tools-chip:hover {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+@media (forced-colors: active) {
+  .back-to-top,
+  .storage-panel,
+  .scratch {
+    border: 1px solid CanvasText;
+  }
+  .storage-wipe {
+    forced-color-adjust: none;
+  }
+}
+
+
+/* ---------------- reading comfort ---------------- */
+
+/* Balanced headline wrapping. `balance` on short headings stops a single word
+   from being orphaned onto its own line, which is the most common ugly break on
+   a narrow screen. `pretty` on body copy avoids a one-word last line. */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p,
+li {
+  text-wrap: pretty;
+}
+
+/* Anchored sections need room under the sticky header, or a jump link parks the
+   heading underneath it. */
+:target,
+section[id],
+h1[id],
+h2[id],
+h3[id] {
+  scroll-margin-top: 84px;
+}
+
+/* Anything that can be focused should show where the focus is, even in a
+   browser that does not support :focus-visible — the fallback is deliberate. */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
+/* Mobile notch and home-indicator padding. Without this the footer's last line
+   sits under the gesture bar on an iPhone. */
+.lounge-shell {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ---------------- print ---------------- */
+
+/* Nobody prints a games site, but if they do — a list of favourites, a
+   permission slip — the chrome should not waste the page. */
+@media print {
+  .site-header,
+  .admin-fab,
+  .back-to-top,
+  .status-line,
+  .scratch-overlay,
+  .storage-overlay,
+  .palette-overlay,
+  .shortcut-overlay,
+  .gg-welcome,
+  .noise,
+  .orbit,
+  footer .footer-bottom a[href='/api/health'] {
+    display: none !important;
+  }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .game-card {
+    break-inside: avoid;
+  }
+
+  a[href^='http']::after {
+    content: ' (' attr(href) ')';
+    font-size: 9px;
+    color: #555;
+  }
+}
+
+/* The "New" badge sits on the artwork, top-right, opposite the rating. */
+.card-new-badge {
+  position: absolute;
+  top: 10px;
+  right: 44px;
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* The greeting is a quiet second line under the section heading, not a rival
+   headline: lowercase weight at heading size reads as a note, not a slogan. */
+.section-heading h2 .greeting {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* The secondary breakdown in the collection note: same row, quieter weight. */
+.collection-note .collection-breakdown {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-left: 1px solid var(--line);
+  padding-left: 10px;
+  margin-left: 2px;
+}
+
+/* ---------------- toolbar result count ---------------- */
+
+.toolbar-count {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- toolbar keyboard hint ---------------- */
+
+.grid-key-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .grid-key-hint {
+    display: none;
+  }
 }

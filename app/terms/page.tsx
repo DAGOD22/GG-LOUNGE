@@ -3,13 +3,14 @@ import type { Metadata } from 'next'
 import { Gamepad2, Scale, AlertTriangle, Shield, FileText, Gavel, Mail } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Terms of Service — GG-Lounge',
+  // Suffix comes from the layout template — see app/privacy/page.tsx.
+  title: 'Terms of Service',
   description: 'Terms for GG-Lounge — acceptable use, proxy, and liability.',
 }
 
 export default function TermsPage() {
   return (
-    <main className="lounge-shell">
+    <main className="lounge-shell" id="main-content">
       <div className="noise" aria-hidden="true" />
       <header className="site-header">
         <Link href="/" className="brand"><span className="brand-mark"><Gamepad2 size={19} /></span><span>GG-LOUNGE<span className="tm">™</span></span></Link>

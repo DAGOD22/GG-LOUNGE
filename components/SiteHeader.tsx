@@ -12,6 +12,8 @@
  * The prop list is deliberately explicit rather than a spread of the page's
  * state: the header should not be able to read things it has no business showing.
  */
+import { usePathname } from 'next/navigation'
+import { formatCount } from '@/lib/site-kit'
 import { Cloud, Download, Gamepad2, LogIn, LogOut, Menu, Moon, Sun, Trophy, User, Wifi, WifiOff, X } from 'lucide-react'
 
 export type HeaderUser = { id: string; username: string } | null
@@ -48,6 +50,11 @@ export function SiteHeader({
   onInstall: () => void
 }) {
   const closeNav = () => setMobileNavOpen(() => false)
+  // `aria-current` is what tells a screen reader (and a stylesheet) which link is
+  // the page you are already on. Hash links on the lounge compare equal to "/",
+  // so they are marked only when the path matches exactly.
+  const pathname = usePathname()
+  const current = (href: string) => (href === pathname ? ('page' as const) : undefined)
   return (
     <header className="site-header">
       <a href="#top" className="brand" aria-label="GG-Lounge home">
@@ -56,23 +63,34 @@ export function SiteHeader({
         </span>
         <span className="brand-name">GG-LOUNGE<span className="tm">™</span></span>
       </a>
-      <button className="mobile-toggle" aria-label="Open menu" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(v => !v)}>{mobileNavOpen ? <X size={16} /> : <Menu size={16} />}</button>
-      <nav className={`header-nav ${mobileNavOpen ? 'mobile-open' : ''}`} aria-label="Primary navigation">
+      <button
+        className="mobile-toggle"
+        aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+        aria-expanded={mobileNavOpen}
+        aria-controls="primary-nav"
+        onClick={() => setMobileNavOpen(v => !v)}
+      >
+        {mobileNavOpen ? <X size={16} /> : <Menu size={16} />}
+      </button>
+      <nav id="primary-nav" className={`header-nav ${mobileNavOpen ? 'mobile-open' : ''}`} aria-label="Primary navigation">
         <a href="#games" onClick={closeNav}>Library</a>
-        <a href="/apps" onClick={closeNav}>Apps</a>
-        <a href="/gg-gpt" onClick={closeNav}>GG-GPT</a>
-        <a href="/proxy" onClick={closeNav}>Proxy</a>
-        <a href="/tools" onClick={closeNav}>Tools</a>
+        <a href="/apps" onClick={closeNav} aria-current={current('/apps')}>Apps</a>
+        <a href="/gg-gpt" onClick={closeNav} aria-current={current('/gg-gpt')}>GG-GPT</a>
+        <a href="/proxy" onClick={closeNav} aria-current={current('/proxy')}>Proxy</a>
+        <a href="/tools" onClick={closeNav} aria-current={current('/tools')}>Tools</a>
         <button onClick={() => { onOpenAchievements(); setMobileNavOpen(() => false) }} style={{ background: 'none', border: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800 }}><Trophy size={12} /> Achievements</button>
         <a href="#about" onClick={closeNav}>Studio</a>
-        <a href="/request-game" onClick={closeNav}>Request a game</a>
-        <a href="/admin" onClick={closeNav}>Admin</a>
+        <a href="/request-game" onClick={closeNav} aria-current={current('/request-game')}>Request a game</a>
+        <a href="/admin" onClick={closeNav} aria-current={current('/admin')}>Admin</a>
       </nav>
       <div className="header-actions">
         <button className={authUser ? 'icon-button header-achievements is-active' : 'icon-button header-achievements'} onClick={onOpenAchievements} aria-label="Achievements" title={authUser ? `${achUnlocked || 0}/${achTotal || '--'} unlocked` : 'View achievements — sign in to save'}><Trophy size={16} />{authUser && achUnlocked ? <span className="header-badge">{achUnlocked}</span> : null}</button>
         <div className="header-status">
           {online ? <Wifi size={12} /> : <WifiOff size={12} color="var(--coral)" />}
-          <span className="live-dot" style={{ background: online ? 'var(--lime)' : 'var(--coral)' }} /> {gameCount} titles
+          <span className="live-dot" style={{ background: online ? 'var(--lime)' : 'var(--coral)' }} />{' '}
+          <span title={online ? `${gameCount} games available right now` : 'Offline — installed games still work'}>
+            {formatCount(gameCount)} titles
+          </span>
         </div>
         {authUser ? (
           <span className="header-user">

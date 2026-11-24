@@ -63,7 +63,7 @@ export default function AppsPage() {
   useEffect(() => { try { const saved = JSON.parse(localStorage.getItem('ggl_app_fav') || '[]'); if (Array.isArray(saved)) setFavorites(saved.filter(value => typeof value === 'string')); } catch {} }, []);
   function toggle(id: string) { setFavorites(current => { const next = current.includes(id) ? current.filter(value => value !== id) : [...current, id]; try { localStorage.setItem('ggl_app_fav', JSON.stringify(next)); } catch {} return next; }); }
   const filtered = apps.filter(app => (category === 'All' || app.genre === category) && `${app.title} ${app.description}`.toLowerCase().includes(query.toLowerCase()));
-  return <main>
+  return <main id="main-content">
     <header className="site-header"><Link className="brand" href="/"><span className="brand-mark"><Gamepad2 size={17}/></span><span>GG-LOUNGE<span className="tm">™</span></span></Link><nav className="header-nav"><Link href="/">Library</Link><Link href="/apps" aria-current="page">Apps</Link><Link href="/proxy">Proxy</Link><Link href="/request-game">Request</Link></nav></header>
     <section className="hero" style={{ minHeight: 300, paddingBottom: 38 }}><div className="hero-copy"><p className="eyebrow">POWERED BY ULTRAVIOLET</p><h1>One place.<br/><em>Your apps.</em></h1><p className="hero-text">A shared, self-hosted browser engine—not a collection of broken embedded launch pages.</p><a className="hero-link" href="/proxy"><Globe size={16}/> Open browser <ArrowUpRight size={16}/></a></div></section>
     <section style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px 60px' }}>

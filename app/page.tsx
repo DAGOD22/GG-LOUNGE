@@ -27,6 +27,10 @@ import { HeroSection } from '@/components/HeroSection'
 import { CommandPalette, ShortcutSheet, buildShortcuts, useShortcuts, type Command } from '@/components/CommandPalette'
 import { SiteExtras } from '@/components/SiteExtras'
 import { NextUpRail } from '@/components/NextUpRail'
+import { Scratchpad, StatusLine, relativeTime, useCopyLink, type SiteStatus } from '@/components/SiteTools'
+import { BackToTop, Greeting, StoragePanel } from '@/components/SiteKit'
+import { catalogSummary, newestIds } from '@/lib/site-kit'
+import { parseSearch } from '@/lib/site-extras'
 
 /**
  * Navigation and randomness are side effects, so they live at module scope
@@ -85,10 +89,14 @@ export default function Page() {
   const [showAchievementsHub, setShowAchievementsHub] = useState(false)
   const [showPalette, setShowPalette] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showScratch, setShowScratch] = useState(false)
+  const [showStorage, setShowStorage] = useState(false)
+  const [status, setStatus] = useState<{ state: SiteStatus; message: string }>({ state: 'idle', message: '' })
   const [achSummary, setAchSummary] = useState<{total:number, unlocked:number, points:number} | null>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [dbMode, setDbMode] = useState<'postgres'|'local'|null>(null)
   const [streak, setStreak] = useState(1)
+  const [lastVisit, setLastVisit] = useState<string | null>(null)
   // Open on first paint: the leaderboard, game of the day and Your Lounge are
   // the reason to visit, and a collapsed panel nobody opens is a feature nobody
   // has. The chevron closes it, and the choice is remembered.
@@ -176,6 +184,7 @@ export default function Page() {
         localStorage.setItem('ggl_last_visit', today)
       }
       setStreak(s||1)
+      if (last) setLastVisit(last)
     }catch{}
   },[])
   useEffect(()=>{ try{localStorage.setItem('ggl_fav', JSON.stringify(favorites))}catch{} },[favorites])
@@ -362,13 +371,18 @@ export default function Page() {
   // Fix 1: precomputed search index to avoid re-concatting strings on every keystroke
   const searchIndex = useMemo(() => new Map(allGames.map((g) => [g.id, `${g.title} ${g.genre} ${g.tone} ${g.description}`.toLowerCase()] as const)), [allGames])
   const fuse = useMemo(() => new Fuse(allGames, { keys: [{ name: 'title', weight: 0.5 }, { name: 'genre', weight: 0.2 }, { name: 'tone', weight: 0.15 }, { name: 'description', weight: 0.15 }], threshold: 0.3, distance: 100, ignoreLocation: true, minMatchCharLength: 2, includeScore: true }), [allGames])
+  // `genre:racing` and `tag:2 player` are real operators, parsed out before the
+  // text search runs. They are advertised in the palette and in the empty state
+  // rather than being a secret handshake.
+  const parsedQuery = useMemo(() => parseSearch(query), [query])
+  const genreOperator = parsedQuery.genre
   const visibleGames = useMemo(
     () => {
-      const q = query.trim().toLowerCase()
+      const q = parsedQuery.text.trim().toLowerCase()
       let base: Game[] = []
       if(q){
         // PROD honest: always use Fuse ranking (typo tolerant), not just fallback — users feel search is smart
-        const results = fuse.search(query.trim(), { limit: 80 })
+        const results = fuse.search(parsedQuery.text.trim(), { limit: 80 })
         const ranked = results.map(r=> r.item)
         // also include exact substring matches that Fuse might miss (boost them to top)
         const exact = allGames.filter(g=> (searchIndex.get(g.id)||'').includes(q))
@@ -396,6 +410,11 @@ export default function Page() {
         }
         base = kept
       }
+      if (genreOperator) {
+        // A genre operator narrows whatever the text search returned, rather
+        // than replacing it: "slope genre:arcade" means "slope, if it is arcade".
+        base = base.filter(g => g.genre.toLowerCase().includes(genreOperator))
+      }
       if (showStaffOnly) base = base.filter(g=> STAFF_PICKS.includes(g.id))
       // sorting
       if (sortBy==='popular') base = [...base].sort((a,b)=> (playCounts[b.id]||0) - (playCounts[a.id]||0))
@@ -407,10 +426,13 @@ export default function Page() {
       )
       return base
     },
-    [allGames, favorites, filter, query, playCounts, sortBy, hideLow, showStaffOnly, searchIndex, fuse],
+    [allGames, favorites, filter, query, playCounts, sortBy, hideLow, showStaffOnly, searchIndex, fuse, parsedQuery, genreOperator],
   )
   const loadMoreRef = useRef<HTMLDivElement>(null)
   const paginatedGames = useMemo(()=> visibleGames.slice(0, visibleCount), [visibleGames, visibleCount])
+  // The tail of the curated list is where new titles are appended, so that is
+  // what the "New" badge keys off. Memoised on the catalogue, not on the filter.
+  const newIds = useMemo(()=> newestIds(allGames.map(g => g.id), 8), [allGames])
   useEffect(()=>{
     if (!loadMoreRef.current) return
     const el = loadMoreRef.current
@@ -422,6 +444,9 @@ export default function Page() {
   }, [paginatedGames.length, visibleGames.length])
 
   // Fix 6: shelves grouping only when actually showing shelves (avoid wasted 192 scan in grid/search)
+  // Distinct genre count for the heading summary. Derived from what is on
+  // screen, so it matches the shelf list rather than the whole catalogue.
+  const genreCount = useMemo(()=> new Set(visibleGames.map(g => g.genre)).size, [visibleGames])
   const grouped = useMemo(()=>{
     if (view !== 'shelves' || filter !== 'All games' || query.trim()) return [] as [string, Game[]][]
     const map: Record<string, Game[]> = {}
@@ -534,6 +559,17 @@ export default function Page() {
     document.getElementById('games')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
   function openTools(){ navigateTo('/tools') }
+  // The most recent game is the head of `recentlyPlayed`. `Date.now()` here
+  // would be an impure call in the render body, so the hint is worked out inside
+  // the command's own `run`-adjacent closure instead of at render time.
+  const recentGameTitle = recentlyPlayed[0]
+    ? allGames.find(g => g.id === recentlyPlayed[0])?.title ?? recentlyPlayed[0]
+    : null
+  // State, not Date.now(): the previous visit is already a stored string, so
+  // rendering it stays pure. The stored value is a calendar day, not a
+  // timestamp, so it is shown as a date rather than run through relativeTime.
+  const lastVisitHint = lastVisit ? `last seen ${lastVisit}` : 'first visit on this device'
+
   const paletteCommands: Command[] = [
     { id: 'go-library', label: 'Go to the library', hint: 'All 250 games', group: 'Go', run: () => { closeEverything(); scrollTo({ top: 0, behavior: 'smooth' }) } },
     { id: 'go-games', label: 'Jump to the game list', hint: 'Skip the hero', group: 'Go', run: () => { closeEverything(); goToGames() } },
@@ -547,6 +583,7 @@ export default function Page() {
     { id: 'play-random', label: 'Play something random', hint: 'From what is on screen', group: 'Play', run: () => { closeEverything(); shufflePick() } },
     { id: 'play-game-of-day', label: 'Play the game of the day', group: 'Play', run: () => { closeEverything(); if(gameOfDay) launch(gameOfDay) } },
     { id: 'play-first', label: 'Play the first result', hint: visibleGames[0]?.title, group: 'Play', run: () => { closeEverything(); if(visibleGames[0]) launch(visibleGames[0]) } },
+    { id: 'play-recent', label: 'Play the last game you opened', hint: recentGameTitle ?? 'nothing opened yet', group: 'Play', run: () => { closeEverything(); const last = allGames.find(g => g.id === recentlyPlayed[0]); if (last) launch(last) } },
     { id: 'view-theme', label: 'Switch light and dark', group: 'View', run: () => { toggleTheme() } },
     { id: 'view-dashboard', label: showDashboard ? 'Collapse the dashboard' : 'Open the dashboard', group: 'View', run: () => { setShowDashboard(v => !v) } },
     { id: 'view-achievements', label: 'Show achievements', hint: 'Your progress', group: 'View', run: () => { closeEverything(); setShowAchievementsHub(true) } },
@@ -554,7 +591,23 @@ export default function Page() {
     { id: 'acct-signin', label: authUser ? `Signed in as ${authUser.username}` : 'Sign in', group: 'Account', run: () => { if(!authUser) { closeEverything(); setShowAuth('login') } } },
     { id: 'acct-favourites', label: `Favourites (${favorites.length})`, hint: 'Filter the catalogue', group: 'Account', run: () => { closeEverything(); setFilter('Favorites'); goToGames() } },
     { id: 'search-games', label: 'Search the catalogue', hint: 'Focus the search box', group: 'Go', run: () => { focusSearch() } },
+    { id: 'about-visit', label: 'When was I last here?', hint: lastVisitHint, group: 'Help', run: () => {
+      closeEverything()
+      // The stored value is a local calendar day. Parsing it happens inside the
+      // handler, not during render, so the clock is read at the right moment.
+      const when = lastVisit ? new Date(`${lastVisit}T12:00:00`).getTime() : Number.NaN
+      setStatus({
+        state: 'info',
+        message: Number.isFinite(when) ? `You were last here ${relativeTime(when)}.` : 'This is your first visit on this device.',
+      })
+    } },
+    { id: 'show-storage', label: 'See what this browser remembers', hint: 'Favourites, history, theme — and clear it', group: 'Help', run: () => { closeEverything(); setShowStorage(true) } },
+    { id: 'open-scratch', label: 'Open the scratchpad', hint: 'Notes that survive a reload', group: 'Tools', run: () => { closeEverything(); setShowScratch(true) } },
+    { id: 'copy-site-link', label: 'Copy a link to this page', hint: 'For sending to someone', group: 'Tools', run: () => { copySiteLink('the lounge', '/') } },
+    { id: 'random-game', label: 'Play a random game', hint: 'From the whole catalogue', group: 'Play', run: () => { closeEverything(); const pick = pickRandom(allGames); if (pick) launch(pick) } },
   ]
+  const copySiteLink = useCopyLink((state, message) => setStatus({ state, message }))
+
   const shortcuts = buildShortcuts({
     focusSearch,
     openPalette: () => setShowPalette(true),
@@ -575,7 +628,13 @@ export default function Page() {
     goGames: () => { closeEverything(); goToGames() },
     closeAll: closeEverything,
   })
-  useShortcuts(shortcuts)
+  // The shared table covers the page-wide actions; the scratchpad is local to
+  // this page, so it is appended rather than pushed into the shared builder.
+  useShortcuts([
+    ...shortcuts,
+    { combo: 'shift+alt+n', label: 'Open the scratchpad', group: 'Tools', run: () => setShowScratch(true) },
+    { combo: 'shift+alt+y', label: 'Copy a link to this page', group: 'Tools', run: () => { copySiteLink('the lounge', '/') } },
+  ])
   const [installHint, setInstallHint] = useState<string|null>(null)
   async function doInstall(){
     const dp:any = installPrompt || (window as any).__gglDeferredPrompt
@@ -643,7 +702,7 @@ export default function Page() {
 
 
   return (
-    <main className="lounge-shell">
+    <main className="lounge-shell" id="main-content">
       <ErrorBoundary>
       <a href="#games" className="sr-only focus:not-sr-only" style={{position:'absolute',left:12,top:12,zIndex:50,padding:'8px 12px',background:'var(--lime)',color:'#0b0d12',borderRadius:999,fontWeight:900}}>Skip to games</a>
       <script type="application/ld+json" dangerouslySetInnerHTML={{__html: JSON.stringify(jsonLd)}} />
@@ -710,11 +769,12 @@ export default function Page() {
         <Reveal className="section-heading">
           <div>
             <p className="eyebrow">THE ARCADE FLOOR</p>
-            <h2>Pick your poison<span>.</span></h2>
+            <h2>Pick your poison<span>.</span><Greeting name={authUser?.username} /></h2>
           </div>
           <div className="collection-note">
             <Trophy size={16} />
             <span><strong>{visibleGames.length.toString().padStart(2, '0')}</strong> available now</span>
+            <span className="collection-breakdown">{catalogSummary(visibleGames.length, genreCount, staffGames.length)}</span>
           </div>
         </Reveal>
         <HomeDashboard
@@ -726,7 +786,7 @@ export default function Page() {
           launch={launch} openProxyTile={openProxyTile}
           setShowAchievementsHub={setShowAchievementsHub} setRecentlyPlayed={setRecentlyPlayed}
         />
-                <LibraryToolbar query={query} setQuery={setQuery} allGames={allGames} sortBy={sortBy} setSortBy={setSortBy} view={view} setView={setView} hideLow={hideLow} setHideLow={setHideLow} showStaffOnly={showStaffOnly} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} />
+                <LibraryToolbar query={query} setQuery={setQuery} allGames={allGames} sortBy={sortBy} setSortBy={setSortBy} view={view} setView={setView} hideLow={hideLow} setHideLow={setHideLow} showStaffOnly={showStaffOnly} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} resultCount={visibleGames.length} />
         {favorites.length>0 && filter!=='Favorites' && (
           <div style={{marginBottom:12, padding:'10px 14px', borderRadius:12, background:'linear-gradient(135deg, rgba(215,243,74,.14), rgba(125,107,255,.08))', border:'1px solid rgba(215,243,74,.28)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
             <span style={{fontSize:13, fontWeight:800, display:'flex', alignItems:'center', gap:8}}><Heart size={14} fill="var(--coral)" color="var(--coral)"/> You have {favorites.length} favorite{favorites.length>1?'s':''}</span>
@@ -747,7 +807,7 @@ export default function Page() {
           <ul style={{ maxHeight: 220, overflowY: 'auto', fontSize: 12 }}>{unavailableGames.map(game => <li key={game.id}><strong>{game.title}</strong> — {getGameAssetIssues(game.id).join('; ')}</li>)}</ul>
           <a href="/request-game" style={{ fontSize: 12, color: 'var(--lime)' }}>View game requests</a>
         </details>}
-        <CatalogGrid view={view} filter={filter} query={query} visibleGames={visibleGames} paginatedGames={paginatedGames} grouped={grouped} staffGames={staffGames} allGames={allGames} favorites={favorites} toggleFavorite={toggleFavorite} launch={launch} loadMoreRef={loadMoreRef} visibleCount={visibleCount} setVisibleCount={setVisibleCount} setQuery={setQuery} setFilter={setFilter} setHideLow={setHideLow} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} />
+        <CatalogGrid view={view} filter={filter} query={query} visibleGames={visibleGames} paginatedGames={paginatedGames} grouped={grouped} staffGames={staffGames} allGames={allGames} newIds={newIds} favorites={favorites} toggleFavorite={toggleFavorite} launch={launch} loadMoreRef={loadMoreRef} visibleCount={visibleCount} setVisibleCount={setVisibleCount} setQuery={setQuery} setFilter={setFilter} setHideLow={setHideLow} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} />
       <NextUpRail
         games={allGames}
         playCounts={playCounts}
@@ -781,6 +841,10 @@ export default function Page() {
       <WelcomeTour />
       <CommandPalette commands={paletteCommands} open={showPalette} onClose={() => setShowPalette(false)} />
       <ShortcutSheet shortcuts={shortcuts} open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+      <Scratchpad open={showScratch} onClose={() => setShowScratch(false)} />
+      <StatusLine status={status.state} message={status.message} />
+      <StoragePanel open={showStorage} onClose={() => setShowStorage(false)} />
+      <BackToTop />
       {showAchievementsHub && <AchievementsHub open={showAchievementsHub} onClose={()=> setShowAchievementsHub(false)} authUser={authUser} onPlayGame={(id)=> { const g=allGames.find(x=> x.id===id); if(g){ setShowAchievementsHub(false); launch(g) } }} />}
       {activeGame && (
         <ErrorBoundary resetKey={activeGame.id}>

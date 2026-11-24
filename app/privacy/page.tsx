@@ -3,13 +3,14 @@ import type { Metadata } from 'next'
 import { Gamepad2, ShieldCheck, Eye, Trash2, Cookie, Lock, Mail } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — GG-Lounge',
+  // The root layout appends " | GG-Lounge"; repeating it here printed it twice.
+  title: 'Privacy Policy',
   description: 'Privacy policy for GG-Lounge — what we store, why, and how to delete it.',
 }
 
 export default function PrivacyPage() {
   return (
-    <main className="lounge-shell">
+    <main className="lounge-shell" id="main-content">
       <div className="noise" aria-hidden="true" />
       <header className="site-header">
         <Link href="/" className="brand"><span className="brand-mark"><Gamepad2 size={19} /></span><span>GG-LOUNGE<span className="tm">™</span></span></Link>

@@ -21,7 +21,7 @@ export const dynamic = 'force-dynamic';
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const game = games.find(entry => entry.id === id);
-  return { title: game ? `${game.title} · GG-LOUNGE` : 'GG-LOUNGE', robots: { index: false } };
+  return { title: game ? game.title : 'Play', robots: { index: false } };
 }
 
 export default async function PlayPage({ params }: { params: Promise<{ id: string }> }) {

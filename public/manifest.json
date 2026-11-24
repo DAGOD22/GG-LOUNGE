@@ -1,10 +1,12 @@
 {
-  "name": "GG-Lounge — Small games. Big energy.",
+  "name": "GG-Lounge \u2014 Small games. Big energy.",
   "short_name": "GG Lounge",
   "description": "A handpicked, no-filler collection of browser games for the minutes between everything. Unblocked.",
   "start_url": "/?source=pwa",
   "id": "/",
-  "launch_handler": { "client_mode": "focus-existing" },
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
   "display": "standalone",
   "background_color": "#0b0d12",
   "theme_color": "#d7f34a",
@@ -54,6 +56,21 @@
       "name": "Customize",
       "url": "/?customize=1",
       "description": "Themes, cursors and the panic key"
+    },
+    {
+      "name": "GG Tools",
+      "url": "/tools",
+      "description": "100 browser utilities"
+    },
+    {
+      "name": "Request a game",
+      "url": "/request-game",
+      "description": "Ask for something to be added"
+    },
+    {
+      "name": "GG-GPT",
+      "url": "/gg-gpt",
+      "description": "Ask the lounge's own assistant"
     }
   ]
 }

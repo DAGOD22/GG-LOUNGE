@@ -1346,3 +1346,24 @@
   background: color-mix(in srgb, var(--coral) 30%, transparent);
   color: var(--coral);
 }
+
+/* Two actions sit side by side in the panel header; they wrap on a phone
+   rather than squeezing the heading. */
+.tools-main-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* The panel heading takes focus when a tool is chosen from the rail. It is
+   focusable but not a tab stop, so it must not grow a ring of its own. */
+.tools-main-head h2:focus {
+  outline: none;
+}
+
+.tools-main-head h2:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
+  border-radius: 6px;
+}

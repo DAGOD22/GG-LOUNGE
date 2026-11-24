@@ -18,6 +18,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, Command, Search, X } from 'lucide-react'
+import { pushRecent } from '@/lib/site-kit'
 
 export type Shortcut = {
   /** Human-readable combination, as `event.key` values joined by `+`. */
@@ -244,6 +245,43 @@ export function prettyCombo(combo: string): string {
 
 /* ---------------- the palette ---------------- */
 
+/** Overlay dialogs that should be closed before a command runs. */
+const PALETTE_RECENT_KEY = 'ggl_palette_recent'
+
+export function readRecentCommands(): string[] {
+  try {
+    const raw = window.localStorage.getItem(PALETTE_RECENT_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.filter(value => typeof value === 'string').slice(0, 5) : []
+  } catch {
+    return []
+  }
+}
+
+export function rememberCommand(id: string): void {
+  try {
+    window.localStorage.setItem(PALETTE_RECENT_KEY, JSON.stringify(pushRecent(readRecentCommands(), id, 5)))
+  } catch { /* ignore */ }
+}
+
+/**
+ * Put recently run commands at the top of an empty query.
+ *
+ * This is the same reason a shell has history: the fourth time somebody opens
+ * the palette in a session it is almost always to do the thing they did first.
+ * Only applied when the query is empty, because a search result order that the
+ * query did not ask for is a lie.
+ */
+export function orderByRecent<T extends { id: string }>(items: T[], recent: string[]): T[] {
+  if (recent.length === 0) return items
+  const rank = new Map(recent.map((id, index) => [id, index]))
+  return [...items].sort((a, b) => {
+    const aRank = rank.has(a.id) ? rank.get(a.id)! : Number.POSITIVE_INFINITY
+    const bRank = rank.has(b.id) ? rank.get(b.id)! : Number.POSITIVE_INFINITY
+    return aRank - bRank
+  })
+}
+
 export function CommandPalette({
   commands,
   open,
@@ -258,7 +296,13 @@ export function CommandPalette({
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const results = useMemo(() => searchCommands(commands, query), [commands, query])
+  const [recent, setRecent] = useState<string[]>([])
+  useEffect(() => { setRecent(readRecentCommands()) }, [open])
+
+  const results = useMemo(() => {
+    const found = searchCommands(commands, query)
+    return query.trim() ? found : orderByRecent(found, recent)
+  }, [commands, query, recent])
 
   // Reset the highlight whenever the result set changes, or Enter runs whatever
   // happens to be at index 3 of a list the user cannot see.
@@ -290,7 +334,7 @@ export function CommandPalette({
     } else if (event.key === 'Enter') {
       event.preventDefault()
       const chosen = results[active]
-      if (chosen) { chosen.run(); close() }
+      if (chosen) { rememberCommand(chosen.id); setRecent(readRecentCommands()); chosen.run(); close() }
     } else if (event.key === 'Escape') {
       event.preventDefault()
       close()
@@ -339,7 +383,7 @@ export function CommandPalette({
                   aria-selected={index === active}
                   className={`palette-item ${index === active ? 'is-active' : ''}`}
                   onMouseEnter={() => setActive(index)}
-                  onClick={() => { command.run(); close() }}
+                  onClick={() => { rememberCommand(command.id); setRecent(readRecentCommands()); command.run(); close() }}
                 >
                   <span>{command.label}</span>
                   {command.hint ? <span className="palette-hint">{command.hint}</span> : null}
