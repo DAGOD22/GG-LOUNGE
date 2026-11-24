@@ -50,7 +50,7 @@ export default function SecretLinkDocPage() {
   const misc = groups.find(group => group.key === 'Misc');
 
   return (
-    <main className="lounge-shell">
+    <main className="lounge-shell" id="main-content">
       <div className="noise" aria-hidden="true" />
 
       <header className="site-header">

@@ -375,7 +375,7 @@ export default function GgGptPage() {
   }
 
   return (
-    <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: 'var(--background)' }}>
+    <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: 'var(--background)' }} id="main-content">
       <header style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,.08)', flexWrap: 'wrap' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 900, letterSpacing: '.02em' }}>
           <ArrowLeft size={16} /> GG-LOUNGE

@@ -232,7 +232,9 @@ export function ToolsPage() {
   const surprise = () => open(TOOLS[Math.floor(Math.random() * TOOLS.length)].id)
 
   return (
-    <main className="tools-page">
+    // A <div>, not a <main>: app/tools/page.tsx already renders the page's main
+    // landmark, and two nested <main> elements is invalid HTML.
+    <div className="tools-page">
       <section className="tools-hero">
         <p className="tools-eyebrow">100 things, all in the browser</p>
         <h1>GG Tools</h1>
@@ -339,7 +341,7 @@ export function ToolsPage() {
           </div>
         ))}
       </section>
-    </main>
+    </div>
   )
 }
 

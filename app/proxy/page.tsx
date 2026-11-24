@@ -87,7 +87,7 @@ export default function ProxyPage() {
     } catch { /* destination isolation prevents inspection; do not call it a failure */ }
     if (runtime.current) setStatus(runtime.current.notice);
   }
-  return <main className="proxy-shell" style={{ minHeight: '100dvh' }}>
+  return <main className="proxy-shell" style={{ minHeight: '100dvh' }} id="main-content">
     <header className="proxy-bar" style={{ flexWrap: 'wrap', height: 'auto', minHeight: 58, padding: '10px 16px' }}>
       <Link className="proxy-brand" href="/"><Globe size={17} /> GG-LOUNGE <span>/ PROXY</span></Link>
       <div className="proxy-nav">

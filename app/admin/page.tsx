@@ -184,7 +184,7 @@ export default function AdminPage() {
 
   if (checking) {
     return (
-      <main className="admin-shell">
+      <main className="admin-shell" id="main-content">
         <section className="admin-login-card" style={{background:'linear-gradient(145deg, rgba(125,107,255,.12), rgba(215,243,74,.08))'}}>
           <div className="admin-spinner" aria-hidden />
           <p className="muted" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8}}><Activity size={16} className="spin"/> Contacting control room…</p>
@@ -242,7 +242,7 @@ export default function AdminPage() {
   const filteredBans = data.bans.filter(b=> !search || b.identifier.includes(search) || (b.reason||'').toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <main className="admin-shell" style={{maxWidth:1280}}>
+    <main className="admin-shell" style={{maxWidth:1280}} id="main-content">
       <header className="console-header" style={{background:'linear-gradient(135deg, rgba(215,243,74,.14) 0%, rgba(125,107,255,.12) 45%, rgba(255,255,255,.04) 100%)', border:'1px solid rgba(255,255,255,.10)', boxShadow:'0 16px 40px rgba(0,0,0,.25)', backdropFilter:'blur(12px)', padding:'22px 24px', borderRadius:22}}>
         <div className="console-brand" style={{gap:16}}>
           <span className="console-shield" style={{background:'linear-gradient(135deg, var(--lime), #b8ff00)', boxShadow:'0 10px 30px rgba(215,243,74,.35)', width:52, height:52, borderRadius:16}}>

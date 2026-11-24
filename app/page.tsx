@@ -704,7 +704,8 @@ export default function Page() {
   return (
     <main className="lounge-shell" id="main-content">
       <ErrorBoundary>
-      <a href="#games" className="sr-only focus:not-sr-only" style={{position:'absolute',left:12,top:12,zIndex:50,padding:'8px 12px',background:'var(--lime)',color:'#0b0d12',borderRadius:999,fontWeight:900}}>Skip to games</a>
+      {/* The skip link lives in the layout now, so there is exactly one. Two of
+          them meant a keyboard user tabbed through "skip to the games" twice. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{__html: JSON.stringify(jsonLd)}} />
       <div className="noise" aria-hidden="true" />
       {/* Above the dashboard and the header: the nav must never sit under it. */}

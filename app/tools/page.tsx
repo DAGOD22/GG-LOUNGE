@@ -32,7 +32,7 @@ export const metadata: Metadata = {
 
 export default function Page() {
   return (
-    <main>
+    <main id="main-content">
       <header className="site-header">
         <Link className="brand" href="/"><span className="brand-mark"><Gamepad2 size={17} /></span><span>GG-LOUNGE<span className="tm">™</span></span></Link>
         <nav className="header-nav" aria-label="Primary navigation">
