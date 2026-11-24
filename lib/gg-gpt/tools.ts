@@ -106,10 +106,12 @@ function parseRss(xml: string, limit = 8): SearchHit[] {
     // long. They are unusable as a visible URL and useless to a reader, so fall
     // back to the publisher's site, and failing that to a news search the
     // person can actually click.
-    const url =
-      raw.length > 300
-        ? publisher?.[1] || `https://news.google.com/search?q=${encodeURIComponent(stripTags(title).slice(0, 80))}`
-        : raw;
+    // Detect the redirect by host, not by length: these blobs are only ~200
+    // characters, so a length threshold silently lets them through.
+    const isRedirect = /news\.google\.com\/rss\/articles/i.test(raw);
+    const url = isRedirect
+      ? publisher?.[1] || `https://news.google.com/search?q=${encodeURIComponent(stripTags(title).slice(0, 80))}`
+      : raw;
     if (!url) continue;
     let clean = stripTags(title).replace(/\s+-\s+[^-]{2,40}$/, "").trim();
     if (publisher?.[2]) {
