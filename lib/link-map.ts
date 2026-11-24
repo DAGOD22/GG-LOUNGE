@@ -16,8 +16,17 @@
 
 import { games, filters, type Game } from './games';
 import { apps, appLaunchUrl } from './apps';
+import { CANONICAL_HOST, SITE_DOMAINS } from './site-domains';
 
-export const SITE_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || 'https://gg-lounge.vercel.app';
+/**
+ * The origin every absolute URL on this page is built from.
+ *
+ * It defaults to the canonical host declared in ./site-domains, so the domain
+ * list and the URLs it describes cannot disagree. An env override still wins,
+ * because a self-hosted copy has a different real origin.
+ */
+export const SITE_ORIGIN =
+  process.env.NEXT_PUBLIC_SITE_URL || `https://${CANONICAL_HOST}`;
 
 /** Filter-row categories, in the order the site shows them. */
 export const DOC_CATEGORIES = filters.filter(f => f !== 'All games' && f !== 'Favorites');
@@ -235,6 +244,19 @@ export function absolute(href: string): string {
 /** The plain-text directory the copy button hands over. */
 export function plainDirectory(): string {
   const lines: string[] = [`GG-LOUNGE — ${SITE_ORIGIN}`, ''];
+  // Every address comes first: the single most useful thing to paste is "these
+  // are all the ways in". A redirecting host is noted inline rather than
+  // quietly dropped, so nobody pastes a dead-looking URL into a group chat.
+  lines.push('== ALL ADDRESSES ==');
+  for (const domain of SITE_DOMAINS) {
+    const suffix = domain.canonical
+      ? ' (canonical)'
+      : domain.redirectsTo
+        ? ` (redirects to ${domain.redirectsTo})`
+        : '';
+    lines.push(`https://${domain.host}${suffix}`);
+  }
+  lines.push('');
   const page = sitePages();
   lines.push(`== ${page.label.toUpperCase()} ==`);
   for (const link of page.links) lines.push(absolute(link.href));

@@ -12,6 +12,7 @@ import {
   sitePages,
   staticAssets,
 } from '@/lib/link-map';
+import { domainGroups, SITE_DOMAINS } from '@/lib/site-domains';
 import { CopyDirectoryButton } from '@/components/CopyDirectoryButton';
 import './link-doc.css';
 
@@ -68,14 +69,26 @@ export default function SecretLinkDocPage() {
 
       <section className="catalog doc-shell">
         <p className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Link2 size={14} /> UNLISTED • {GAME_COUNT} GAMES • {groups.length} CATEGORIES
+          <Link2 size={14} /> UNLISTED • {GAME_COUNT} GAMES • {groups.length} CATEGORIES •{' '}
+          {SITE_DOMAINS.length} ADDRESSES
         </p>
         <h1 className="doc-title">Every link on GG-Lounge<span>.</span></h1>
         <p className="doc-lede">
-          This is the whole map: the lounge&apos;s own pages, every playable title in all three of its
-          URL shapes, the app launchers, the files and the API. It is generated from the catalogue
-          itself, so if a game is listed here it has files behind it — nothing on this page is a
-          guess, and nothing here points at a title the site has quietly dropped.
+          This is the whole map: every address the lounge answers on, its own pages, every playable
+          title in all three of its URL shapes, the app launchers, the files and the API. It is
+          generated from the catalogue itself, so if a game is listed here it has files behind it —
+          nothing on this page is a guess, and nothing here points at a title the site has quietly
+          dropped.
+        </p>
+
+        {/* All six hostnames as one glanceable row, before the long sections. */}
+        <p className="doc-hostline" aria-label="All addresses">
+          {SITE_DOMAINS.map((domain, index) => (
+            <span key={domain.host}>
+              <a href={`https://${domain.host}`} rel="noopener">{domain.host}</a>
+              {index < SITE_DOMAINS.length - 1 && <span aria-hidden="true"> · </span>}
+            </span>
+          ))}
         </p>
 
         <div className="doc-callout">
@@ -96,6 +109,50 @@ export default function SecretLinkDocPage() {
           <a className="doc-action" href="/api/games">Catalogue JSON <ArrowUpRight size={13} /></a>
           <span className="doc-origin">{SITE_ORIGIN.replace(/^https?:\/\//, '')}</span>
         </div>
+
+        {/*
+          Every address, before anything else.
+          The whole point of this page is "where is the lounge", and the answer
+          has six parts. It goes first so a reader never has to scroll past 250
+          games to find the second hostname.
+        */}
+        <section className="doc-section" id="addresses">
+          <div className="doc-section-head">
+            <h2>Every address <span>{SITE_DOMAINS.length}</span></h2>
+            <p>
+              This is one deployment reachable at six hostnames. The canonical one is what every
+              link on this page is built from; the rest serve the same lounge. They are listed
+              rather than hidden: a link someone already has should still work, and a decoy name
+              is only useful if you know it exists.
+            </p>
+          </div>
+
+          {domainGroups().map(group => (
+            <div className="doc-domain-group" key={group.key}>
+              <h3 className="doc-domain-label">
+                {group.label} <span>{group.domains.length}</span>
+              </h3>
+              <p className="doc-domain-blurb">{group.blurb}</p>
+              <ul className="doc-domains">
+                {group.domains.map(domain => (
+                  <li key={domain.host} className={domain.canonical ? 'is-canonical' : undefined}>
+                    <a href={`https://${domain.host}`} rel="noopener">
+                      <code>{domain.host}</code>
+                      {domain.canonical && <span className="doc-badge">canonical</span>}
+                      {domain.redirectsTo && (
+                        <span className="doc-badge doc-badge-muted">308 → {domain.redirectsTo}</span>
+                      )}
+                      {domain.disguise === 'decoy' && (
+                        <span className="doc-badge doc-badge-warn">decoy</span>
+                      )}
+                    </a>
+                    <span className="doc-note">{domain.note}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </section>
 
         <Section section={pages} />
 
