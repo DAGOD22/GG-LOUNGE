@@ -16,6 +16,7 @@ import { getWeather, webSearch, renderHits, lookupTopic, type ToolResult } from 
 import { recommend, renderRecommendation } from "@/lib/gg-gpt/recommend";
 import { games } from "@/lib/games";
 import { detectIntent, type Intent } from "@/lib/gg-gpt/intent";
+import { answerClock } from "@/lib/gg-gpt/clock";
 import { buildSystemPrompt } from "@/lib/gg-gpt/persona";
 
 export const runtime = "nodejs";
@@ -181,7 +182,7 @@ async function selfTest(question = "In one sentence, what is a quokka?"): Promis
   // Run the same tools the route would, so the test exercises the whole
   // pipeline rather than just the model. Without this, a weather question
   // reaches the model with no data and the model invents "typically mild".
-  const tools = await gatherTools(intent);
+  const tools = await gatherTools(intent, question);
   const notes = tools.map(t => `[${t.source}] ${t.text}`);
 
   /**
@@ -216,11 +217,20 @@ async function selfTest(question = "In one sentence, what is a quokka?"): Promis
 }
 
 /** The tools a question needs, run exactly as the chat route runs them. */
-async function gatherTools(intent: Intent): Promise<ToolResult[]> {
+async function gatherTools(intent: Intent, question: string): Promise<ToolResult[]> {
   const tools: ToolResult[] = [];
   if (intent.weather) {
     const w = await getWeather(intent.weather.place).catch(() => null);
     if (w) tools.push(w);
+  }
+  // Arithmetic and clock answers are computed, not generated. Trying a model
+  // first would burn a unit of the shared free quota to get a worse answer.
+  if (intent.math) {
+    tools.push({ source: "arithmetic", text: `**${intent.math.expression}** = **${intent.math.pretty}**`, data: intent.math });
+  }
+  if (intent.clock) {
+    const clock = answerClock(question);
+    if (clock) tools.push({ source: clock.source, text: clock.text, data: clock.data });
   }
   if (intent.topic) {
     const t = await lookupTopic(intent.topic.term).catch(() => null);
