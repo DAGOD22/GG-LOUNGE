@@ -16,6 +16,12 @@ import { getWeather, webSearch, renderHits, lookupTopic, type ToolResult } from 
 import { recommend, renderRecommendation } from "@/lib/gg-gpt/recommend";
 import { games } from "@/lib/games";
 import { detectIntent, type Intent } from "@/lib/gg-gpt/intent";
+import {
+  detectFeature, tasteCard, backlogTriage, compareGames, sessionPlanner, progressReport,
+  discoveryChallenge, genreExplainer, controlsHelp, catalogueQuiz,
+  type CatalogueGame,
+} from "@/lib/gg-gpt/features";
+import { getGameControls } from "@/lib/game-controls";
 import { answerClock } from "@/lib/gg-gpt/clock";
 import { buildSystemPrompt } from "@/lib/gg-gpt/persona";
 
@@ -181,6 +187,45 @@ async function probeOne(p: Probe): Promise<ProbeResult> {
  */
 async function selfTest(question = "In one sentence, what is a quokka?"): Promise<Record<string, unknown>> {
   const started = Date.now();
+
+  // The ten site-data features answer without a model. Check them first: if the
+  // question is one of them, running it through the model would both waste the
+  // shared quota and test something production never does.
+  const feature = detectFeature(question);
+  if (feature) {
+    const games: CatalogueGame[] = gameCatalogue();
+    const state = { playCounts: {}, favorites: [], recentlyPlayed: [] as string[] };
+    const now = Date.now();
+    let text = "";
+    switch (feature.feature) {
+      case "taste-card": text = tasteCard(state, games).text; break;
+      case "backlog-triage": text = backlogTriage(state, games, Number(feature.args.minutes ?? 30)).text; break;
+      case "compare": text = compareGames(String(feature.args.a), String(feature.args.b), games, state).text; break;
+      case "session-planner": text = sessionPlanner(Number(feature.args.minutes ?? 30), games).text; break;
+      case "progress-report": text = progressReport(state, games).text; break;
+      case "discovery-challenge": text = discoveryChallenge(state, games).text; break;
+      case "genre-explainer": text = genreExplainer(String(feature.args.genre), games, state).text; break;
+      case "catalogue-quiz": text = catalogueQuiz(games).text; break;
+      case "controls-help": {
+        const q = String(feature.args.game).toLowerCase();
+        const g = games.find(x => x.id === q) ?? games.find(x => x.title.toLowerCase().includes(q));
+        text = g ? controlsHelp(g, { description: getGameControls(g.id, g.genre) }).text : "no such game";
+        break;
+      }
+      case "achievement-coach": text = "needs a signed-in account; the guest path is checked in tests"; break;
+    }
+    return {
+      question,
+      feature: feature.feature,
+      provider: `feature:${feature.feature}`,
+      rateLimited: false,
+      ms: Date.now() - now,
+      chars: text.length,
+      answer: text.slice(0, 400),
+      attempts: [],
+    };
+  }
+
   const intent = detectIntent(question);
 
   // Run the same tools the route would, so the test exercises the whole
@@ -220,6 +265,13 @@ async function selfTest(question = "In one sentence, what is a quokka?"): Promis
   };
 }
 
+/** The catalogue in the shape the feature module wants. */
+function gameCatalogue(): CatalogueGame[] {
+  return games.map(g => ({
+    id: g.id, title: g.title, genre: g.genre, tone: g.tone, description: g.description, proxy: g.proxy,
+  }));
+}
+
 /** The tools a question needs, run exactly as the chat route runs them. */
 async function gatherTools(intent: Intent, question: string): Promise<ToolResult[]> {
   const tools: ToolResult[] = [];
@@ -241,7 +293,7 @@ async function gatherTools(intent: Intent, question: string): Promise<ToolResult
     if (t) tools.push(t);
   }
   if (intent.catalogue) {
-    const cat = games.map(g => ({ id: g.id, title: g.title, genre: g.genre, tone: g.tone, description: g.description }));
+    const cat = gameCatalogue();
     const rec = recommend(intent.catalogue.query, cat, null);
     tools.push({ text: renderRecommendation(rec), data: rec.picks, source: "catalogue" });
   }
