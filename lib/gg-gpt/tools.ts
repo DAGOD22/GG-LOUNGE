@@ -127,6 +127,25 @@ async function mojeek(query: string): Promise<SearchHit[]> {
   return parseRss(await res.text(), 6);
 }
 
+/** Keyless news RSS from Google — real headlines with dates, no API key. */
+async function googleNews(query: string): Promise<SearchHit[]> {
+  const res = await fetch(
+    `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`,
+    { headers: { "user-agent": UA, accept: "application/rss+xml, application/xml" }, signal: AbortSignal.timeout(12000) },
+  );
+  if (!res.ok) return [];
+  return parseRss(await res.text(), 8);
+}
+
+async function bingNews(query: string): Promise<SearchHit[]> {
+  const res = await fetch(`https://www.bing.com/news/search?format=rss&q=${encodeURIComponent(query)}`, {
+    headers: { "user-agent": UA, accept: "application/rss+xml, application/xml" },
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!res.ok) return [];
+  return parseRss(await res.text(), 6);
+}
+
 async function wikipediaSearch(query: string): Promise<SearchHit[]> {
   const res = await fetch(
     `https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=5&srsearch=${encodeURIComponent(query)}`,
@@ -181,7 +200,11 @@ export function searchQuery(sentence: string): string {
 export async function webSearch(query: string): Promise<{ hits: SearchHit[]; source: string }> {
   const clean = searchQuery(query);
   if (!clean) return { hits: [], source: "none" };
+  const wantsNews = /\b(news|headlines?|latest|today|this week|recent)\b/i.test(query);
   const engines: Array<[string, (q: string) => Promise<SearchHit[]>, number]> = [
+    // News questions need a news index. A general web index answers "ISRO news"
+    // with ISRO's Wikipedia page, which is true but not news.
+    ...(wantsNews ? ([["google-news", googleNews, 6], ["bing-news", bingNews, 5]] as Array<[string, (q: string) => Promise<SearchHit[]>, number]>) : []),
     // Ranked by whether the engine survives this network, which the
     // diagnostics measured: Bing RSS and Wikipedia answer; DuckDuckGo returns
     // a 202 challenge page from datacenter IPs.
@@ -231,6 +254,12 @@ function relevant(hits: SearchHit[], terms: string[]): SearchHit[] {
     return { h, matched, isHomepage, score: matched * 2 + Math.min(pathDepth, 3) - (isHomepage ? 3 : 0) };
   });
   const decent = scored.filter(s => s.matched > 0 && !s.isHomepage);
+  if (!decent.length) {
+    // Nothing matched every term: keep the non-homepage results rather than
+    // handing the model an empty list. Partial relevance beats silence.
+    const partial = scored.filter(s => !s.isHomepage);
+    if (partial.length) return partial.sort((a, b) => b.score - a.score).map(s => s.h).slice(0, 6);
+  }
   const pool = decent.length ? decent : scored.filter(s => s.matched > 0);
   return pool.sort((a, b) => b.score - a.score).map(s => s.h).slice(0, 6);
 }
