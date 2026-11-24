@@ -161,13 +161,29 @@ function ToolCards({ cards }: { cards: ToolCard[] }) {
 
 const SUGGESTIONS = [
   'What should I play tonight?',
-  'What\'s the weather in Adelaide?',
-  'Convert 180 USD to AUD',
+  'What kind of player am I?',
+  'Plan a 45 minute session',
+  'Compare Doom (13 KB) and Quake',
+  "What\'s the weather in Adelaide?",
   'Make a video of a cat surfing',
-  'What\'s 15% off 240?',
-  'Explain how raycasting works in Doom',
   'Generate an image of a neon arcade at midnight',
-  'Best idle games on here and why',
+  'Which achievement is closest?',
+  'Quiz me on the catalogue',
+  'Challenge me with something new',
+];
+
+/** The ten things only this assistant can do, surfaced so people find them. */
+const ABILITIES = [
+  { label: 'Taste card', ask: 'What kind of player am I?' },
+  { label: 'Backlog', ask: 'What should I play with 20 minutes' },
+  { label: 'Compare', ask: 'Compare Doom (13 KB) and Quake' },
+  { label: 'Achievements', ask: 'Which achievement is closest' },
+  { label: 'Session plan', ask: 'Plan a 90 minute session' },
+  { label: 'Progress', ask: 'Give me my progress report' },
+  { label: 'Challenge', ask: 'Challenge me with something new' },
+  { label: 'Genres', ask: 'What is a puzzle game' },
+  { label: 'Controls', ask: 'How do I play Suika controls' },
+  { label: 'Quiz', ask: 'Quiz me on the catalogue' },
 ];
 
 export default function GgGptPage() {
@@ -431,9 +447,15 @@ export default function GgGptPage() {
                   <Sparkles size={26} color="var(--lime)" />
                 </div>
                 <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 8 }}>GG-GPT</h1>
-                <p style={{ fontSize: 13, opacity: 0.65, marginBottom: 20 }}>
-                  Text, web search, image and video generation. No API key, no sign-up to try it. Sign in and it remembers you between chats.
+                <p style={{ fontSize: 13, opacity: 0.65, marginBottom: 14 }}>
+                  Text, web search, image and video generation — plus ten things built on this site&apos;s own data that a general chatbot cannot do.
+                  No API key, no sign-up to try it. Sign in and it remembers you between chats.
                 </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 18 }}>
+                  {ABILITIES.map(a => (
+                    <button key={a.label} onClick={() => send(a.ask)} title={a.ask} style={{ ...chip, cursor: 'pointer', fontSize: 11, opacity: 0.9 }}>{a.label}</button>
+                  ))}
+                </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
                   {SUGGESTIONS.map(s => (
                     <button key={s} onClick={() => send(s)} style={{ ...chip, cursor: 'pointer', fontSize: 12 }}>{s}</button>

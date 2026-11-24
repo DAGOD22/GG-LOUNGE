@@ -31,7 +31,7 @@ const ASK = [
 type Probe = {
   name: string;
   url: string;
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "HEAD";
   headers: Record<string, string>;
   body?: string;
 };
@@ -123,6 +123,10 @@ function probes(): Probe[] {
   });
   out.push({ name: "image:pollinations", url: "https://image.pollinations.ai/prompt/a%20red%20cube?width=256&height=256&nologo=true", method: "GET", headers: {} });
 
+  // Video: is there any keyless host that actually answers? Measured here so
+  // the answer is a fact rather than a hope.
+  out.push({ name: "video:pollinations-image", url: imageUrl("a red cube", { width: 256, height: 256 }), method: "HEAD", headers: {} });
+  out.push({ name: "video:gpt4free-video", url: "https://api.airforce/v1/video/generations", method: "HEAD", headers: {} });
   out.push({ name: "news:google", url: "https://news.google.com/rss/search?q=ISRO&hl=en-US&gl=US&ceid=US:en", method: "GET", headers: { "user-agent": "GG-GPT/1.0 (https://gg-lounge.vercel.app)" } });
   out.push({ name: "news:bing", url: "https://www.bing.com/news/search?format=rss&q=ISRO", method: "GET", headers: { "user-agent": "GG-GPT/1.0 (https://gg-lounge.vercel.app)" } });
   out.push({ name: "weather:wttr", url: "https://wttr.in/Adelaide?format=j1", method: "GET", headers: { "user-agent": "curl/8 (GG-GPT)" } });
