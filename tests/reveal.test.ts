@@ -54,7 +54,13 @@ test('the hero stat animates presentation, never the number', async () => {
   const css = await read();
   assert.match(css, /@keyframes stat-pop \{[^@]*from \{[^}]*opacity: 0/, 'stat-pop animates opacity');
 
+  // The hero stat lives in components/HeroSection.tsx (it was inline in
+  // app/page.tsx until that page was split). Check both: the number must be
+  // rendered from the prop with nothing in between, and no count-up may appear
+  // anywhere near it.
+  const hero = await readFile(new URL('../components/HeroSection.tsx', import.meta.url), 'utf8');
+  assert.match(hero, /<strong className="stat-pop">\{gameCount\}<\/strong>/, 'the stat renders the real count directly');
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
-  assert.match(page, /<strong className="stat-pop">\{allGames.length\}<\/strong>/, 'the stat renders the real count directly');
-  assert.equal(/CountUp/.test(page), false, 'no component may substitute a value into the digits');
+  assert.match(page, /gameCount=\{allGames.length\}/, 'and the page passes the real length');
+  assert.equal(/CountUp/.test(page + hero), false, 'no component may substitute a value into the digits');
 });

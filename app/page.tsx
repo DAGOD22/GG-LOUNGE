@@ -9,7 +9,7 @@ import { THEMES } from '@/lib/customization/settings'
 import { dedupeGames } from '@/lib/game-identity'
 import { unavailableGames, getGameAssetIssues } from '@/lib/games'
 import Fuse from 'fuse.js'
-import { ArrowUpRight, Gamepad2, Heart, Play, ShieldCheck, Sparkles, Trophy, X, Shuffle, AlertCircle, Sun, Moon, Download, Flame, Gift, Keyboard, WifiOff, Wifi, LogIn, LogOut, User, Cloud, Menu } from 'lucide-react'
+import { Gamepad2, Heart, ShieldCheck, Trophy, X, AlertCircle, Download, Cloud, WifiOff } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, gameOfDayIndex, isNearDuplicate, curatedRank } from '@/lib/games'
 import type { Game } from '@/lib/games'
@@ -22,6 +22,8 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { Reveal } from '@/components/Reveal'
 import { AuthDialog } from '@/components/AuthDialog'
 import { AnnouncementBanner } from '@/components/AnnouncementBanner'
+import { SiteHeader } from '@/components/SiteHeader'
+import { HeroSection } from '@/components/HeroSection'
 const GameModal = dynamic(() => import('@/components/GameModal').then(m => m.GameModal), { ssr: false, loading: () => null })
 const AchievementsHub = dynamic(() => import('@/components/AchievementsHub').then(m => m.AchievementsHub), { ssr: false, loading: () => null })
 
@@ -563,45 +565,22 @@ export default function Page() {
       <div className="noise" aria-hidden="true" />
       {/* Above the dashboard and the header: the nav must never sit under it. */}
       <AnnouncementBanner />
-      <header className="site-header">
-        <a href="#top" className="brand" aria-label="GG-Lounge home">
-          <span className="brand-mark">
-            <Gamepad2 size={19} />
-          </span>
-          <span className="brand-name">GG-LOUNGE<span className="tm">™</span></span>
-        </a>
-        <button className="mobile-toggle" aria-label="Open menu" aria-expanded={mobileNavOpen} onClick={()=> setMobileNavOpen(v=>!v)}>{mobileNavOpen ? <X size={16}/> : <Menu size={16}/>}</button>
-        <nav className={`header-nav ${mobileNavOpen?'mobile-open':''}`} aria-label="Primary navigation">
-          <a href="#games" onClick={()=> setMobileNavOpen(false)}>Library</a>
-          <a href="/apps" onClick={()=> setMobileNavOpen(false)}>Apps</a>
-          <a href="/gg-gpt" onClick={()=> setMobileNavOpen(false)}>GG-GPT</a>
-          <a href="/proxy" onClick={()=> setMobileNavOpen(false)}>Proxy</a>
-          <button onClick={()=> { setShowAchievementsHub(true); setMobileNavOpen(false) }} style={{background:'none',border:0,cursor:'pointer',font: 'inherit',color:'inherit',display:'flex',alignItems:'center',gap:6,fontWeight:800}}><Trophy size={12}/> Achievements</button>
-          <a href="#about" onClick={()=> setMobileNavOpen(false)}>Studio</a>
-          <a href="/request-game" onClick={()=> setMobileNavOpen(false)}>Request a game</a>
-          <a href="/admin" onClick={()=> setMobileNavOpen(false)}>Admin</a>
-        </nav>
-        <div className="header-actions">
-          <button className={authUser ? "icon-button header-achievements is-active" : "icon-button header-achievements"} onClick={()=> setShowAchievementsHub(true)} aria-label="Achievements" title={authUser ? `${achSummary?.unlocked||0}/${achSummary?.total||"--"} unlocked` : "View achievements — sign in to save"}><Trophy size={16}/>{authUser && achSummary && achSummary.unlocked>0 ? <span className="header-badge">{achSummary.unlocked}</span> : null}</button>
-          <div className="header-status">
-            {online ? <Wifi size={12}/> : <WifiOff size={12} color="var(--coral)"/>}
-            <span className="live-dot" style={{background: online?'var(--lime)':'var(--coral)'}} /> {allGames.length} titles
-          </div>
-          {authUser ? (
-            <span className="header-user">
-              <User size={14}/> {authUser.username}
-              <span className="header-user-sync"><Cloud size={10}/> Synced</span>
-              <button className="header-user-logout" onClick={doLogout} aria-label="Log out" title="Log out"><LogOut size={12}/></button>
-            </span>
-          ) : (
-            <button className="header-signin" onClick={()=> setShowAuth('login')}><LogIn size={14}/> <span>Sign in</span></button>
-          )}
-          <button className="icon-button" onClick={toggleTheme} aria-label="Toggle theme" title={theme==='dark'?'Switch to light mode':'Switch to dark mode'}>
-            {theme==='dark' ? <Sun size={16}/> : <Moon size={16}/>}
-          </button>
-          {installable && <button className="header-install" onClick={doInstall}><Download size={14}/> <span>Install</span></button>}
-        </div>
-      </header>
+      <SiteHeader
+        mobileNavOpen={mobileNavOpen}
+        setMobileNavOpen={setMobileNavOpen}
+        authUser={authUser}
+        achUnlocked={achSummary?.unlocked}
+        achTotal={achSummary?.total}
+        online={online}
+        gameCount={allGames.length}
+        theme={theme}
+        installable={installable}
+        onOpenAchievements={() => setShowAchievementsHub(true)}
+        onSignIn={() => setShowAuth('login')}
+        onLogOut={doLogout}
+        onToggleTheme={toggleTheme}
+        onInstall={doInstall}
+      />
       {showAuth && (
         <AuthDialog
           mode={showAuth}
@@ -622,73 +601,16 @@ export default function Page() {
         <span style={{display:'flex',gap:8}}><button onClick={doInstall} style={{padding:'8px 14px',borderRadius:999,background:'#0b0d12',color:'#fff',border:'1px solid rgba(255,255,255,.15)',fontWeight:800,cursor:'pointer'}}>Install</button><button onClick={()=> setInstallable(false)} style={{padding:'8px 10px',borderRadius:999,background:'transparent',border:'1px solid var(--line)',color:'var(--foreground)',cursor:'pointer'}}>Dismiss</button></span>
       </div>}
       {installHint && <div role="status" style={{margin:'10px 18px 0', padding:'10px 14px', borderRadius:12, background:'rgba(255,255,255,.06)', border:'1px solid var(--line)', fontSize:13, textAlign:'center'}}>{installHint}</div>}
-      <section className="hero" id="top" style={{position:"relative", overflow:"hidden", background:"radial-gradient(600px 400px at 15% 10%, rgba(125,107,255,.14), transparent 60%), radial-gradient(700px 500px at 85% 15%, rgba(215,243,74,.12), transparent 60%), radial-gradient(500px 400px at 50% 90%, rgba(255,108,131,.08), transparent 60%), var(--background)"}}>
-        <div className="hero-copy">
-          <p className="eyebrow">
-            <Sparkles size={14} /> THE INDEPENDENT ARCADE
-          </p>
-          <h1>
-            Stay a while.
-            <br />
-            <em>Play forever.</em>
-          </h1>
-          <p className="hero-text">A handpicked, no-filler collection of browser games for the minutes between everything. <span style={{opacity:.8}}><Keyboard size={12} style={{display:'inline',verticalAlign:'-2px'}}/> Every game lists its own controls — hover any card to see them.</span></p>
-          <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:14}}>
-            <a className="hero-link" href="#games">
-              Enter the lounge <ArrowUpRight size={15} />
-            </a>
-            <button onClick={shufflePick} className="btn-ghost" style={{padding:'8px 14px',fontSize:13}}>
-              <Shuffle size={14}/> Surprise me
-            </button>
-            <button onClick={()=> launch(gameOfDay)} style={{padding:'8px 12px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',fontWeight:800,fontSize:12,display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}>
-              <Gift size={14}/> Game of the Day: {gameOfDay.title}
-            </button>
-          </div>
-          <div className="hero-stats" style={{gap:18, padding:'12px 16px', borderRadius:999, background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.06)', backdropFilter:'blur(8px)', display:'inline-flex', width:'fit-content', marginTop:22}}>
-            <span>
-              <strong className="stat-pop">{allGames.length}</strong> games
-            </span>
-            <span>
-              <strong>∞</strong> replay value
-            </span>
-            <span style={{display:'flex',alignItems:'center',gap:6}}><Flame size={12} color={streak>2?'var(--lime)':'inherit'}/> <strong className="stat-pop">{streak}</strong> day streak</span>
-            <span>
-              <strong>01</strong> lounge
-            </span>
-          </div>
-        </div>
-        <Reveal className="spotlight" delay={90}>
-          <div className="spotlight-top">
-            <span>SPOTLIGHT / {(String(spotIdx+1).padStart(2,'0'))}</span>
-            <span className="spotlight-tag">FEATURED</span>
-          </div>
-          <div className="spotlight-art" onClick={()=> launch(spotlight)} role="button" tabIndex={0} onKeyDown={e=> e.key==='Enter'&&launch(spotlight)} style={{cursor:'pointer', overflow:'hidden', borderRadius:16, position:'relative'}}>
-            {spotlight.icon ? (
-              <img src={spotlight.icon} alt={spotlight.title} style={{position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', opacity:.9}} onError={(e)=> (e.currentTarget.style.display='none')} />
-            ) : null}
-            <div style={{position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 30%, rgba(0,0,0,.55) 100%)'}}/>
-            <div className="orbit orbit-a" style={{opacity:.5}} />
-            <div className="orbit orbit-b" style={{opacity:.4}} />
-            <span className="spotlight-mark" style={{position:'relative', zIndex:1, textShadow:'0 4px 20px rgba(0,0,0,.45)'}}>{spotlight.mark}</span>
-            <span className="spotlight-caption" style={{zIndex:1, background:'rgba(0,0,0,.32)', padding:'6px 10px', borderRadius:999, border:'1px solid rgba(255,255,255,.14)', backdropFilter:'blur(6px)'}}>
-              {spotlight.tone.toUpperCase()}<br/>{spotlight.genre.toUpperCase()}
-            </span>
-          </div>
-          <div className="spotlight-bottom">
-            <div>
-              <p className="card-kicker">{spotlight.genre} · {spotlight.tone}</p>
-              <h2>{spotlight.title}</h2>
-              <p>{spotlight.subtitle}</p>
-            </div>
-            <button className="circle-play" onClick={() => launch(spotlight)} aria-label={`Play ${spotlight.title}`}>
-              <Play size={18} fill="currentColor" />
-            </button>
-          </div>
-          <div style={{display:'flex',gap:6,justifyContent:'center',marginTop:10}}>
-            {featuredGames.map((_,i)=> <span key={i} style={{width: i===spotIdx?22:8,height:6,borderRadius:99,background: i===spotIdx?'var(--lime)':'rgba(255,255,255,.22)',transition:'all .3s',display:'block'}}/>)}
-          </div>
-        </Reveal>
-      </section>
+      <HeroSection
+        gameCount={allGames.length}
+        streak={streak}
+        spotlight={spotlight}
+        spotIdx={spotIdx}
+        featuredCount={featuredGames.length}
+        gameOfDay={gameOfDay}
+        onShuffle={shufflePick}
+        onLaunch={launch}
+      />
 
       <section className="catalog" id="games">
         <Reveal className="section-heading">
