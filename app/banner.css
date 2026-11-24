@@ -1,0 +1,120 @@
+/* ── Summer drop announcement ────────────────────────────────────────────────
+   A normal block above the header, not a fixed bar: nothing is ever covered,
+   and the page never jumps when it is dismissed. Colours come from the theme
+   variables the rest of the site uses, so it follows light/dark and any custom
+   accent instead of fighting them. */
+.gg-banner {
+  position: relative;
+  z-index: 3;
+  border-bottom: 1px solid var(--line);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--lime) 12%, transparent), transparent 55%),
+    color-mix(in srgb, var(--panel) 90%, transparent);
+  backdrop-filter: blur(8px);
+}
+.gg-banner-inner {
+  max-width: 1240px;
+  margin-inline: auto;
+  padding: 10px 44px 10px 38px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.gg-banner-eyebrow {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--lime) 45%, transparent);
+  background: color-mix(in srgb, var(--lime) 14%, transparent);
+  color: var(--lime);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.gg-banner-copy {
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.gg-banner-copy strong {
+  color: var(--foreground);
+  font-weight: 900;
+  letter-spacing: 0.01em;
+}
+.gg-banner-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 9px;
+  margin: 0 1px;
+  border-radius: 999px;
+  background: var(--lime);
+  color: #0b0d12;
+  font-weight: 900;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--lime) 60%, transparent);
+  animation: gg-banner-pulse 2.4s ease-in-out infinite;
+}
+.gg-banner-cta:hover {
+  filter: brightness(1.08);
+}
+@keyframes gg-banner-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--lime) 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--lime) 0%, transparent);
+  }
+}
+.gg-banner-close {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.gg-banner-close:hover {
+  color: var(--foreground);
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+.gg-banner-close:focus-visible,
+.gg-banner-cta:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+@media (max-width: 900px) {
+  .gg-banner-inner {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 42px 10px 16px;
+    font-size: 11px;
+  }
+  .gg-banner-copy {
+    flex-basis: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gg-banner-cta {
+    animation: none;
+  }
+}

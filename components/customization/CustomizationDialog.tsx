@@ -128,6 +128,6 @@ export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onC
       </>}
       </div>
     </div>
-    <footer className="gg-settings-footer"><span>{saveError?'Not saved':busy?'Saving file…':<><Check size={13}/> Automatically saved</>}<small>{RELEASE_NAME}</small></span><div className="gg-action-row"><button className="gg-reset" onClick={()=>{if(!resetConfirm){setResetConfirm(true);return;}const id=settings.background.mediaId;reset();if(id)deleteMedia(id).catch(()=>{});setResetConfirm(false);setError('');}}><RotateCcw size={13}/>{resetConfirm?'Confirm reset':'Reset preferences'}</button><button className="gg-primary" onClick={onClose}>Done</button></div></footer>
+    <footer className="gg-settings-footer"><span>{saveError?'Not saved':busy?'Saving file…':<><Check size={13}/> Automatically saved • </> }<small>{RELEASE_NAME}</small></span><div className="gg-action-row"><button className="gg-reset" onClick={()=>{if(!resetConfirm){setResetConfirm(true);return;}const id=settings.background.mediaId;reset();if(id)deleteMedia(id).catch(()=>{});setResetConfirm(false);setError('');}}><RotateCcw size={13}/>{resetConfirm?'Confirm reset':'Reset preferences'}</button><button className="gg-primary" onClick={onClose}>Done</button></div></footer>
   </dialog>;
 }

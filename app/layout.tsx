@@ -4,35 +4,72 @@ import '@fontsource-variable/space-grotesk'
 import '@fontsource-variable/inter'
 import './globals.css'
 import './customization.css'
+import './banner.css'
 import { CustomizationProvider } from '@/components/customization/CustomizationProvider'
 import GlobalSW from './global-sw'
 
+/**
+ * Titles and descriptions are the only SEO surface a search engine is obliged
+ * to believe, so they say exactly what the site is. The old text ("a collection
+ * of local browser games") was short enough that Bing filled the gap by pulling
+ * a sentence from whichever game page it crawled last, which is why the result
+ * snippet read like one game instead of like the site.
+ */
+const SITE_TITLE = 'GG-Lounge — Unblocked Browser Games, Web Proxy & Indie Arcade (250+ Games)'
+const SITE_DESCRIPTION =
+  'Play 250+ self-hosted, ad-free browser games instantly — no installs, no sign-up. Every title runs on GG-Lounge’s own CDN, with a built-in web proxy, custom themes, a tab cloaker and GG-GPT, the games assistant that knows what you have actually played.'
+const SITE_KEYWORDS = [
+  'unblocked games',
+  'browser games',
+  'free online games',
+  'ad-free games',
+  'self-hosted games',
+  'indie arcade',
+  'web proxy',
+  'unblocked proxy',
+  'school games',
+  'classroom games',
+  'tab cloaker',
+  'tab disguise',
+  'custom themes',
+  'game site themes',
+  'no download games',
+  'HTML5 games',
+  'slope',
+  'retro bowl',
+  'cookie clicker',
+  'moto x3m',
+  'geometry dash',
+  'drift hunters',
+  'GG Lounge',
+]
+
 export const metadata: Metadata = {
   title: {
-    default: 'GG-Lounge — Browser Games',
+    default: SITE_TITLE,
     template: '%s | GG-Lounge',
   },
-  description: 'A collection of local browser games, community requests and a shared Scramjet app launcher.',
-  keywords: ['unblocked games','slope','retro bowl','stack','hole.io','moto x3m','1v1.lol','proxy games','school games','GG Lounge'],
-  authors: [{ name: 'GG-Lounge Studios', url: 'https://gg-lounge.example.com' }],
+  description: SITE_DESCRIPTION,
+  keywords: SITE_KEYWORDS,
+  authors: [{ name: 'GG-Lounge Studios', url: 'https://gg-lounge.vercel.app' }],
   creator: 'GG-Lounge Studios',
   publisher: 'GG-Lounge Studios',
   formatDetection: { email: false, address: false, telephone: false },
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://gg-lounge.vercel.app')),
   alternates: { canonical: '/' },
   openGraph: {
-    title: 'GG-Lounge — Browser Games',
-    description: 'Local browser games for school — fast, proxy-powered, no login.',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     url: '/',
     siteName: 'GG-Lounge',
-    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'GG Lounge — Browser Games' }],
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'GG-Lounge — 250+ unblocked browser games' }],
     locale: 'en_US',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'GG-Lounge — Browser Games',
-    description: 'Local browser games, proxy-powered.',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     images: ['/og-image.png'],
   },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large' } },
@@ -76,8 +113,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               '@context': 'https://schema.org',
               '@type': 'WebSite',
               name: 'GG-Lounge',
-              url: process.env.NEXT_PUBLIC_SITE_URL || 'https://gg-lounge.example.com',
-              description: 'Local browser games',
+              alternateName: 'GG Lounge',
+              url: process.env.NEXT_PUBLIC_SITE_URL || 'https://gg-lounge.vercel.app',
+              description: SITE_DESCRIPTION,
               publisher: { '@type': 'Organization', name: 'GG-Lounge Studios' },
               potentialAction: { '@type': 'SearchAction', target: '/?q={search_term_string}', 'query-input': 'required name=search_term_string' },
             }),

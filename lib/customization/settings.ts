@@ -1,6 +1,6 @@
 import { ANIMATED_CURSOR_IDS } from './cursor-presets';
 export const SETTINGS_KEY = 'ggl_customization_v1';
-export const RELEASE_NAME = 'new upadted version';
+export const RELEASE_NAME = 'New updated version';
 export type Colors = { background: string; surface: string; panel: string; text: string; muted: string; accent: string; secondary: string };
 export const THEMES: Record<string, { name: string; mode: 'dark' | 'light'; colors: Colors }> = {
   lounge: { name: 'Original Lounge', mode: 'dark', colors: { background:'#0b0d12',surface:'#14161a',panel:'#141720',text:'#f4f2ec',muted:'#9699a8',accent:'#d7f34a',secondary:'#7d6bff' } },

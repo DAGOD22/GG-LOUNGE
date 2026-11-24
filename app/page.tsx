@@ -19,6 +19,7 @@ const HomeDashboard = dynamic(() => import('@/components/HomeDashboard').then(m 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { Reveal } from '@/components/Reveal'
 import { AuthDialog } from '@/components/AuthDialog'
+import { AnnouncementBanner } from '@/components/AnnouncementBanner'
 const GameModal = dynamic(() => import('@/components/GameModal').then(m => m.GameModal), { ssr: false, loading: () => null })
 const AchievementsHub = dynamic(() => import('@/components/AchievementsHub').then(m => m.AchievementsHub), { ssr: false, loading: () => null })
 
@@ -519,6 +520,8 @@ export default function Page() {
       <a href="#games" className="sr-only focus:not-sr-only" style={{position:'absolute',left:12,top:12,zIndex:50,padding:'8px 12px',background:'var(--lime)',color:'#0b0d12',borderRadius:999,fontWeight:900}}>Skip to games</a>
       <script type="application/ld+json" dangerouslySetInnerHTML={{__html: JSON.stringify(jsonLd)}} />
       <div className="noise" aria-hidden="true" />
+      {/* Above the dashboard and the header: the nav must never sit under it. */}
+      <AnnouncementBanner />
       <header className="site-header">
         <a href="#top" className="brand" aria-label="GG-Lounge home">
           <span className="brand-mark">
