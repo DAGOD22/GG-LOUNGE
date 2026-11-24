@@ -15,7 +15,7 @@ import { chatComplete, imageUrl } from "@/lib/gg-gpt/engine";
 import { getWeather, webSearch, renderHits, type ToolResult } from "@/lib/gg-gpt/tools";
 import { recommend, renderRecommendation } from "@/lib/gg-gpt/recommend";
 import { games } from "@/lib/games";
-import { detectIntent } from "@/lib/gg-gpt/intent";
+import { detectIntent, type Intent } from "@/lib/gg-gpt/intent";
 import { buildSystemPrompt } from "@/lib/gg-gpt/persona";
 
 export const runtime = "nodejs";
@@ -179,6 +179,42 @@ async function selfTest(question = "In one sentence, what is a quokka?"): Promis
   // Run the same tools the route would, so the test exercises the whole
   // pipeline rather than just the model. Without this, a weather question
   // reaches the model with no data and the model invents "typically mild".
+  const tools = await gatherTools(intent);
+  const notes = tools.map(t => `[${t.source}] ${t.text}`);
+
+  /**
+   * The same rule the chat route uses: if the tools already produced the whole
+   * answer, do not hand it to a model. Asking a model to repeat a list of
+   * games is how it invents "Zen Garden Escape", a game we do not have.
+   */
+  const solid = tools.filter(t => t.source !== "search:bing" && t.source !== "search:mojeek" && t.source !== "search:duckduckgo" && t.source !== "search:wikipedia" && t.source !== "search:wikipedia-ua");
+  const toolOnly = solid.length === tools.length && tools.length > 0 ? tools.map(t => t.text).join("\n\n") : null;
+
+  const result = toolOnly
+    ? { text: toolOnly, provider: "tools", rateLimited: false, attempts: [] as Array<{ provider: string; status: number; ms: number; error?: string }>, model: "none" }
+    : await chatComplete(
+        [
+          { role: "system", content: buildSystemPrompt({ profile: {}, memories: [], now: new Date(), notes }) },
+          { role: "user", content: question },
+        ],
+        { timeoutMs: 30_000 },
+      );
+  return {
+    question,
+    intent: Object.keys(intent).filter(k => intent[k as keyof typeof intent]),
+    tools: tools.map(t => ({ source: t.source, text: t.text.slice(0, 300) })),
+    provider: result.provider,
+    rateLimited: result.rateLimited,
+    ms: Date.now() - started,
+    chars: result.text.length,
+    answer: result.text.slice(0, 400),
+    attempts: result.attempts.map(a => ({ provider: a.provider, status: a.status, ms: a.ms, error: a.error })),
+    imageSample: imageUrl("a red cube", { width: 256, height: 256 }),
+  };
+}
+
+/** The tools a question needs, run exactly as the chat route runs them. */
+async function gatherTools(intent: Intent): Promise<ToolResult[]> {
   const tools: ToolResult[] = [];
   if (intent.weather) {
     const w = await getWeather(intent.weather.place).catch(() => null);
@@ -193,27 +229,7 @@ async function selfTest(question = "In one sentence, what is a quokka?"): Promis
     const s = await webSearch(intent.search.query).catch(() => ({ hits: [], source: "none" }));
     if (s.hits.length) tools.push({ text: renderHits(s.hits), data: s.hits, source: `search:${s.source}` });
   }
-  const notes = tools.map(t => `[${t.source}] ${t.text}`);
-
-  const result = await chatComplete(
-    [
-      { role: "system", content: buildSystemPrompt({ profile: {}, memories: [], now: new Date(), notes }) },
-      { role: "user", content: question },
-    ],
-    { timeoutMs: 30_000 },
-  );
-  return {
-    question,
-    intent: Object.keys(intent).filter(k => intent[k as keyof typeof intent]),
-    tools: tools.map(t => ({ source: t.source, text: t.text.slice(0, 300) })),
-    provider: result.provider,
-    rateLimited: result.rateLimited,
-    ms: Date.now() - started,
-    chars: result.text.length,
-    answer: result.text.slice(0, 400),
-    attempts: result.attempts.map(a => ({ provider: a.provider, status: a.status, ms: a.ms, error: a.error })),
-    imageSample: imageUrl("a red cube", { width: 256, height: 256 }),
-  };
+  return tools;
 }
 
 export async function GET(req: Request) {
