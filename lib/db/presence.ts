@@ -103,7 +103,18 @@ export type LiveEventRow = {
  * youtube.com" and "is on the apps page" are what the user asked to see, and
  * neither is a launch.
  */
-const ALLOWED_KINDS = new Set(['launch', 'achievement', 'online', 'room', 'join', 'visited']);
+/**
+ * Event kinds the store will accept.
+ *
+ * This is the allow-list the *store* enforces, and it has to be kept in step
+ * with the templates in the event route: a kind the route knows but the store
+ * does not is dropped silently, with a 200 and no row — which is exactly how
+ * "browsing" and "tool" went missing after the feed learned about the proxy and
+ * the tools page.
+ */
+const ALLOWED_KINDS = new Set([
+  'launch', 'achievement', 'online', 'room', 'join', 'visited', 'browsing', 'tool',
+]);
 
 /** Trim and bound a name that will be shown to other players. */
 export function cleanName(value: unknown): string | null {

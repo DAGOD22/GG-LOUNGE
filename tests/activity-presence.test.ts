@@ -170,6 +170,31 @@ test('the feed can icon a proxy visit and a page visit', () => {
   }
 });
 
+test('every kind the event route can send is a kind the store will keep', () => {
+  // The store dropped "browsing" and "tool" silently — a 200 and no row — for
+  // as long as it took to notice the feed never showed a proxy visit. Comparing
+  // the two lists is the only way to keep them in step.
+  const route = read('app/api/presence/event/route.ts');
+  const store = read('lib/db/presence.ts');
+  const routeKinds = [...route.matchAll(/^\s{2}(\w+):\s*\(?name/gm)].map(match => match[1]);
+  const storeKinds = /const ALLOWED_KINDS = new Set\(\[([\s\S]*?)\]\)/.exec(store)?.[1] ?? '';
+  const allowed = [...storeKinds.matchAll(/'([a-z]+)'/g)].map(match => match[1]);
+
+  assert.ok(routeKinds.length >= 5, 'the route templates should have been found');
+  for (const kind of routeKinds) {
+    assert.ok(allowed.includes(kind), `${kind} is templated but never stored`);
+  }
+});
+
+test('the proxy reports in-frame navigation, not just the first load', () => {
+  const page = read('app/proxy/page.tsx');
+  // The proxy is one route: clicking through a proxied site changes nothing in
+  // the address bar, so `?url=` alone would leave the roster on the first host.
+  assert.match(page, /setProxyDestination\(event\.url\)/);
+  assert.match(read('components/live/ActivityReporter.tsx'), /subscribeProxyDestination/);
+  assert.match(read('lib/proxy-activity.ts'), /export function setProxyDestination/);
+});
+
 test('the server refuses a page it cannot name', () => {
   const route = read('app/api/presence/event/route.ts');
   // The closed set of pages is what stops an arbitrary path reaching the feed.
