@@ -761,7 +761,9 @@ export default function Page() {
         genres={filters.filter(filter => filter !== 'All games' && filter !== 'Favorites')}
         onLaunch={game => { const found = allGames.find(candidate => candidate.id === game.id); if (found) launch(found) }}
         playCounts={playCounts}
-        shareTitle="GG-Lounge — 250 browser games, no installs"
+        // The count is derived, not typed: a hard-coded "250" was already stale
+        // at 254 titles, and a share card that undercounts is a small lie.
+        shareTitle={`GG-Lounge — ${allGames.length} browser games, no installs`}
         sharePath="/"
       />
 

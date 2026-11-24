@@ -102,7 +102,7 @@ export function whyThisGame(game: CatalogEntry, context: { playCount?: number; i
   if (context.isRandom) return 'Picked at random, so no algorithm can be blamed.';
   if (game.featured) return 'A featured pick this week.';
   if ((context.playCount ?? 0) >= 10) return 'Played a lot here — a safe bet.';
-  if ((context.sameGenre ?? 0) >= 8) return `One of ${context.sameGenre} in ${game.genre || 'this category'}.`;
+  if ((context.sameGenre ?? 0) >= 8) return `One of ${context.sameGenre} games in ${game.genre || 'this category'}.`;
   if ((game.tags ?? []).length >= 3) return `Tagged ${game.tags!.slice(0, 3).join(', ')}.`;
   return 'Not many people have opened this one yet.';
 }

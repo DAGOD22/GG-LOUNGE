@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation'
 import { games } from '@/lib/games'
 import { canonicalOrigin } from '@/lib/site-domains'
 import { sessionLabel } from '@/lib/site-kit'
-import { ReadingTime } from '@/components/SiteTools'
 import { estimatedSessionMinutes, similarGames, whyThisGame } from '@/lib/site-extras'
 import Link from 'next/link'
 
@@ -63,13 +62,22 @@ export default async function Page({params}:{params:Promise<{id:string}>}){
       <p style={{fontSize:12, letterSpacing:'.12em', color:'#6b7280'}}>GG-LOUNGE • {g.genre.toUpperCase()} / {g.tone.toUpperCase()}</p>
       <h1 style={{fontSize:36, letterSpacing:'-.03em', margin:'8px 0'}}>{g.title}</h1>
       <p style={{color:'#4b5563', lineHeight:1.6}}>
-        {g.description} — {g.subtitle} <ReadingTime text={`${g.description} ${g.subtitle}`} />
+        {g.description} — {g.subtitle}
       </p>
       {/* Two honest facts a landing page should carry: how long a go lasts, and
           a one-line reason this title is here at all. Both come from the same
           helpers the lobby uses, so the two pages cannot disagree. */}
       <p style={{color:'#6b7280', fontSize:13, fontWeight:600, margin:'4px 0 0'}}>
-        A typical go lasts {sessionLabel(estimatedSessionMinutes(g.genre))}. {whyThisGame(g, { playCount: 0 })}.
+        A typical go lasts {sessionLabel(estimatedSessionMinutes(g.genre))}. {/* whyThisGame can return its
+            // "nobody has opened this yet" fallback, which reads as a slight on a
+            // landing page that is meant to be an invitation — so the fallback is
+            // replaced with the genre fact this page actually knows. */}
+        {(() => {
+          const reason = whyThisGame(g, { playCount: 0 })
+          return reason === 'Not many people have opened this one yet.'
+            ? `One of the ${g.genre.toLowerCase()} games in the lounge.`
+            : reason
+        })()}
       </p>
       {g.icon && <img src={g.icon} alt="" style={{width:'100%', maxWidth:480, aspectRatio:'1', objectFit:'cover', borderRadius:16, border:'1px solid #e5e7eb', marginTop:16}} />}
       <div style={{marginTop:20, display:'flex', gap:12}}>

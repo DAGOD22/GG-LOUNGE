@@ -12,6 +12,7 @@
  */
 import { useCallback, useMemo, useState } from 'react'
 import { CalendarDays, Check, Copy, Share2, Sparkles, TrendingUp } from 'lucide-react'
+import { sessionLabel } from '@/lib/site-kit'
 
 import {
   dailyPicks, dayProgress, estimatedSessionMinutes, genreCounts, localDayKey,
@@ -53,7 +54,10 @@ export function DailyPick({
       <p className="extras-copy">{reason}</p>
       <div className="extras-chips">
         {picks.game.genre ? <span className="extras-chip">{picks.game.genre}</span> : null}
-        <span className="extras-chip">about {session} min</span>
+        {/* sessionLabel says "about 5 minutes" / "about an hour" — the raw
+            number used to be printed bare, and "about 6 min" read like a typo
+            next to the rest of the site's prose. */}
+        <span className="extras-chip">{sessionLabel(session)}</span>
         {picks.genre ? <span className="extras-chip">genre of the day: {picks.genre}</span> : null}
       </div>
       <div className="extras-progress" aria-hidden="true"><span style={{ width: `${progress * 100}%` }} /></div>
