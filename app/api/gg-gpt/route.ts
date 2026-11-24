@@ -30,6 +30,15 @@ import {
 } from "@/lib/gg-gpt/tools";
 import { detectIntent, titleFromMessage } from "@/lib/gg-gpt/intent";
 import { recommend, renderRecommendation, type PlaySignal } from "@/lib/gg-gpt/recommend";
+import {
+  detectFeature, tasteCard, backlogTriage, compareGames, achievementCoach, sessionPlanner,
+  progressReport, discoveryChallenge, genreExplainer, controlsHelp, catalogueQuiz,
+  type CatalogueGame, type FeatureResult, type PlayerState,
+} from "@/lib/gg-gpt/features";
+import { critiqueAnswer, followUp, mergeFollowUp, plan as planSteps } from "@/lib/gg-gpt/reason";
+import { getGameControls } from "@/lib/game-controls";
+import { listUserAchievements, getUserStats } from "@/lib/db/achievements";
+import { ACHIEVEMENTS } from "@/lib/achievements";
 import { answerClock } from "@/lib/gg-gpt/clock";
 import { cacheGet, cacheSet } from "@/lib/gg-gpt/cache";
 import { exclusive, exclusiveStream, backOff, waitEstimate } from "@/lib/gg-gpt/queue";
@@ -217,7 +226,80 @@ export async function POST(req: Request) {
     }
   }
 
-  const intent = detectIntent(message);
+  /**
+   * Ten capabilities that need this site's data, not a bigger model. They are
+   * answered here — deterministic, instant, and impossible for a general chatbot
+   * — before any intent detection or model call happens.
+   */
+  const feature = detectFeature(message);
+  if (feature) {
+    const state = await playSignalFor(user?.id).catch(() => null);
+    const games: CatalogueGame[] = CATALOGUE as CatalogueGame[];
+    const empty: PlayerState = { playCounts: {}, favorites: [], recentlyPlayed: [] };
+    const ps = state ?? empty;
+    let result: FeatureResult | null = null;
+
+    switch (feature.feature) {
+      case "taste-card": result = tasteCard(ps, games); break;
+      case "backlog-triage": result = backlogTriage(ps, games, Number(feature.args.minutes ?? 30)); break;
+      case "compare":
+        result = compareGames(String(feature.args.a), String(feature.args.b), games, ps);
+        break;
+      case "achievement-coach": {
+        if (!user) {
+          result = { feature: "achievement-coach", text: "Sign in and I can read your real achievement progress — as a guest there is nothing for me to read." };
+        } else {
+          const [unlocked, stats] = await Promise.all([
+            listUserAchievements(user.id).catch(() => []),
+            getUserStats(user.id).catch(() => null),
+          ]);
+          const defs = ACHIEVEMENTS.map(a => ({ id: a.id, gameId: a.gameId, name: a.title, description: a.description, points: a.points, target: a.target }));
+          result = achievementCoach(
+            unlocked.map(u => ({ gameId: u.gameId, achievementId: u.achievementId, unlocked: Boolean(u.unlocked), progress: u.progress ?? 0 })),
+            defs, games, ps.playCounts,
+          );
+          if (stats) result.text += `\n\n**Totals:** ${stats.totalUnlocked} unlocked, ${stats.totalPoints} points.`;
+        }
+        break;
+      }
+      case "session-planner": result = sessionPlanner(Number(feature.args.minutes ?? 30), games); break;
+      case "progress-report": result = progressReport(ps, games); break;
+      case "discovery-challenge": result = discoveryChallenge(ps, games); break;
+      case "genre-explainer": result = genreExplainer(String(feature.args.genre), games, ps); break;
+      case "controls-help": {
+        const q = String(feature.args.game).toLowerCase();
+        const game = games.find(g => g.id === q) ?? games.find(g => g.title.toLowerCase().includes(q) || q.includes(g.title.toLowerCase()));
+        if (!game) {
+          result = { feature: "controls-help", text: `I could not find a game called "${feature.args.game}" here. Name it exactly and I will pull its legend.` };
+        } else {
+          const legend = getGameControls(game.id, game.genre);
+          result = controlsHelp(game, legend ? { description: legend } : null);
+        }
+        break;
+      }
+      case "catalogue-quiz": result = catalogueQuiz(games); break;
+    }
+
+    if (result) {
+      const text = result.text;
+      if (user && chatId) {
+        await addMessage(user.id, chatId, "assistant", text, { provider: `feature:${result.feature}` }).catch(() => undefined);
+        await touchChat(user.id, chatId).catch(() => undefined);
+      }
+      return body.stream
+        ? sseOnce(text, { chatId, provider: `feature:${result.feature}` })
+        : NextResponse.json({ text, chatId, provider: `feature:${result.feature}`, signedIn: !!user });
+    }
+  }
+
+  /* ---------- follow-up resolution ---------- */
+  // "and tomorrow?" used to be treated as a brand-new, subject-less question.
+  // Carry the previous subject forward so the continuation means something.
+  const priorUser = [...history].reverse().find(h => h.role === "user")?.content ?? null;
+  const follow = followUp(message, priorUser);
+  const effectiveMessage = follow.isFollowUp && follow.subject ? mergeFollowUp(message, follow.subject) : message;
+
+  const intent = detectIntent(effectiveMessage);
 
   /* ---------- media ---------- */
   if (intent.image) {
@@ -391,7 +473,19 @@ export async function POST(req: Request) {
       ? sseOnce(cached.text, { chatId, provider: cached.provider, cards, cached: true })
       : NextResponse.json({ text: cached.text, chatId, provider: cached.provider, signedIn: !!user, cards, cached: true });
   }
-  const system = buildSystemPrompt({ profile, memories, now: new Date(), notes });
+  // Decide what the answer may rest on before writing it. The plan is passed to
+  // the model as a constraint: these facts exist, do not invent others.
+  const stepPlan = planSteps(intent, effectiveMessage);
+  const plannerNote = stepPlan.steps.length
+    ? `Answer only from these sources: ${stepPlan.steps.map(s => `${s.tool} (${s.reason})`).join("; ")}. If a fact you want is not covered by them, say so instead of inventing it.`
+    : "No live data was fetched for this message. Answer from general knowledge, and do not state anything time-sensitive as current.";
+
+  const system = buildSystemPrompt({
+    profile,
+    memories,
+    now: new Date(),
+    notes: [...notes, `[plan] ${plannerNote}`],
+  });
   const turns: ChatTurn[] = [
     { role: "system", content: system },
     ...history,
@@ -474,6 +568,18 @@ export async function POST(req: Request) {
   if (result.rateLimited) backOff();
   let text = sanitizeAnswer(result.text);
   let provider = result.provider;
+
+  // Read the answer the way an editor would before the user sees it. Only
+  // mechanical faults are repaired; anything needing judgement is left alone,
+  // because a silently rewritten answer is worse than a blunt one.
+  if (text) {
+    const critique = critiqueAnswer(text, {
+      hasLiveData: notes.length > 0,
+      askedForLive: Boolean(intent.search || intent.weather || intent.crypto || intent.currency),
+    });
+    if (critique.repaired) text = critique.repaired;
+  }
+
   if (!text) {
     text = deterministic || offlineAnswer(message, profile, attempted, result.rateLimited);
     provider = "offline";
