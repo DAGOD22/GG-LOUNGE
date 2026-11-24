@@ -168,6 +168,23 @@ export async function touchPresence(
   return { peers, online: peers.length };
 }
 
+/** How many people the live tables think are online. Null when unreachable. */
+export async function countPresence(): Promise<number> {
+  const cutoff = new Date(Date.now() - PRESENCE_TTL_MS).toISOString();
+  if (getMode() === 'postgres') {
+    await migrate();
+    const rows = await pgQuery<{ n: string }>(
+      'SELECT COUNT(*)::text AS "n" FROM "live_presence" WHERE "seen_at" >= $1',
+      [cutoff],
+    );
+    return Number(rows[0]?.n ?? 0);
+  }
+  const store = (await readLocal()) as unknown as LocalPresence;
+  const presence = store.presence ?? {};
+  const now = Date.now();
+  return Object.values(presence).filter(row => row.seenAt >= now - PRESENCE_TTL_MS).length;
+}
+
 /** Forget a player immediately, for the "leaving the site" path. */
 export async function dropPresence(id: string): Promise<void> {
   if (getMode() === 'postgres') {

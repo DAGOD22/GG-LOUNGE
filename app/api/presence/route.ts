@@ -4,6 +4,7 @@ import {
   cleanCursor,
   cleanGameId,
   cleanName,
+  countPresence,
   recentLiveEvents,
   touchPresence,
 } from '@/lib/db/presence';
@@ -106,5 +107,14 @@ export async function DELETE(req: Request) {
 export async function GET() {
   // A bare GET is a cheap way to ask "is anyone on?" without writing a row.
   const events = await recentLiveEvents().catch(() => []);
-  return NextResponse.json({ events }, { headers: { 'cache-control': 'no-store' } });
+  // `mode` and `live` are here to be diagnosable: the difference between "no
+  // one is playing" and "the live tables were never created" is invisible from
+  // the outside otherwise, and this endpoint is the one place to see it.
+  const { getMode } = await import('@/lib/db/connection');
+  const mode = getMode();
+  const live = await countPresence().catch(() => null);
+  return NextResponse.json(
+    { events, mode, online: live, live: live !== null },
+    { headers: { 'cache-control': 'no-store' } },
+  );
 }
