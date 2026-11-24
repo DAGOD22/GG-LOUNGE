@@ -318,8 +318,10 @@ export async function POST(req: Request) {
       const lines = rec.picks.length
         ? renderRecommendation(rec)
         : found.map(g => `- ${g.title} (${g.genre}) — /g/${g.id}`).join("\n");
-      const text =
-        `Games on GG-LOUNGE worth your time${rec.summary !== "No play history yet, so recommend a spread of genres." ? ` — ${rec.summary}` : ""}:\n${lines}`;
+      const personalised = rec.summary !== "No play history yet, so recommend a spread of genres.";
+      const text = personalised
+        ? `**Based on what you actually play** (${rec.summary.replace(/^They /, "you ").replace(/^No play history yet; they /, "no history yet, but you ")})\n\n${lines}`
+        : `**Worth your time**\n\n${lines}`;
       toolResults.push({ text, data: { games: found, picks: rec.picks }, source: "catalogue" });
       cards.push({ label: "games", source: "catalogue", data: { games: found, picks: rec.picks } });
     }

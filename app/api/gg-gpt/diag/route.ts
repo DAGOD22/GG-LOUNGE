@@ -13,6 +13,8 @@ import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth";
 import { chatComplete, imageUrl } from "@/lib/gg-gpt/engine";
 import { getWeather, webSearch, renderHits, type ToolResult } from "@/lib/gg-gpt/tools";
+import { recommend, renderRecommendation } from "@/lib/gg-gpt/recommend";
+import { games } from "@/lib/games";
 import { detectIntent } from "@/lib/gg-gpt/intent";
 import { buildSystemPrompt } from "@/lib/gg-gpt/persona";
 
@@ -181,6 +183,11 @@ async function selfTest(question = "In one sentence, what is a quokka?"): Promis
   if (intent.weather) {
     const w = await getWeather(intent.weather.place).catch(() => null);
     if (w) tools.push(w);
+  }
+  if (intent.catalogue) {
+    const cat = games.map(g => ({ id: g.id, title: g.title, genre: g.genre, tone: g.tone, description: g.description }));
+    const rec = recommend(intent.catalogue.query, cat, null);
+    tools.push({ text: renderRecommendation(rec), data: rec.picks, source: "catalogue" });
   }
   if (intent.search) {
     const s = await webSearch(intent.search.query).catch(() => ({ hits: [], source: "none" }));
