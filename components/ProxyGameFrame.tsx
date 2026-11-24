@@ -1,4 +1,5 @@
 'use client';
+import { GAME_FRAME_SANDBOX } from '@/lib/frame-policy'
 import { useEffect, useRef, useState } from 'react';
 import { bootProxy, normalizeProxyUrl } from '@/lib/proxy-client';
 
@@ -71,6 +72,7 @@ export function ProxyGameFrame({ title, target }: { title: string; target: strin
           src={src}
           title={title}
           allow="fullscreen; autoplay; gamepad; clipboard-read; clipboard-write; encrypted-media; picture-in-picture"
+          sandbox={GAME_FRAME_SANDBOX}
           allowFullScreen
           style={{ flex: 1, width: '100%', height: '100%', border: 0, background: '#000' }}
         />

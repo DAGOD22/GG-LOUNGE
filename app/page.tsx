@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGameUrl } from '@/lib/use-game-url'
+import { mergeGuestPlays } from '@/lib/guest-progress'
 import { useCustomization } from '@/components/customization/CustomizationProvider'
 import { WelcomeTour } from '@/components/live/WelcomeTour'
 import { THEMES } from '@/lib/customization/settings'
@@ -50,6 +51,7 @@ export default function Page() {
   const [newReqTitle, setNewReqTitle] = useState('')
   const [leaderTab, setLeaderTab] = useState<'today'|'week'>('today')
   const [authUser, setAuthUser] = useState<{id:string; username:string}|null>(null)
+  const [guestMergeNote, setGuestMergeNote] = useState('')
   const [showAuth, setShowAuth] = useState<null|'login'|'register'|'reset'>(null)
   const [authForm, setAuthForm] = useState({ username:'', password:'', favoriteFood:'', newPassword:'' })
   const [authError, setAuthError] = useState('')
@@ -540,6 +542,10 @@ export default function Page() {
       // fetch me
       const me = await fetch('/api/auth/me').then(x=> x.json()).catch(()=>null)
       if(me?.user) setAuthUser(me.user)
+      // Plays made while signed out live in localStorage; hand them to the
+      // account now, or they are lost the first time the browser clears up.
+      const carried = await mergeGuestPlays()
+      if(carried > 0) setGuestMergeNote(`${carried} play${carried === 1 ? '' : 's'} from before you signed in were added to your account.`)
       setShowAuth(null); setAuthForm({ username:'', password:'', favoriteFood:'', newPassword:'' })
     }catch(e:any){ setAuthError(e.message || 'Error') } finally{ setAuthLoading(false) }
   }
@@ -609,6 +615,7 @@ export default function Page() {
         />
       )}
       {!online && <div role="status" aria-live="polite" style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(255,92,92,.12)',border:'1px solid rgba(255,92,92,.3)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:13}}><WifiOff size={16}/> You’re offline — browsing is limited. A few cached games may still work, but most need internet.</div>}
+      {guestMergeNote && <div role="status" aria-live="polite" style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(204,255,0,.12)',border:'1px solid rgba(204,255,0,.32)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:13}}><Cloud size={15}/> {guestMergeNote} <button onClick={()=> setGuestMergeNote('')} style={{marginLeft:'auto',background:'none',border:0,color:'var(--foreground)',cursor:'pointer',display:'flex'}} aria-label="Dismiss"><X size={14}/></button></div>}
       {dbMode==='local' && !authUser && <div role="note" style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(255,190,70,.14)',border:'1px solid rgba(255,190,70,.3)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:12}}><AlertCircle size={14}/> Guest mode: progress saves locally. <button onClick={()=> setShowAuth('register')} style={{marginLeft:4, textDecoration:'underline', background:'none', border:0, color:'var(--foreground)', fontWeight:800, cursor:'pointer'}}>Sign in to keep it forever</button> — survives deploys.</div>}
       {installable && <div style={{margin:'12px 18px 0',padding:'12px 14px',borderRadius:14,background:'linear-gradient(135deg, rgba(204,255,0,.18), rgba(0,242,234,.14))',border:'1px solid rgba(204,255,0,.35)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
         <span style={{display:'flex',alignItems:'center',gap:10,fontWeight:800,fontSize:13}}><span style={{width:32,height:32,borderRadius:999,background:'var(--lime)',display:'grid',placeItems:'center',color:'#0b0d12'}}><Download size={16}/></span> Install GG Lounge — play offline & launch like an app</span>

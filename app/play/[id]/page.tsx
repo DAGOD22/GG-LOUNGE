@@ -1,3 +1,4 @@
+import { GAME_FRAME_SANDBOX } from '@/lib/frame-policy'
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -44,6 +45,7 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
         src={game.path}
         title={game.title}
         allow="autoplay; fullscreen; gamepad; clipboard-write"
+        sandbox={GAME_FRAME_SANDBOX}
         allowFullScreen
         style={{ border: 0, width: '100%', height: '100%', display: 'block' }}
       />

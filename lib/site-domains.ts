@@ -79,6 +79,43 @@ export const SITE_DOMAINS: SiteDomain[] = [
   },
 ];
 
+/**
+ * Strip a configured site URL down to a bare origin.
+ *
+ * Hand-typed env vars arrive with trailing slashes, a path, or no scheme at all,
+ * and every caller here concatenates paths onto the result — so a trailing slash
+ * silently becomes `//privacy` in the sitemap and the OG image URLs.
+ */
+function normalizeOrigin(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return `https://${CANONICAL_HOST}`;
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    return new URL(withScheme).origin;
+  } catch {
+    return `https://${CANONICAL_HOST}`;
+  }
+}
+
+/**
+ * The one origin every absolute URL on the site is built from.
+ *
+ * `NEXT_PUBLIC_SITE_URL` wins when it is set, so a custom domain can be used
+ * without editing sealed hostnames; otherwise it falls back to the host marked
+ * `canonical` above rather than to a literal repeated in twenty files.
+ */
+export function canonicalOrigin(): string {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL;
+  return configured ? normalizeOrigin(configured) : `https://${CANONICAL_HOST}`;
+}
+
+/** Join a site-relative path onto the canonical origin. */
+export function absoluteUrl(pathname = '/'): string {
+  const origin = canonicalOrigin();
+  if (!pathname) return origin + '/';
+  return origin + (pathname.startsWith('/') ? pathname : `/${pathname}`);
+}
+
 /** Every host as a full origin, canonical first. */
 export function siteOrigins(): string[] {
   return SITE_DOMAINS.map(domain => `https://${domain.host}`);

@@ -1,4 +1,5 @@
 'use client'
+import { GAME_FRAME_SANDBOX } from '@/lib/frame-policy'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Heart, Maximize2, X, ExternalLink, Gamepad2, Keyboard, Monitor, Bug, Flag, AlertCircle, Loader2, Save, Trophy, Star, Lock, Medal, Crown, Columns2, Volume2, VolumeX, Share2, Check } from 'lucide-react'
 import type { Game } from '@/lib/games'
@@ -883,6 +884,7 @@ export function GameModal({
           src={game.proxy ? `/play/${game.id}` : game.path}
           title={game.title}
           allow="fullscreen; autoplay; gamepad; keyboard-map; clipboard-read; clipboard-write; encrypted-media; picture-in-picture; web-share"
+          sandbox={GAME_FRAME_SANDBOX}
           allowFullScreen
           onLoad={handleFrameLoad}
           onError={() => setFrameError('Failed to load game file.')}

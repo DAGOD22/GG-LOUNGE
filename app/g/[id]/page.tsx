@@ -1,14 +1,25 @@
 import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
 import { games } from '@/lib/games'
+import { canonicalOrigin } from '@/lib/site-domains'
 import Link from 'next/link'
 
 export function generateStaticParams(){
   return games.map(g=> ({ id: g.id }))
 }
-export function generateMetadata({params}:{params:{id:string}}): Metadata {
-  const g = games.find(x=> x.id===params.id)
-  if(!g) return { title: 'Game not found — GG Lounge' }
-  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://gg-lounge.vercel.app'
+/**
+ * Route params are a Promise in Next 16. Reading `params.id` synchronously
+ * yielded `undefined`, so `find` never matched and this page rendered "Not
+ * found" for *every* game while still answering 200 — the landing pages that
+ * exist for link unfurls were dead for the whole catalogue and the status code
+ * hid it. Both handlers await now.
+ */
+export async function generateMetadata({params}:{params:Promise<{id:string}>}): Promise<Metadata> {
+  const { id } = await params
+  const g = games.find(x=> x.id===id)
+  // A real 404 (see below) still gets rendered HTML, so say noindex explicitly.
+  if(!g) return { title: 'Game not found — GG Lounge', robots: { index: false, follow: false } }
+  const base = canonicalOrigin()
   return {
     title: `${g.title} — Play on GG Lounge`,
     description: g.description,
@@ -22,10 +33,12 @@ export function generateMetadata({params}:{params:{id:string}}): Metadata {
     twitter: { card: 'summary_large_image', title: g.title, description: g.description, images: [base + (g.icon||'')] }
   }
 }
-export default function Page({params}:{params:{id:string}}){
-  const g = games.find(x=> x.id===params.id)
-  if(!g) return <main style={{padding:40}}>Not found — <Link href="/">Go home</Link></main>
-  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://gg-lounge.vercel.app'
+export default async function Page({params}:{params:Promise<{id:string}>}){
+  const { id } = await params
+  const g = games.find(x=> x.id===id)
+  // Unknown ids answer a real 404 instead of a 200 with a sad message.
+  if(!g) notFound()
+  const base = canonicalOrigin()
   const jsonLd = {
     '@context':'https://schema.org',
     '@type':'VideoGame',

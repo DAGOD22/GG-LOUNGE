@@ -18,6 +18,7 @@
  * gets a best-effort attempt and simply does not mute, which is honest.
  */
 
+import { GAME_FRAME_SANDBOX } from '@/lib/frame-policy'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Columns2, Search, Volume2, VolumeX, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Game } from '@/lib/games';
@@ -186,6 +187,7 @@ export function SplitScreen({
             src={rightGame.proxy ? `/play/${rightGame.id}` : rightGame.path}
             title={`${rightGame.title} — right pane`}
             allow="fullscreen; autoplay; gamepad; clipboard-read; clipboard-write; encrypted-media"
+            sandbox={GAME_FRAME_SANDBOX}
             allowFullScreen
             onLoad={() => applyMute(rightFrame.current, rightMuted)}
           />
