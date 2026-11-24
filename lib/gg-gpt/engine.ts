@@ -87,15 +87,36 @@ function sseDeltas(chunk: string): string[] {
     if (!data || data === "[DONE]") continue;
     try {
       const j = JSON.parse(data) as {
-        choices?: Array<{ delta?: { content?: string }; message?: { content?: string } }>;
+        choices?: Array<{
+          delta?: { content?: string; reasoning?: string; reasoning_content?: string };
+          message?: { content?: string };
+          text?: string;
+        }>;
       };
-      const delta = j?.choices?.[0]?.delta?.content ?? j?.choices?.[0]?.message?.content;
-      if (delta) out.push(delta);
+      const choice = j?.choices?.[0];
+      // Only `content` is answer. `reasoning` is the model's working-out: it is
+      // not written for a reader, it is often wrong, and showing it is how an
+      // assistant looks broken. It is parsed and deliberately discarded.
+      const delta = choice?.delta?.content ?? choice?.message?.content ?? choice?.text;
+      if (typeof delta === "string" && delta) out.push(delta);
     } catch {
       // A partial JSON line; the caller keeps the remainder for the next chunk.
     }
   }
   return out;
+}
+
+/**
+ * Does this chunk look like a Server-Sent Events frame rather than prose?
+ *
+ * This distinction is load-bearing. Several free gateways answer with SSE even
+ * when asked for plain text, and a frame whose JSON we could not read used to
+ * fall through to the "then it must be plain text" branch — which printed
+ * `data: {"choices":[...]}` verbatim into the chat. A chunk that is SSE is
+ * never prose, however badly it parsed.
+ */
+function isSseFrame(chunk: string): boolean {
+  return /^(?:data|event|id|retry):/m.test(chunk);
 }
 
 function providers(): Provider[] {
@@ -312,7 +333,11 @@ function providers(): Provider[] {
     parseStream: (chunk) => {
       const deltas = sseDeltas(chunk);
       if (deltas.length) return deltas;
-      // Not SSE: the whole body arrived at once.
+      // If it looks like SSE at all, it is not prose — even when the JSON was
+      // truncated mid-line. Dropping it makes the chain fall through to the
+      // next provider, which is always better than showing the user wire data.
+      if (isSseFrame(chunk)) return [];
+      // Genuinely plain text: the gateway ignored ?stream=true.
       const plain = chunk.trim();
       if (!plain || plain.startsWith("{") || plain.startsWith("<")) return [];
       return [plain];
@@ -503,15 +528,92 @@ export function sanitizeAnswer(text: string): string {
     .trim();
 }
 
+/**
+ * Turn a short request into a prompt that actually renders well.
+ *
+ * The difference between "a dragon" and a good image is almost entirely in the
+ * prompt, and users type "a dragon". Rather than ask a model to expand it (slow,
+ * costs a quota unit, and can wander off-subject), prepend the descriptors that
+ * measurably help a diffusion model: medium, lighting, lens, and a quality floor.
+ * Anything the user already specified wins — we never contradict them.
+ */
+export function enhanceImagePrompt(prompt: string, style: ImageStyle = "auto"): string {
+  const raw = prompt.replace(/\s+/g, " ").trim().replace(/[.。]\s*$/, "");
+  if (!raw) return raw;
+  const has = (re: RegExp) => re.test(raw);
+
+  const styleBits: Record<Exclude<ImageStyle, "auto">, string> = {
+    photo: "photorealistic, 35mm photograph, natural lighting, shallow depth of field, sharp focus",
+    cinematic: "cinematic film still, anamorphic lens, dramatic volumetric lighting, rich colour grade",
+    art: "digital painting, painterly brushwork, dramatic composition, rich colour",
+    anime: "anime key visual, clean linework, vibrant cel shading, expressive composition",
+    "3d": "3D render, subsurface scattering, soft studio lighting, octane render",
+    sketch: "detailed pencil sketch, cross-hatching, strong linework, paper texture",
+  };
+
+  const bits: string[] = [raw];
+  const chosen: keyof typeof styleBits | null =
+    style !== "auto"
+      ? style
+      : has(/\b(photo|photoreal|cinematic|anime|render|painting|sketch|illustration|3d)\b/i)
+        ? null
+        : "cinematic";
+  if (chosen) bits.push(styleBits[chosen]);
+  if (!has(/\b(lighting|lit|glow|shadow|golden hour|neon|backlit)\b/i)) bits.push("dramatic lighting");
+  if (!has(/\b(detail|detailed|high resolution|8k|hd|sharp)\b/i)) bits.push("highly detailed, sharp focus, best quality");
+  if (!has(/\b(background|bokeh|depth of field)\b/i)) bits.push("intentional background");
+
+  // Keep it under what the gateway accepts; drop our own adjectives first.
+  let out = bits.join(", ");
+  while (out.length > 900 && bits.length > 1) {
+    bits.pop();
+    out = bits.join(", ");
+  }
+  return out.slice(0, 900);
+}
+
+export type ImageStyle = "auto" | "photo" | "cinematic" | "art" | "anime" | "3d" | "sketch";
+
+/**
+ * Fit a request into the free tier's real budget.
+ *
+ * Pollinations' classic endpoint caps the *area* at 768x768 and keeps the
+ * aspect ratio. Asking for 1344x768 does not give a wider picture, it just gets
+ * clamped server-side after we have already waited in the queue — so the fit is
+ * done here, where the UI can be told the size it will actually receive.
+ */
+export function fitImage(w: number, h: number): { width: number; height: number } {
+  const MAX_AREA = 768 * 768;
+  const ratio = w / h;
+  let width = Math.max(256, Math.round(w));
+  let height = Math.max(256, Math.round(h));
+  if (width * height > MAX_AREA) {
+    const scale = Math.sqrt(MAX_AREA / (width * height));
+    width = Math.max(256, Math.floor(width * scale));
+    height = Math.max(256, Math.floor(height * scale));
+  }
+  // Keep the short edge at least 320 so the result is not a postage stamp.
+  if (Math.min(width, height) < 320) {
+    if (ratio >= 1) { width = 768; height = Math.max(256, Math.round(768 / ratio)); }
+    else { height = 768; width = Math.max(256, Math.round(768 * ratio)); }
+    while (width * height > MAX_AREA) { width = Math.floor(width * 0.98); height = Math.floor(height * 0.98); }
+  }
+  return { width, height };
+}
+
 export function imageUrl(
   prompt: string,
-  opts: { width?: number; height?: number; seed?: number; model?: string } = {},
+  opts: { width?: number; height?: number; seed?: number; model?: string; style?: ImageStyle } = {},
 ): string {
-  const w = Math.min(Math.max(opts.width ?? 1024, 256), 1536);
-  const h = Math.min(Math.max(opts.height ?? 1024, 256), 1536);
+  const { width: w, height: h } = fitImage(opts.width ?? 1024, opts.height ?? 1024);
   const seed = opts.seed ?? Math.floor(Math.random() * 1_000_000);
+  // `flux` renders noticeably better than `turbo`/`kontext` on the free tier.
   const model = opts.model || "flux";
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0, 900))}?width=${w}&height=${h}&seed=${seed}&model=${model}&nologo=true&referrer=gg-lounge`;
+  const enhanced = enhanceImagePrompt(prompt, opts.style);
+  return (
+    `https://image.pollinations.ai/prompt/${encodeURIComponent(enhanced)}` +
+    `?width=${w}&height=${h}&seed=${seed}&model=${model}&nologo=true&enhance=false&safe=false&referrer=gg-lounge`
+  );
 }
 
 /**

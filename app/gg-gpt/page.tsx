@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Brain, Image as ImageIcon, Loader2, Plus, Search, Send, Sparkles, Trash2, Video, X } from 'lucide-react';
+import { BrowserVideo } from '@/components/gg-gpt/BrowserVideo';
 
 type Chat = { id: string; title: string; updatedAt: string };
 type ToolCard = { label: string; source: string; data?: Record<string, unknown> };
@@ -10,7 +11,13 @@ type Msg = {
   role: 'user' | 'assistant';
   content: string;
   meta?: string | null;
-  media?: { kind: string; url: string; prompt: string };
+  media?: {
+    kind: string;
+    url: string;
+    prompt: string;
+    frames?: Array<{ url: string; move: 'zoom-in' | 'zoom-out' | 'pan-left' | 'pan-right' | 'tilt-up' }>;
+    width?: number; height?: number; durationSec?: number; fps?: number;
+  };
   cards?: ToolCard[];
 };
 type Memory = { id: string; fact: string; createdAt: string };
@@ -454,10 +461,21 @@ export default function GgGptPage() {
                     <div style={{ marginTop: 10 }}>
                       {m.media.kind === 'image' ? (
                         <img src={m.media.url} alt={m.media.prompt} style={{ maxWidth: '100%', borderRadius: 10, display: 'block' }} loading="lazy" />
+                      ) : m.media.kind === 'video-frames' && m.media.frames?.length ? (
+                        <BrowserVideo
+                          frames={m.media.frames}
+                          width={m.media.width ?? 768}
+                          height={m.media.height ?? 768}
+                          durationSec={m.media.durationSec ?? 6}
+                          fps={m.media.fps ?? 24}
+                          name={m.media.prompt}
+                        />
                       ) : (
-                        <video src={m.media.url} controls style={{ maxWidth: '100%', borderRadius: 10, display: 'block' }} />
+                        <video src={m.media.url} controls loop style={{ maxWidth: '100%', borderRadius: 10, display: 'block' }} />
                       )}
-                      <a href={m.media.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, opacity: 0.6, display: 'inline-block', marginTop: 6 }}>Open full size</a>
+                      {m.media.kind !== 'video-frames' && (
+                        <a href={m.media.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, opacity: 0.6, display: 'inline-block', marginTop: 6 }}>Open full size</a>
+                      )}
                     </div>
                   )}
                   {!!m.cards?.length && <ToolCards cards={m.cards} />}

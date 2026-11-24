@@ -13,7 +13,8 @@ import {
   addMemory,
   forgetMemory,
 } from "@/lib/db/gg-gpt";
-import { chatComplete, chatStream, imageUrl, videoPlan, sanitizeAnswer, type ChatTurn } from "@/lib/gg-gpt/engine";
+import { chatComplete, chatStream, imageUrl, sanitizeAnswer, type ChatTurn } from "@/lib/gg-gpt/engine";
+import { videoPlan, describeVideoPlan } from "@/lib/gg-gpt/video";
 import {
   webSearch,
   renderHits,
@@ -221,7 +222,14 @@ export async function POST(req: Request) {
   /* ---------- media ---------- */
   if (intent.image) {
     const prompt = intent.image.prompt.slice(0, 600);
-    const url = imageUrl(prompt, { width: intent.image.width, height: intent.image.height });
+    // Images come out of the *same* one-request-per-45-seconds budget as text,
+    // so they queue behind the same gate. Without this, asking for a picture
+    // right after a question returns a 402 card instead of a picture.
+    if (waitEstimate() > 12_000) {
+      const text = "**The free tier allows one generation every 45 seconds.** Try again in a moment and I'll render it.";
+      return NextResponse.json({ text, chatId, provider: "rate-limited", signedIn: !!user });
+    }
+    const url = imageUrl(prompt, { width: intent.image.width, height: intent.image.height, style: intent.image.style });
     const caption = `Here's an image of **${prompt}**.`;
     const media = { kind: "image", url, prompt };
     if (user && chatId) {
@@ -232,13 +240,29 @@ export async function POST(req: Request) {
   }
   if (intent.video) {
     const prompt = intent.video.prompt.slice(0, 600);
-    const plan = videoPlan(prompt);
-    const media = { kind: "image", url: plan.imageUrl, prompt };
+    if (waitEstimate() > 12_000) {
+      const text = "**The free tier allows one generation every 45 seconds.** Try again in a moment and I'll build the clip.";
+      return NextResponse.json({ text, chatId, provider: "rate-limited", signedIn: !!user });
+    }
+    const plan = videoPlan(prompt, { hostUrl: process.env.GG_VIDEO_HOST || null });
+    const text = describeVideoPlan(plan, prompt);
+    // The client renders the clip when there is no AI host: send the shot list,
+    // not a URL pretending to be a video.
+    const media = {
+      kind: plan.renderInBrowser ? "video-frames" : "video",
+      url: plan.url,
+      prompt,
+      frames: plan.frames,
+      width: plan.width,
+      height: plan.height,
+      durationSec: plan.durationSec,
+      fps: plan.fps,
+    };
     if (user && chatId) {
-      await addMessage(user.id, chatId, "assistant", plan.text, media).catch(() => undefined);
+      await addMessage(user.id, chatId, "assistant", text, media).catch(() => undefined);
       await touchChat(user.id, chatId).catch(() => undefined);
     }
-    return NextResponse.json({ text: plan.text, media, chatId, provider: "pollinations-image", signedIn: !!user });
+    return NextResponse.json({ text, media, chatId, provider: "video", signedIn: !!user });
   }
 
   /* ---------- clock: the model has no idea what time it is ---------- */

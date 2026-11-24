@@ -15,6 +15,7 @@
  */
 
 import { solveArithmetic } from "./math";
+import type { ImageStyle } from "./engine";
 
 export interface Intent {
   search?: { query: string };
@@ -26,7 +27,7 @@ export interface Intent {
   math?: { expression: string; value: number; pretty: string };
   clock?: { place?: string };
   catalogue?: { query: string };
-  image?: { prompt: string; width?: number; height?: number };
+  image?: { prompt: string; width?: number; height?: number; style?: ImageStyle };
   video?: { prompt: string };
   /** A factual "what is X" that deserves a sourced summary. */
   topic?: { term: string };
@@ -65,6 +66,21 @@ const CURRENCIES: Record<string, string> = {
   krw: "KRW", won: "KRW", sgd: "SGD", hkd: "HKD", mxn: "MXN", peso: "MXN", pesos: "MXN",
   thb: "THB", baht: "THB", idr: "IDR", myr: "MYR", php: "PHP", vnd: "VND",
 };
+
+/**
+ * Read a requested look out of the message. "anime", "watercolour" and
+ * "3d render" are not decoration — they pick a different prompt scaffold, which
+ * is the difference between a good render and a generic one.
+ */
+export function detectImageStyle(lower: string): ImageStyle {
+  if (/\b(photo|photoreal|realistic|photograph)\b/.test(lower)) return "photo";
+  if (/\b(anime|manga|cel shade)\b/.test(lower)) return "anime";
+  if (/\b(3d|render|octane|blender|cgi)\b/.test(lower)) return "3d";
+  if (/\b(sketch|pencil|line drawing)\b/.test(lower)) return "sketch";
+  if (/\b(painting|painted|watercolo?ur|oil painting|art|artwork|illustration)\b/.test(lower)) return "art";
+  if (/\b(cinematic|film still|movie|dramatic)\b/.test(lower)) return "cinematic";
+  return "auto";
+}
 
 /** Longest-first so "miles" is tried before "mi". */
 const UNIT_WORDS: Array<[RegExp, string]> = [
@@ -157,6 +173,7 @@ export function detectIntent(message: string): Intent {
       if (/\b(wide|landscape|16:9|banner)\b/i.test(lower)) { intent.image.width = 1344; intent.image.height = 768; }
       if (/\b(tall|portrait|9:16|vertical)\b/i.test(lower)) { intent.image.width = 768; intent.image.height = 1344; }
       if (/\b(square|1:1)\b/i.test(lower)) { intent.image.width = 1024; intent.image.height = 1024; }
+      intent.image.style = detectImageStyle(lower);
       return intent;
     }
   }
