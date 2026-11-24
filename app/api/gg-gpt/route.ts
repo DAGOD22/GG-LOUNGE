@@ -27,6 +27,7 @@ import {
   type ToolResult,
 } from "@/lib/gg-gpt/tools";
 import { detectIntent, titleFromMessage } from "@/lib/gg-gpt/intent";
+import { recommend, renderRecommendation, type PlaySignal } from "@/lib/gg-gpt/recommend";
 import { answerClock } from "@/lib/gg-gpt/clock";
 import { cacheGet, cacheSet } from "@/lib/gg-gpt/cache";
 import { exclusive, exclusiveStream, backOff, waitEstimate } from "@/lib/gg-gpt/queue";
@@ -100,6 +101,24 @@ async function profileFor(userId: string | null, username?: string | null): Prom
     // personalisation is best-effort
   }
   return profile;
+}
+
+/** What this person has actually played, for the recommender. */
+async function playSignalFor(userId?: string | null): Promise<PlaySignal | null> {
+  if (!userId) return null;
+  const state = (await getUserState(userId)) as unknown as Record<string, unknown> | null;
+  if (!state) return null;
+  const playCounts: Record<string, number> = {};
+  const raw = state.playCounts ?? state.playcounts;
+  if (raw && typeof raw === "object") {
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof v === "number" && v > 0) playCounts[k] = v;
+    }
+  }
+  const favorites = Array.isArray(state.favorites) ? state.favorites.map(String) : [];
+  const recentlyPlayed = Array.isArray(state.recentlyPlayed) ? state.recentlyPlayed.map(String) : [];
+  if (!Object.keys(playCounts).length && !favorites.length) return null;
+  return { playCounts, favorites, recentlyPlayed };
 }
 
 /** The catalogue, in the shape the search tool wants. */
@@ -286,11 +305,23 @@ export async function POST(req: Request) {
   }
 
   if (intent.catalogue) {
-    const found = searchCatalogue(CATALOGUE, intent.catalogue.query, 6);
+    // Recommendations are the one thing this assistant can do better than a
+    // general chatbot, because it knows what you have actually played. Use the
+    // history when there is one; fall back to plain catalogue matching for
+    // guests who have never played anything.
+    const signal = await playSignalFor(user?.id).catch(() => null);
+    const rec = recommend(intent.catalogue.query, CATALOGUE, signal);
+    const found = rec.picks.length
+      ? rec.picks.map(p => CATALOGUE.find(g => g.id === p.id)!).filter(Boolean)
+      : searchCatalogue(CATALOGUE, intent.catalogue.query, 6);
     if (found.length) {
-      const text = `Games on GG-LOUNGE matching that:\n${found.map(g => `- ${g.title} (${g.genre}) — /g/${g.id}`).join("\n")}`;
-      toolResults.push({ text, data: { games: found }, source: "catalogue" });
-      cards.push({ label: "games", source: "catalogue", data: { games: found } });
+      const lines = rec.picks.length
+        ? renderRecommendation(rec)
+        : found.map(g => `- ${g.title} (${g.genre}) — /g/${g.id}`).join("\n");
+      const text =
+        `Games on GG-LOUNGE worth your time${rec.summary !== "No play history yet, so recommend a spread of genres." ? ` — ${rec.summary}` : ""}:\n${lines}`;
+      toolResults.push({ text, data: { games: found, picks: rec.picks }, source: "catalogue" });
+      cards.push({ label: "games", source: "catalogue", data: { games: found, picks: rec.picks } });
     }
   }
 

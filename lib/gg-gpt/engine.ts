@@ -392,19 +392,19 @@ export async function chatComplete(
 ): Promise<ChatResult & { attempts: AttemptLog[]; rateLimited: boolean }> {
   const chain = providers();
   const attempts: AttemptLog[] = [];
-  let rateLimited = false;
+  let sawRateLimit = false;
 
   // Primary: first two candidates raced, so the fastest good answer wins.
   const head = chain.slice(0, 2);
   const headResults = await Promise.all(head.map(p => attempt(p, turns, opts)));
   for (const r of headResults) {
     attempts.push(r.log);
-    if (r.rateLimited) rateLimited = true;
+    if (r.rateLimited) sawRateLimit = true;
   }
   const winner = headResults.find(r => r.text);
   if (winner) {
     const log = attempts.find(a => a.provider === winner.log.provider)!;
-    return { text: winner.text, provider: log.provider, model: log.model, attempts, rateLimited };
+    return { text: winner.text, provider: log.provider, model: log.model, attempts, rateLimited: false };
   }
 
   // Rest of the chain, sequentially with one retry each — cheap and resilient.
@@ -412,9 +412,9 @@ export async function chatComplete(
     for (let attemptNo = 0; attemptNo < 2; attemptNo++) {
       const r = await attempt(p, turns, opts);
       attempts.push(r.log);
-      if (r.rateLimited) rateLimited = true;
+      if (r.rateLimited) sawRateLimit = true;
       if (r.text) {
-        return { text: r.text, provider: p.name, model: p.model, attempts, rateLimited };
+        return { text: r.text, provider: p.name, model: p.model, attempts, rateLimited: false };
       }
       // A spent quota or a hard 4xx will not improve on retry.
       if (r.rateLimited) break;
@@ -425,7 +425,8 @@ export async function chatComplete(
     }
   }
 
-  return { text: "", provider: "none", model: "none", attempts, rateLimited };
+  // Only now does the quota matter: it is the reason there is no answer.
+  return { text: "", provider: "none", model: "none", attempts, rateLimited: sawRateLimit };
 }
 
 /**
