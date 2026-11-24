@@ -51,7 +51,7 @@ export default function TermsPage() {
             </ul>
           </Card>
           <Card icon={<Mail size={16} />} title="6. Contact & changes">
-            <p>Operator: <strong>Kai Chauhan — GG-Lounge Studios™</strong>, Adelaide SA, AU. We post material term changes as a banner for 7 days + bump this date. Continued use = acceptance.</p>
+            <p>Operator: <strong>DAGOD22 — GG-Lounge Studios™</strong>, Adelaide SA, AU. We post material term changes as a banner for 7 days + bump this date. Continued use = acceptance.</p>
           </Card>
           <Card icon={<FileText size={16} />} title="7. Privacy">
             <p>See <a href="/privacy" style={{ color: 'var(--lime)', textDecoration: 'underline' }}>Privacy Policy</a> for what we store (anon ID, optional account, playCounts) and how to delete. By using the lounge you agree to that too.</p>

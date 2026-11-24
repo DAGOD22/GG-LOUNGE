@@ -29,6 +29,11 @@ Disallow: /admin
 Disallow: /gate
 Disallow: /banned
 
+# The link directory is a reference page, not a landing page. Indexing it would
+# put 250 near-duplicate game listings into search results next to the real
+# library, which is the duplicate-content problem the sitemap exists to avoid.
+Disallow: /secret-link-doc
+
 # Assets carry no indexable text; crawling them only burns crawl budget.
 Disallow: /*.webp$
 Disallow: /*.wasm$

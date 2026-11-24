@@ -702,7 +702,7 @@ export default function Page() {
             <strong>GG-LOUNGE<span className="tm">™</span></strong>
           </div>
           <span className="footer-rule" />
-          <p>Made by <strong>Kai Chauhan</strong></p>
+          <p>Made by <strong>DAGOD22</strong></p>
         </div>
         <div className="footer-bottom">
           <span>© 2026 GG-LOUNGE STUDIOS™. All rights reserved.</span>

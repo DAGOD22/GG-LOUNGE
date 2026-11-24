@@ -53,7 +53,7 @@ export default function PrivacyPage() {
             <p style={{ marginTop: 10, padding: 12, borderRadius: 12, background: 'rgba(215,243,74,.08)', border: '1px solid rgba(215,243,74,.2)', fontSize: 13 }}><strong>Under 13?</strong> Don't register. Play as guest — no personal info needed.</p>
           </Card>
           <Card icon={<Mail size={16} />} title="Contact & age">
-            <p>This is a hobby project by <strong>Kai Chauhan — GG-Lounge Studios™</strong>. For privacy requests: open <a href="/request-game" style={{ textDecoration: 'underline' }}>Request page</a> and type "privacy". We respond within 7 days.</p>
+            <p>This is a hobby project by <strong>DAGOD22 — GG-Lounge Studios™</strong>. For privacy requests: open <a href="/request-game" style={{ textDecoration: 'underline' }}>Request page</a> and type "privacy". We respond within 7 days.</p>
             <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 12 }}>If we change this policy, we bump the date above and post a banner on the lounge for 7 days.</p>
           </Card>
         </div>

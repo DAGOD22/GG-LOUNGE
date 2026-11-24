@@ -1,0 +1,333 @@
+/* ── The link directory ──────────────────────────────────────────────────────
+   A reference page, so it is dense on purpose: the unit of information is a
+   URL and the reader is scanning for one. Everything is built from the same
+   custom properties as the rest of the lounge, which means it follows light
+   mode and any custom theme without a second set of colours. */
+
+.doc-shell {
+  max-width: 1080px;
+  padding-bottom: 80px;
+}
+
+.doc-title {
+  margin: 10px 0 0;
+  font-size: clamp(34px, 6vw, 62px);
+  letter-spacing: -0.06em;
+  line-height: 1.02;
+}
+
+.doc-title span {
+  color: var(--lime);
+}
+
+.doc-lede {
+  max-width: 74ch;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.doc-lede strong,
+.doc-callout strong {
+  color: var(--foreground);
+}
+
+.doc-callout {
+  display: flex;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--lime) 26%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--lime) 7%, transparent);
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.doc-callout svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--lime);
+}
+
+.doc-callout p {
+  margin: 0;
+}
+
+.doc-callout code,
+.doc-links code,
+.doc-game-links code {
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: var(--surface-strong);
+  color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+}
+
+.doc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.doc-copy,
+.doc-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.doc-copy {
+  border-color: transparent;
+  background: var(--lime);
+  color: #0b0d12;
+}
+
+.doc-copy:hover {
+  filter: brightness(1.05);
+}
+
+.doc-action:hover {
+  border-color: var(--lime);
+}
+
+.doc-origin {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.doc-section {
+  margin-top: 46px;
+  scroll-margin-top: 24px;
+}
+
+.doc-section-head h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  font-size: clamp(22px, 3vw, 30px);
+  letter-spacing: -0.04em;
+}
+
+.doc-section-head h2 span {
+  color: var(--lime);
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.doc-section-head p {
+  max-width: 78ch;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+/* ── link lists ───────────────────────────────────────────────────────────── */
+.doc-links {
+  display: grid;
+  gap: 1px;
+  margin-top: 16px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  list-style: none;
+  background: var(--line);
+}
+
+.doc-links li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--panel);
+}
+
+.doc-links a {
+  color: var(--foreground);
+}
+
+.doc-links a:hover code {
+  color: var(--lime);
+}
+
+.doc-note {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.doc-note-warn {
+  color: var(--coral);
+}
+
+.doc-abs {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  opacity: 0.55;
+  word-break: break-all;
+}
+
+/* ── game shelves ─────────────────────────────────────────────────────────── */
+.doc-group {
+  margin-top: 26px;
+  scroll-margin-top: 24px;
+}
+
+.doc-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.doc-group-head h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.doc-group-head h3 span {
+  color: var(--lime);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+.doc-group-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.doc-games {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 2px 18px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc-game {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px dashed color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.doc-game-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--foreground);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.doc-game-title:hover {
+  color: var(--lime);
+}
+
+.doc-tag {
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--violet) 45%, transparent);
+  border-radius: 999px;
+  color: var(--violet);
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.doc-game-links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.doc-game-links a {
+  color: var(--muted);
+}
+
+.doc-game-links a:hover code {
+  color: var(--lime);
+  background: var(--surface-hover);
+}
+
+.doc-game-links code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 10.5px;
+}
+
+/* ── footer ───────────────────────────────────────────────────────────────── */
+.doc-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 52px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.doc-footer p {
+  margin: 0;
+  max-width: 62ch;
+  line-height: 1.6;
+}
+
+.doc-footer strong {
+  color: var(--foreground);
+}
+
+.doc-footer a {
+  text-decoration: underline;
+}
+
+@media (max-width: 720px) {
+  .doc-games {
+    grid-template-columns: 1fr;
+  }
+  .doc-abs {
+    width: 100%;
+    margin-left: 0;
+  }
+  .doc-origin {
+    margin-left: 0;
+    width: 100%;
+  }
+}
