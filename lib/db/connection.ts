@@ -195,6 +195,12 @@ export function migrate(): Promise<void> {
           "seen_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
         CREATE INDEX IF NOT EXISTS "live_presence_seen_idx" ON "live_presence" ("seen_at" DESC);
+        /* What a player is *doing*, not only which game they have open.
+           "in the proxy, on youtube.com" and "reading /apps" are as
+           interesting in the feed as a game launch, and without these the
+           roster could only ever answer "which game". */
+        ALTER TABLE "live_presence" ADD COLUMN IF NOT EXISTS "kind" TEXT;
+        ALTER TABLE "live_presence" ADD COLUMN IF NOT EXISTS "label" TEXT;
         CREATE TABLE IF NOT EXISTS "live_event" (
           "id" BIGSERIAL PRIMARY KEY,
           "kind" TEXT NOT NULL,
@@ -203,6 +209,10 @@ export function migrate(): Promise<void> {
           "game" TEXT,
           "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
+        /* The feed shows "what they opened", so it carries the same kind/label
+           pair the roster does, plus the destination for proxy visits. */
+        ALTER TABLE "live_event" ADD COLUMN IF NOT EXISTS "target" TEXT;
+        ALTER TABLE "live_event" ADD COLUMN IF NOT EXISTS "label" TEXT;
         CREATE INDEX IF NOT EXISTS "live_event_created_idx" ON "live_event" ("created_at" DESC);
         CREATE TABLE IF NOT EXISTS "live_budget" (
           "key" TEXT PRIMARY KEY,

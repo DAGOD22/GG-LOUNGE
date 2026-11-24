@@ -1,22 +1,30 @@
-import { cookies } from "next/headers";
+import { NextResponse } from 'next/server';
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+/**
+ * Ultraviolet's client config.
+ *
+ * This used to be a dynamic Node route that read a `gg_bare` cookie and wrote
+ * a different `bare:` address per visitor. It is now one fixed file, and the
+ * reason is a bug that cost days: a service worker's install cannot tolerate a
+ * config that can fail. The worker is evaluated from scratch on every install
+ * and every cold start, so a single non-200 here, a cookie parsing surprise or
+ * a cold Node lambda mid-install leaves the worker `redundant` — which the page
+ * reports, accurately and uselessly, as "Proxy worker installation failed".
+ *
+ * Nothing was gained by the cookie, either: the only value it could take was
+ * `/api/bare/`, which is what this route already fell back to. So it is a
+ * constant, served with an immutable cache header, and the worker can no longer
+ * be broken by anything the browser sends it.
+ *
+ * Kept as a route rather than moved to `public/` because the deployed worker
+ * fetches exactly this path; changing the file's URL would strand every
+ * already-installed worker on a 404.
+ */
+export const dynamic = 'force-static';
 
-/** Ultraviolet client config, served dynamically so the proxy page can switch
- *  between the local bare server and public fallback bare servers. */
-export async function GET() {
-  const jar = await cookies();
-  const raw = (jar.get("gg_bare")?.value || "/api/bare/").trim();
-  const safe =
-    /^https?:\/\/[A-Za-z0-9.-]+(?::\d+)?(?:\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=-]*)?$/.test(raw) ||
-    raw.startsWith("/")
-      ? raw.replace(/["'\\<>]/g, "")
-      : "/api/bare/";
-
-  const js = `self.__uv$config = {
+const CONFIG = `self.__uv$config = {
   prefix: "/service/",
-  bare: ${JSON.stringify(safe)},
+  bare: "/api/bare/",
   encodeUrl: Ultraviolet.codec.xor.encode,
   decodeUrl: Ultraviolet.codec.xor.decode,
   handler: "/uv/uv.handler.js",
@@ -25,5 +33,14 @@ export async function GET() {
   sw: "/uv/uv.sw.js",
 };
 `;
-  return new Response(js, { headers: { "content-type": "application/javascript" } });
+
+export function GET() {
+  return new NextResponse(CONFIG, {
+    headers: {
+      'content-type': 'application/javascript; charset=utf-8',
+      // Never cached: an installed worker re-imports this on every cold start,
+      // and a stale config is indistinguishable from a broken worker.
+      'cache-control': 'no-store',
+    },
+  });
 }

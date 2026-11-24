@@ -94,7 +94,7 @@ export function GameModal({
   // the launcher) and to the live feed, which is what other players see.
   useEffect(() => {
     live.setActiveGame(game.id)
-    live.announce('launch', game.id)
+    live.announce('launch', { gameId: game.id })
     // On close, drop the "playing …" tag from this player's ghost cursor so the
     // room stops advertising a game that is no longer on screen.
     return () => live.setActiveGame(null)

@@ -48,6 +48,29 @@ function loadScript(src: string): Promise<void> {
   return pending;
 }
 
+/**
+ * The bare hostname of a destination, for anything that leaves this browser:
+ * the activity roster, the feed, a status line.
+ *
+ * Paths and queries on a proxied URL routinely contain search terms, session
+ * ids and account names. Broadcasting "in the proxy" is fine; broadcasting
+ * "in the proxy on youtube.com/watch?v=something-embarrassing" is a leak, so
+ * everything past the host is dropped at the source rather than at the sink.
+ */
+export function hostOnly(input: string): string {
+  const value = input.trim();
+  if (!value) return '';
+  try {
+    const url = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(value) ? value : `https://${value}`);
+    const host = url.hostname.replace(/^www\./, '').toLowerCase();
+    // Must look like a hostname; a bare word is not a destination.
+    if (!host.includes('.') || !/[a-z]/.test(host)) return '';
+    return host.slice(0, 60);
+  } catch {
+    return '';
+  }
+}
+
 export function normalizeProxyUrl(input: string): string {
   let value = input.trim();
   if (!value) throw new Error('Enter a website address or search.');
@@ -61,26 +84,85 @@ export function normalizeProxyUrl(input: string): string {
 }
 
 /**
- * navigator.serviceWorker.ready can resolve for an unrelated worker, or wait
- * forever when the page is outside the worker's scope. Wait for THIS
- * registration instead.
+ * Watch one worker's lifecycle, keeping the states it passed through.
+ *
+ * The old version reported two outcomes, `activated` and the catch-all
+ * "installation failed" — which is what the page showed for a failed *fetch*, a
+ * syntax error in the bundle and a genuine install exception alike. That text
+ * told the user nothing they could act on and told us nothing we could fix.
+ * Every state is recorded now, so the message can name the step that broke.
  */
-export function waitForActivation(reg: ServiceWorkerRegistration, timeoutMs = 15000): Promise<ServiceWorkerRegistration> {
+export function watchWorker(worker: ServiceWorker, timeoutMs = 15000): Promise<void> {
   return new Promise((resolve, reject) => {
-    const worker = reg.installing || reg.waiting || reg.active;
-    if (!worker) return reject(new Error('Proxy worker was not installed.'));
+    const states: string[] = [];
     const finish = (error?: Error) => {
-      clearTimeout(timer); worker.removeEventListener('statechange', check);
-      error ? reject(error) : resolve(reg);
+      clearTimeout(timer);
+      worker.removeEventListener('statechange', check);
+      if (error) {
+        // Keep the sentence first; the state trail is supporting detail.
+        error.message = `Proxy worker activation timed out or failed: ${error.message}`;
+        if (states.length) error.message += ` (${states.join(' → ')})`;
+        reject(error);
+      } else resolve();
     };
     const check = () => {
+      states.push(worker.state);
       if (worker.state === 'activated') finish();
-      else if (worker.state === 'redundant') finish(new Error('Proxy worker installation failed. Reload to retry.'));
+      // `redundant` is terminal: the browser has thrown this worker away.
+      else if (worker.state === 'redundant') finish(new Error('Proxy worker installation failed'));
     };
-    const timer = setTimeout(() => finish(new Error('Proxy worker activation timed out.')), timeoutMs);
+    const timer = setTimeout(
+      () => finish(new Error(`Proxy worker did not finish installing (state: ${worker.state})`)),
+      timeoutMs,
+    );
     worker.addEventListener('statechange', check);
     check();
   });
+}
+
+/**
+ * Wait for THIS registration, not for `navigator.serviceWorker.ready`.
+ *
+ * `ready` can resolve for an unrelated worker, and waits forever when the page
+ * is outside the worker's scope — both of which read as a hung proxy.
+ */
+export function waitForActivation(reg: ServiceWorkerRegistration, timeoutMs = 15000): Promise<ServiceWorkerRegistration> {
+  const worker = reg.installing || reg.waiting || reg.active;
+  if (!worker) return Promise.reject(new Error('Proxy worker was not installed'));
+  return watchWorker(worker, timeoutMs).then(() => reg);
+}
+
+/**
+ * Check the two files the worker imports before asking the browser to install it.
+ *
+ * A worker's install is a black box: it activates or it goes `redundant`, and
+ * the page is told nothing about why. Probing the same URLs the worker imports
+ * turns the common failures into a sentence instead of "installation failed":
+ *
+ *   · a 404, or an HTML error page where a script should be (bad deploy, or a
+ *     rewrite catching /uv/*),
+ *   · a config that is not the shape Ultraviolet expects,
+ *   · a bundle that is missing the globals the worker extends at load time.
+ *
+ * An exception *inside* a valid-looking bundle is the one case this cannot see.
+ */
+async function preflight(): Promise<string | null> {
+  const [bundle, config] = await Promise.all([
+    fetch('/uv/uv.bundle.js', { cache: 'no-store' }).catch(() => null),
+    fetch('/uv/uv.config.js', { cache: 'no-store' }).catch(() => null),
+  ]);
+  if (!bundle) return 'The proxy engine could not be downloaded.';
+  if (!bundle.ok) return `The proxy engine could not be downloaded (HTTP ${bundle.status}).`;
+  if (bundle.headers.get('content-type')?.includes('text/html')) {
+    return 'The proxy engine was served as a web page instead of a script.';
+  }
+  if (!config) return 'The proxy configuration could not be downloaded.';
+  if (!config.ok) return `The proxy configuration could not be downloaded (HTTP ${config.status}).`;
+  const configText = await config.text().catch(() => '');
+  if (!/self\.__uv\$config\s*=/.test(configText)) return 'The proxy configuration is malformed.';
+  const bundleText = await bundle.text().catch(() => '');
+  if (!bundleText.includes('Ultraviolet')) return 'The proxy engine file is incomplete.';
+  return null;
 }
 
 /**
@@ -89,9 +171,30 @@ export function waitForActivation(reg: ServiceWorkerRegistration, timeoutMs = 15
  * controls, so navigating before control is established yields a 404.
  */
 export async function ensureProxyWorker(): Promise<ServiceWorkerRegistration> {
-  const registration = await waitForActivation(
-    await navigator.serviceWorker.register('/uv/uv.sw.js', { scope: '/', updateViaCache: 'none' }),
-  );
+  const problem = await preflight();
+  if (problem) throw new Error(`${problem} Reload to retry.`);
+
+  let registration: ServiceWorkerRegistration;
+  try {
+    registration = await navigator.serviceWorker.register('/uv/uv.sw.js', {
+      scope: '/',
+      updateViaCache: 'none',
+    });
+  } catch (cause) {
+    // register() rejects when the script will not parse — a different fix from
+    // a worker that installs and then throws.
+    throw new Error(`The proxy worker could not be registered: ${describe(cause)}.`);
+  }
+
+  try {
+    await waitForActivation(registration);
+  } catch (cause) {
+    // A redundant worker is not retried by the browser on the same page load,
+    // so leaving the registration behind guarantees the next attempt fails too.
+    await registration.unregister().catch(() => {});
+    throw new Error(`${describe(cause)}. Reload to retry.`);
+  }
+
   if (!navigator.serviceWorker.controller) {
     await new Promise<void>(resolve => {
       const done = () => resolve();
@@ -102,24 +205,61 @@ export async function ensureProxyWorker(): Promise<ServiceWorkerRegistration> {
   for (let attempt = 0; attempt < 40 && !navigator.serviceWorker.controller; attempt++) {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  if (!navigator.serviceWorker.controller) throw new Error('The proxy worker could not take control of this page. Reload and try again.');
+  if (!navigator.serviceWorker.controller) {
+    throw new Error('The proxy worker installed but could not take control of this page. Reload and try again.');
+  }
   return registration;
 }
 
-/** Does this host actually upgrade /api/wisp? One probe, cached. */
+/** A short, human reason from whatever was thrown. */
+function describe(cause: unknown): string {
+  if (cause instanceof Error && cause.message) return cause.message;
+  const name = (cause as { name?: string })?.name;
+  return name ? `the browser reported ${name}` : 'the browser gave no reason';
+}
+
+/**
+ * Is there a real WebSocket relay at /api/wisp?
+ *
+ * The old probe *fetched* `/api/wisp` and believed the JSON, which says "yes,
+ * transport: websocket" on the self-hosted server and returns a JSON body on a
+ * serverless host too — so the client switched to a Wisp transport that did not
+ * exist and proxied pages sat on a blank frame. The only honest test is an
+ * actual upgrade, so this opens one and closes it. A serverless deployment
+ * refuses immediately and we stay on Bare, which is what actually works there.
+ */
 let wispProbe: Promise<boolean> | null = null;
 function wispAvailable(): Promise<boolean> {
   if (wispProbe) return wispProbe;
-  wispProbe = (async () => {
+  wispProbe = new Promise<boolean>(resolve => {
+    let settled = false;
+    let timer = 0;
+    const done = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      socket.onopen = socket.onerror = socket.onclose = null;
+      try { socket.close(); } catch { /* already closed */ }
+      resolve(ok);
+    };
+    let socket: WebSocket;
     try {
-      const res = await fetch('/api/wisp', { method: 'GET', headers: { accept: 'application/json' } });
-      if (!res.ok) return false;
-      const body = (await res.json()) as { transport?: string };
-      return body?.transport === 'websocket';
+      socket = new WebSocket(
+        `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/wisp/`,
+        ['wisp-v2', 'wisp-v1'],
+      );
     } catch {
-      return false;
+      resolve(false);
+      return;
     }
-  })();
+    // Probe with the exact protocol list the Wisp client itself uses; a server
+    // that speaks only wisp-v1 would reject v2 and answer a v2-only probe with
+    // a close, which is indistinguishable from "no server at all".
+    timer = window.setTimeout(() => done(false), 3500);
+    socket.onopen = () => done(true);
+    socket.onerror = () => done(false);
+    socket.onclose = () => done(false);
+  });
   return wispProbe;
 }
 
@@ -127,11 +267,27 @@ export function bootProxy(): Promise<ProxyRuntime> {
   if (bootPromise) return bootPromise;
   bootPromise = (async (): Promise<ProxyRuntime> => {
     if (!window.isSecureContext || !('serviceWorker' in navigator)) throw new Error('The proxy needs HTTPS and service workers enabled in your browser.');
-    // Only one engine may own the scope; drop the old Scramjet workers.
+
+    // Retire the *other* engines' workers only.
+    //
+    // This used to also unregister `/uv/uv.sw.js` — the worker the next line
+    // then registers — because the old Scramjet worker shared that shape of
+    // path. Unregistering a worker does not cancel its in-flight install, so
+    // the registration below raced the unregister and the page reported
+    // "Proxy worker installation failed" against a worker that had, in fact,
+    // been removed by our own boot code. Match the legacy scripts exactly and
+    // touch nothing else: an installed, controlling worker is what makes
+    // /service/ resolve at all.
     const existing = await navigator.serviceWorker.getRegistrations();
     await Promise.all(existing.filter(reg => {
-      const scriptPath = new URL((reg.active || reg.waiting || reg.installing)?.scriptURL || location.href).pathname;
-      return scriptPath === '/gg-sw.js' || scriptPath === '/proxy/sw.js' || /\/(?:uv\/)?uv\.sw\.js$/.test(scriptPath);
+      const scriptPath = new URL(
+        (reg.active || reg.waiting || reg.installing)?.scriptURL || location.href,
+      ).pathname;
+      return scriptPath === '/gg-sw.js'
+        || scriptPath === '/proxy/sw.js'
+        || scriptPath === '/gg-app-sw.js'
+        || scriptPath === '/uv.sw.js'
+        || scriptPath === '/service/uv.sw.js';
     }).map(reg => reg.unregister()));
 
     await ensureProxyWorker();

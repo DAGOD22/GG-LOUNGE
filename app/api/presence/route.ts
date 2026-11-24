@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getUserFromToken } from '@/lib/db';
 import {
+  cleanActivity,
   cleanCursor,
   cleanGameId,
   cleanName,
@@ -67,8 +68,11 @@ export async function POST(req: Request) {
   const cursor = cleanCursor(body?.cursor);
   if (!GHOST_PRESETS.has(cursor.preset)) cursor.preset = 'system';
   const game = cleanGameId(body?.game);
+  // The roster reports what people are *doing*, which is a game, an app, a
+  // page or a proxy destination — see cleanActivity for what is allowed in.
+  const activity = cleanActivity(body?.activity);
 
-  const { peers, online } = await touchPresence(id, { username, cursor, game });
+  const { peers, online } = await touchPresence(id, { username, cursor, game, activity });
   const events = await recentLiveEvents().catch(() => []);
 
   // `online` includes the caller, so it is always at least 1. Everything a
@@ -79,7 +83,10 @@ export async function POST(req: Request) {
     {
       online,
       others: others.length,
+      // The caller's own id, so the roster can label its own row "you" and
+      // show its own cursor colour rather than reporting a stranger's.
       self: id,
+      selfCursor: cursor,
       peers: others.map(peer => ({
         id: peer.id,
         username: peer.username,
@@ -88,6 +95,7 @@ export async function POST(req: Request) {
         name: displayName(peer),
         cursor: peer.cursor,
         game: peer.game,
+        activity: peer.activity,
         seen: peer.seenAt,
       })),
       // The store speaks `createdAt`, the client type speaks `at`. Sending both
@@ -99,6 +107,8 @@ export async function POST(req: Request) {
         name: event.name,
         message: event.message,
         game: event.game,
+        target: event.target,
+        label: event.label,
         at: event.createdAt,
         createdAt: event.createdAt,
       })),
@@ -135,6 +145,8 @@ export async function GET() {
         name: event.name,
         message: event.message,
         game: event.game,
+        target: event.target,
+        label: event.label,
         at: event.createdAt,
         createdAt: event.createdAt,
       })),

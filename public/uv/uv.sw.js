@@ -658,6 +658,199 @@ Object.defineProperty(EventEmitter, "defaultMaxListeners", {
 
 
 const sw = new UVServiceWorker(self.__uv$config);
-self.addEventListener('install', (e) => self.skipWaiting());
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
-self.addEventListener('fetch', (event) => event.respondWith(sw.fetch(event)));
+
+/* ========================================================================
+ * One worker, not two.
+ *
+ * This file used to be the proxy worker only, while public/gg-app-sw.js was a
+ * *second* worker registered at the same scope ("/") to cache the shell for
+ * offline use. A scope can only have one registration: the second register()
+ * call replaces the first, and the replaced worker goes straight to
+ * `state === 'redundant'` — which the proxy page reported, correctly and
+ * uselessly, as "Proxy worker installation failed". It also meant that
+ * whichever worker lost the race was not controlling /service/, so a proxied
+ * navigation fell through to Next.js, hit the legacy /service redirect, and
+ * bounced the user back to GG-Lounge. That is exactly the reported bug: open
+ * the proxy, land back on the lounge.
+ *
+ * So the offline shell lives here now, behind the proxy's own rules, and only
+ * one registration exists at origin scope. Everything below this line is the
+ * old gg-app-sw.js, with one addition: a dispatcher that hands proxied traffic
+ * to Ultraviolet and everything else to the cache.
+ * ===================================================================== */
+
+const SHELL_VERSION = 'ggl-app-v2';
+const SHELL = `${SHELL_VERSION}-shell`;
+const ASSETS = `${SHELL_VERSION}-assets`;
+const GAMES = `${SHELL_VERSION}-games`;
+const SHELL_FILES = ['/offline.html', '/manifest.json', '/icon.svg'];
+const MAX_GAME_ENTRIES = 120;
+
+/**
+ * Paths that must never be served from a cache, or that belong to the proxy.
+ *
+ * Matched per path *segment*, not by string prefix: the routes are `/proxy` and
+ * `/apps`, with no trailing slash, so a `startsWith('/proxy/')` test missed them
+ * entirely and served a cached copy of the proxy shell over a live one.
+ */
+const HANDS_OFF = ['/browse', '/proxy', '/service', '/api', '/uv', '/_next', '/gg-sw.js', '/gg-app-sw.js'];
+
+function handsOff(pathname) {
+  return HANDS_OFF.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+function cacheable(request) {
+  if (request.method !== 'GET') return false;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return false;
+  return !handsOff(url.pathname);
+}
+
+/**
+ * Is this request part of a proxied document?
+ *
+ * The document itself is under /service/. Its subresources are same-origin
+ * requests whose referrer is still the proxied URL, and Ultraviolet has to see
+ * both — a cached copy of a destination's asset would be a cached copy of
+ * somebody else's site.
+ */
+function proxied(event) {
+  if (event.request.url.startsWith(self.location.origin + '/service/')) return true;
+  const referrer = event.request.referrer || '';
+  return referrer.startsWith(self.location.origin + '/service/');
+}
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    (async () => {
+      // Individually, so one 404 cannot fail the install and leave the origin
+      // with no worker at all — which is precisely the failure mode this file
+      // has already caused once.
+      const cache = await caches.open(SHELL);
+      await Promise.all(SHELL_FILES.map(file => cache.add(file).catch(() => {})));
+      await self.skipWaiting();
+    })(),
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    (async () => {
+      const names = await caches.keys();
+      await Promise.all(
+        names
+          .filter(name => (name.startsWith('ggl-app-') || name.startsWith('ggl-shell-')) && !name.startsWith(SHELL_VERSION))
+          .map(name => caches.delete(name)),
+      );
+      await self.clients.claim();
+    })(),
+  );
+});
+
+self.addEventListener('fetch', event => {
+  // The proxy gets first refusal. A destination's own documents, assets and
+  // API calls must never be answered from this origin's cache.
+  if (proxied(event)) {
+    event.respondWith(sw.fetch(event));
+    return;
+  }
+  const request = event.request;
+  if (!cacheable(request)) return;
+
+  const url = new URL(request.url);
+
+  // Navigations: network first, cache second, offline page last. The cache is
+  // a fallback, never the source of truth, so a deploy shows up next load.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      (async () => {
+        try {
+          const response = await fetch(request);
+          const cache = await caches.open(SHELL);
+          cache.put(request, response.clone()).catch(() => {});
+          return response;
+        } catch {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+          const shell = await caches.match('/');
+          if (shell) return shell;
+          return (await caches.match('/offline.html')) || Response.error();
+        }
+      })(),
+    );
+    return;
+  }
+
+  // Game files, icons and host-game frames: cache first. They are immutable
+  // and are the difference between an installed app that opens instantly and
+  // one that spins on a school network.
+  if (url.pathname.startsWith('/games/') || url.pathname.startsWith('/game-icons/') || url.pathname.startsWith('/app-frames/')) {
+    event.respondWith(
+      (async () => {
+        const cache = await caches.open(GAMES);
+        const cached = await cache.match(request);
+        if (cached) return cached;
+        try {
+          const response = await fetch(request);
+          if (response.ok) {
+            // Bound the cache: a 254-game catalogue would otherwise fill the
+            // quota and get the whole origin evicted.
+            const keys = await cache.keys();
+            if (keys.length >= MAX_GAME_ENTRIES) await cache.delete(keys[0]);
+            cache.put(request, response.clone()).catch(() => {});
+          }
+          return response;
+        } catch {
+          return new Response('', { status: 504, statusText: 'Offline' });
+        }
+      })(),
+    );
+    return;
+  }
+
+  // Everything else: stale-while-revalidate.
+  event.respondWith(
+    (async () => {
+      const cache = await caches.open(ASSETS);
+      const cached = await cache.match(request);
+      const network = fetch(request)
+        .then(response => {
+          if (response.ok) cache.put(request, response.clone()).catch(() => {});
+          return response;
+        })
+        .catch(() => cached);
+      return cached || network;
+    })(),
+  );
+});
+
+/**
+ * The page can ask for a game to be kept offline, which is what makes the
+ * "download for offline" affordance honest rather than decorative.
+ */
+self.addEventListener('message', event => {
+  const data = event.data || {};
+  if (data.type !== 'ggl-precache' || !Array.isArray(data.urls)) return;
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(GAMES);
+      let stored = 0;
+      for (const raw of data.urls.slice(0, 40)) {
+        try {
+          const url = new URL(raw, self.location.origin);
+          if (url.origin !== self.location.origin) continue;
+          const response = await fetch(url);
+          if (!response.ok) continue;
+          await cache.put(url.href, response);
+          stored++;
+        } catch {
+          /* skip this one, keep going */
+        }
+      }
+      const client = event.source;
+      if (client && typeof client.postMessage === 'function') {
+        client.postMessage({ type: 'ggl-precached', stored });
+      }
+    })(),
+  );
+});

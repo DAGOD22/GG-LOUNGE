@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, ExternalLink, Globe, Home, RotateCw, Search } from 'lucide-react';
 import { bootProxy, createFrame, normalizeProxyUrl, type ProxyFrame, type ProxyRuntime } from '@/lib/proxy-client';
+import { setProxyDestination } from '@/lib/proxy-activity';
 
 const shortcuts = [
   ['YouTube', 'https://www.youtube.com/'], ['Bing', 'https://www.bing.com/'],
@@ -32,6 +33,7 @@ export default function ProxyPage() {
       if (!active) throw new Error('Wait for the proxy to connect first.');
       const proxied = active.encode(url);
       setError(''); setLoading(true); setAddress(url); setCurrent(proxied);
+      setProxyDestination(url);
       controlledFrame.current.go(proxied);
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => { setLoading(false); setStatus('Upstream response timed out.'); setError('No page response after 35 seconds. The destination may be unreachable, rate-limiting us, or requiring JavaScript the proxy cannot carry. Try again or open the site directly.'); }, 35000);
@@ -55,6 +57,10 @@ export default function ProxyPage() {
         if (cancelled) return;
         setAddress(event.url);
         setCurrent(event.url);
+        // Publish where the frame actually is, so the roster can say
+        // "in the proxy on youtube.com" and follow in-frame navigation —
+        // this route's own query string does not change when it happens.
+        setProxyDestination(event.url);
         setLoading(false);
         setError('');
       });

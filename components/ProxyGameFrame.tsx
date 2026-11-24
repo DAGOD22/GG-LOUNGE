@@ -2,6 +2,7 @@
 import { GAME_FRAME_SANDBOX } from '@/lib/frame-policy'
 import { useEffect, useRef, useState } from 'react';
 import { bootProxy, normalizeProxyUrl } from '@/lib/proxy-client';
+import { setProxyDestination } from '@/lib/proxy-activity';
 
 /**
  * Full-bleed player for proxy-only games. The game fills the viewport and the
@@ -22,7 +23,11 @@ export function ProxyGameFrame({ title, target }: { title: string; target: strin
     let cancelled = false;
     bootProxy().then(runtime => {
       if (cancelled) return;
-      setSrc(runtime.encode(normalizeProxyUrl(target)));
+      const url = normalizeProxyUrl(target);
+      setSrc(runtime.encode(url));
+      // Proxied catalogue games run in the same worker, so they belong in the
+      // roster too — "playing <title>" with the origin it came from.
+      setProxyDestination(url);
       setStatus('');
     }).catch(cause => {
       if (cancelled) return;

@@ -19,6 +19,56 @@ export const PRESENCE_TTL_MS = 30_000;
 const EVENT_KEEP = 200;
 const POLL_EVENTS = 8;
 
+/** The fixed set of things a player can be doing. Never free text. */
+export const ACTIVITY_KINDS = ['game', 'app', 'page', 'proxy', 'tools', 'idle'] as const;
+export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
+
+export type ActivityInput = { kind: ActivityKind; label: string; game: string | null };
+
+/**
+ * Bound an activity payload.
+ *
+ * `label` is the only field that can carry user-visible text, so it is the only
+ * one worth worrying about: control characters stripped, length capped at 40,
+ * and for a proxy destination reduced to a bare hostname. A path or a query on
+ * a proxied URL can contain a search term, a reset token or a username, and a
+ * roster that broadcasts those to every other player is a privacy hole, not a
+ * feature.
+ */
+export function cleanActivity(input: unknown): ActivityInput | null {
+  const raw = (input ?? {}) as Record<string, unknown>;
+  const kind = typeof raw.kind === 'string' && (ACTIVITY_KINDS as readonly string[]).includes(raw.kind)
+    ? (raw.kind as ActivityKind)
+    : null;
+  if (!kind || kind === 'idle') return null;
+  const label = String(raw.label ?? '')
+    // Control characters, but also the invisible ones: a zero-width space or a
+    // bidi override lets a label look like one thing while being another, and
+    // the roster renders it as-is.
+    .replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028\u2029\ufeff]/g, '')
+    .trim()
+    .slice(0, 40);
+  if (!label) return null;
+  const game = kind === 'game' ? cleanGameId(raw.game) : null;
+  return { kind, label: kind === 'proxy' ? hostOnly(label) : label, game };
+}
+
+/** `https://www.youtube.com/watch?v=x` → `youtube.com`. Anything odd → ''. */
+export function hostOnly(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  try {
+    const url = new URL(/^[a-z]+:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
+    const host = url.hostname.replace(/^www\./, '').toLowerCase();
+    // A label must look like a hostname. Without this, any bare word the client
+    // sends becomes a "destination" in the roster ("in the proxy on hello").
+    if (!host.includes('.') || !/[a-z]/.test(host)) return '';
+    return host.slice(0, 60);
+  } catch {
+    return '';
+  }
+}
+
 export type PresenceCursorInput = {
   x: number;
   y: number;
@@ -33,6 +83,7 @@ export type PresenceRow = {
   username: string | null;
   cursor: PresenceCursorInput;
   game: string | null;
+  activity: ActivityInput | null;
   seenAt: number;
 };
 
@@ -42,10 +93,17 @@ export type LiveEventRow = {
   name: string;
   message: string;
   game: string | null;
+  target: string | null;
+  label: string | null;
   createdAt: number;
 };
 
-const ALLOWED_KINDS = new Set(['launch', 'achievement', 'online', 'room', 'join']);
+/**
+ * `visited` is the one the feed needed and did not have: "opened the proxy on
+ * youtube.com" and "is on the apps page" are what the user asked to see, and
+ * neither is a launch.
+ */
+const ALLOWED_KINDS = new Set(['launch', 'achievement', 'online', 'room', 'join', 'visited']);
 
 /** Trim and bound a name that will be shown to other players. */
 export function cleanName(value: unknown): string | null {
@@ -95,7 +153,12 @@ type LocalPresence = { presence: Record<string, PresenceRow>; events: LiveEventR
  */
 export async function touchPresence(
   id: string,
-  data: { username: string | null; cursor: PresenceCursorInput; game: string | null },
+  data: {
+    username: string | null;
+    cursor: PresenceCursorInput;
+    game: string | null;
+    activity: ActivityInput | null;
+  },
 ): Promise<{ peers: PresenceRow[]; online: number }> {
   const now = Date.now();
   const cutoff = now - PRESENCE_TTL_MS;
@@ -104,13 +167,14 @@ export async function touchPresence(
     await migrate();
     await pgQuery(
       `INSERT INTO "live_presence"
-         ("id","username","x","y","cursor_preset","cursor_image","cursor_size","accent","game","seen_at")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
+         ("id","username","x","y","cursor_preset","cursor_image","cursor_size","accent","game","kind","label","seen_at")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
        ON CONFLICT ("id") DO UPDATE SET
          "username"=EXCLUDED."username", "x"=EXCLUDED."x", "y"=EXCLUDED."y",
          "cursor_preset"=EXCLUDED."cursor_preset", "cursor_image"=EXCLUDED."cursor_image",
          "cursor_size"=EXCLUDED."cursor_size", "accent"=EXCLUDED."accent",
-         "game"=EXCLUDED."game", "seen_at"=NOW()`,
+         "game"=EXCLUDED."game", "kind"=EXCLUDED."kind", "label"=EXCLUDED."label",
+         "seen_at"=NOW()`,
       [
         id,
         data.username,
@@ -121,6 +185,8 @@ export async function touchPresence(
         data.cursor.size,
         data.cursor.accent,
         data.game,
+        data.activity?.kind ?? null,
+        data.activity?.label ?? null,
       ],
     );
     // Housekeeping rides along with the write that would have created the row.
@@ -128,10 +194,10 @@ export async function touchPresence(
     const rows = await pgQuery<{
       id: string; username: string | null; x: number; y: number;
       preset: string; image: string; size: number; accent: string;
-      game: string | null; seen: string;
+      game: string | null; kind: string | null; label: string | null; seen: string;
     }>(
       `SELECT "id","username","x","y","cursor_preset" AS "preset","cursor_image" AS "image",
-              "cursor_size" AS "size","accent","game","seen_at" AS "seen"
+              "cursor_size" AS "size","accent","game","kind","label","seen_at" AS "seen"
          FROM "live_presence" WHERE "seen_at" >= $1 ORDER BY "seen_at" DESC LIMIT 80`,
       [new Date(cutoff).toISOString()],
     );
@@ -147,6 +213,9 @@ export async function touchPresence(
         accent: row.accent,
       },
       game: row.game,
+      activity: row.kind && row.label
+        ? { kind: row.kind as ActivityKind, label: row.label, game: row.game }
+        : null,
       seenAt: new Date(row.seen).getTime(),
     }));
     return { peers, online: peers.length };
@@ -158,7 +227,14 @@ export async function touchPresence(
     for (const [key, row] of Object.entries(presence)) {
       if (row.seenAt < cutoff) delete presence[key];
     }
-    presence[id] = { id, username: data.username, cursor: data.cursor, game: data.game, seenAt: now };
+    presence[id] = {
+      id,
+      username: data.username,
+      cursor: data.cursor,
+      game: data.game,
+      activity: data.activity,
+      seenAt: now,
+    };
     peers = Object.values(presence).sort((a, b) => b.seenAt - a.seenAt).slice(0, 80);
   });
   return { peers, online: peers.length };
@@ -206,6 +282,7 @@ export async function pushLiveEvent(
   name: string,
   message: string,
   game: string | null = null,
+  extra: { target?: string | null; label?: string | null } = {},
 ): Promise<void> {
   if (!ALLOWED_KINDS.has(kind)) return;
   const safeMessage = message.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 160);
@@ -214,8 +291,8 @@ export async function pushLiveEvent(
   if (getMode() === 'postgres') {
     await migrate();
     await pgQuery(
-      `INSERT INTO "live_event" ("kind","name","message","game") VALUES ($1,$2,$3,$4)`,
-      [kind, safeName, safeMessage, game],
+      `INSERT INTO "live_event" ("kind","name","message","game","target","label") VALUES ($1,$2,$3,$4,$5,$6)`,
+      [kind, safeName, safeMessage, game, extra.target ?? null, extra.label ?? null],
     );
     // Keep the table bounded; the feed only ever reads the newest handful.
     await pgQuery(
@@ -230,7 +307,16 @@ export async function pushLiveEvent(
 
   await withLocalLock(async (store: any) => {
     const events: LiveEventRow[] = (store.events ??= []);
-    events.push({ id: (events.at(-1)?.id ?? 0) + 1, kind, name: safeName, message: safeMessage, game, createdAt: Date.now() });
+    events.push({
+      id: (events.at(-1)?.id ?? 0) + 1,
+      kind,
+      name: safeName,
+      message: safeMessage,
+      game,
+      target: extra.target ?? null,
+      label: extra.label ?? null,
+      createdAt: Date.now(),
+    });
     if (events.length > EVENT_KEEP) events.splice(0, events.length - EVENT_KEEP);
   });
 }
@@ -241,9 +327,10 @@ export async function recentLiveEvents(limit = POLL_EVENTS): Promise<LiveEventRo
   if (getMode() === 'postgres') {
     await migrate();
     const rows = await pgQuery<{
-      id: string; kind: string; name: string; message: string; game: string | null; created: string;
+      id: string; kind: string; name: string; message: string; game: string | null;
+      target: string | null; label: string | null; created: string;
     }>(
-      `SELECT "id","kind","name","message","game","created_at" AS "created"
+      `SELECT "id","kind","name","message","game","target","label","created_at" AS "created"
          FROM "live_event" ORDER BY "id" DESC LIMIT $1`,
       [take],
     );
@@ -253,6 +340,8 @@ export async function recentLiveEvents(limit = POLL_EVENTS): Promise<LiveEventRo
       name: row.name,
       message: row.message,
       game: row.game,
+      target: row.target,
+      label: row.label,
       createdAt: new Date(row.created).getTime(),
     }));
   }

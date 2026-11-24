@@ -3156,8 +3156,12 @@ h4,
 .gg-ghost-label {
   position: absolute;
   transform: translate(14px, 16px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: 9px;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: .02em;
@@ -3166,9 +3170,22 @@ h4,
   background: var(--lime);
   box-shadow: 0 4px 12px rgba(0,0,0,.35);
   pointer-events: none;
-  max-width: 160px;
+  max-width: 190px;
+}
+.gg-ghost-name,
+.gg-ghost-action {
+  display: block;
+  max-width: 176px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* Second line, quieter than the name: it is context, not identity. */
+.gg-ghost-action {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  opacity: .72;
+  text-transform: lowercase;
 }
 
 /* ---- activity feed --------------------------------------------------- */
@@ -3207,7 +3224,148 @@ h4,
   box-shadow: 0 0 0 3px rgba(215,243,74,.16);
   flex: none;
 }
-.gg-live-pill { opacity: .82; }
+.gg-live-pill { opacity: .82; pointer-events: auto; padding: 4px 6px 4px 10px; }
+/* The count itself is the button that opens the roster. */
+.gg-live-who {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  padding: 4px 2px;
+  border-radius: 999px;
+  font: inherit;
+}
+.gg-live-who:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+.gg-live-who:hover { color: var(--lime); }
+
+/*
+ * The one-line "what is everyone doing" preview.
+ *
+ * Deliberately quieter than the pill: it is context, and it disappears the
+ * moment the roster is open, where the same information is spelled out per
+ * person.
+ */
+.gg-live-summary {
+  margin: 0;
+  padding: 0 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  color: color-mix(in srgb, var(--foreground) 62%, transparent);
+  text-align: right;
+  text-shadow: 0 1px 8px rgba(0,0,0,.7);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- who's online ---------------------------------------------------- */
+.gg-roster-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 62;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: rgba(4,6,10,.42);
+  cursor: default;
+  animation: gg-roster-fade .18s ease-out both;
+}
+.gg-roster {
+  position: fixed;
+  right: 18px;
+  bottom: 64px;
+  z-index: 63;
+  width: min(304px, 88vw);
+  max-height: min(58vh, 420px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 11px 12px 12px;
+  border-radius: 16px;
+  background: rgba(13,16,23,.97);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px rgba(0,0,0,.55);
+  backdrop-filter: blur(14px);
+  animation: gg-live-in .22s ease-out both;
+}
+.gg-roster:focus { outline: none; }
+.gg-roster-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  letter-spacing: .02em;
+  color: var(--foreground);
+  padding-bottom: 9px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.gg-roster-head strong { flex: 1; font-weight: 800; }
+.gg-roster-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.gg-roster-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 2px;
+  border-radius: 10px;
+}
+.gg-roster-row + .gg-roster-row { border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
+.gg-roster-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 4px;
+  border-radius: 999px;
+  flex: none;
+}
+.gg-roster-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gg-roster-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gg-roster-you,
+.gg-roster-tabs {
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: 1px 5px;
+  border-radius: 6px;
+  color: #0b0d12;
+  background: var(--lime);
+  flex: none;
+}
+.gg-roster-tabs { color: var(--foreground); background: color-mix(in srgb, var(--line) 90%, transparent); }
+.gg-roster-activity {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--foreground) 68%, transparent);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gg-roster-activity svg { flex: none; opacity: .75; }
+.gg-roster-empty {
+  margin: 8px 2px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--foreground) 55%, transparent);
+}
+@keyframes gg-roster-fade { from { opacity: 0; } to { opacity: 1; } }
+
 .gg-live-close {
   all: unset;
   cursor: pointer;

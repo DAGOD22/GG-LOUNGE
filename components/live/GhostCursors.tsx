@@ -30,7 +30,7 @@ import {
   type CursorInstance,
   type HoverState,
 } from '@/lib/customization/cursor-presets';
-import { ghostName, type PresencePeer } from '@/lib/presence';
+import { activityLine, ghostName, type PresencePeer } from '@/lib/presence';
 
 type Tracked = {
   id: string;
@@ -54,6 +54,9 @@ type Tracked = {
   /** when the peer was last in a snapshot, for eviction */
   aliveAt: number;
   labelEl: HTMLDivElement;
+  /** Second line under the name: "playing Slope", "on youtube.com". */
+  actionEl: HTMLSpanElement | null;
+  actionText: string;
 };
 
 export function GhostCursors({
@@ -118,14 +121,28 @@ export function GhostCursors({
     function makeGhost(peer: PresencePeer): Tracked {
       const label = document.createElement('div');
       label.className = 'gg-ghost-label';
-      label.textContent = peer.name?.trim() || peer.username?.trim() || ghostName(peer.id);
+      // Name on the first line, activity on the second. The activity line is a
+      // child element rather than part of `textContent` so the two lines can be
+      // styled apart and so the name keeps its pill.
+      const nameEl = document.createElement('span');
+      nameEl.className = 'gg-ghost-name';
+      nameEl.textContent = peer.name?.trim() || peer.username?.trim() || ghostName(peer.id);
+      label.appendChild(nameEl);
+      const action = activityLine(peer.activity);
+      let actionEl: HTMLSpanElement | null = null;
+      if (action) {
+        actionEl = document.createElement('span');
+        actionEl.className = 'gg-ghost-action';
+        actionEl.textContent = action;
+        label.appendChild(actionEl);
+      }
       // Decorative duplicate of the name drawn on the canvas; the real list of
       // who is online is announced by the activity feed instead.
       label.setAttribute('aria-hidden', 'true');
       layer!.append(label);
       return {
         id: peer.id,
-        name: label.textContent || 'Player',
+        name: nameEl.textContent || 'Player',
         tx: (peer.cursor.x / 100) * vw,
         ty: (peer.cursor.y / 100) * vh,
         x: (peer.cursor.x / 100) * vw,
@@ -141,6 +158,8 @@ export function GhostCursors({
         fade: 1,
         aliveAt: performance.now(),
         labelEl: label,
+        actionEl,
+        actionText: action ?? '',
       };
     }
 
@@ -185,6 +204,24 @@ export function GhostCursors({
         ghost.accent = peer.cursor.accent;
         ghost.size = peer.cursor.size;
         ghost.image = peer.cursor.image;
+
+        // Activity changes far less often than the pointer does; only touch the
+        // DOM when the sentence actually differs, because this loop runs at
+        // 60fps and a text write per frame is a layout per frame.
+        const nextAction = activityLine(peer.activity) ?? '';
+        if (nextAction !== ghost.actionText) {
+          ghost.actionText = nextAction;
+          if (!ghost.actionEl && nextAction) {
+            const el = document.createElement('span');
+            el.className = 'gg-ghost-action';
+            ghost.labelEl.appendChild(el);
+            ghost.actionEl = el;
+          }
+          if (ghost.actionEl) {
+            ghost.actionEl.textContent = nextAction;
+            ghost.actionEl.style.display = nextAction ? '' : 'none';
+          }
+        }
       }
       for (const [id, ghost] of tracked.current) {
         if (seen.has(id)) continue;

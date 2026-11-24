@@ -31,6 +31,26 @@ export type GhostCursor = {
   accent: string;
 };
 
+/**
+ * What a player is doing, in one field.
+ *
+ * A game id alone was not enough: the roster could not say "in the proxy, on
+ * youtube.com" or "reading the apps page", and the feed could only ever
+ * announce launches. `kind` is from a fixed set so the client can pick an icon
+ * and a verb without trusting a sentence, and `label` is display-ready text
+ * the *server* derived — for a proxy destination it is just a hostname, never
+ * a path or a query, so nothing private rides along.
+ */
+export type ActivityKind = 'game' | 'app' | 'page' | 'proxy' | 'tools' | 'idle';
+
+export type Activity = {
+  kind: ActivityKind;
+  /** Human-readable: a catalogue title, an app name, "youtube.com", "/tools". */
+  label: string;
+  /** The game id when kind is 'game', so the ghost tag can deep-link. */
+  game: string | null;
+};
+
 export type PresencePeer = {
   id: string;
   name: string;
@@ -39,9 +59,25 @@ export type PresencePeer = {
   cursor: GhostCursor;
   /** Which game this player has open, if any. */
   game: string | null;
+  /** What they are doing right now. Absent from an older server. */
+  activity?: Activity;
   /** ms epoch the server saw them last. */
   seen: number;
 };
+
+/**
+ * Can two people be shown the same roster row?
+ *
+ * Presence ids are per-tab (a signed guest token, or an account id), so the
+ * same person in a second tab is a second peer. That is correct for cursors —
+ * two tabs really are two pointers — but wrong for a roster, which should say
+ * "Pix Fox" once with their two tabs counted, not list them twice with the
+ * same name and a confusing double cursor.
+ */
+export function rosterKey(peer: PresencePeer): string {
+  const name = (peer.username ?? peer.name ?? '').trim().toLowerCase();
+  return name || peer.id;
+}
 
 export type PresenceEvent = {
   id: number;
@@ -49,6 +85,9 @@ export type PresenceEvent = {
   name: string;
   message: string;
   game: string | null;
+  /** Same shape as a peer's activity, so the feed can icon it identically. */
+  target?: string | null;
+  label?: string | null;
   /** ms epoch. The wire field is `createdAt`; `at` is kept for older callers. */
   at: number;
   createdAt?: number;
@@ -138,4 +177,44 @@ export function cursorForPresence(cursor: Settings['cursor'], accent: string): G
 export function sameCursor(a: GhostCursor | null, b: GhostCursor): boolean {
   if (!a) return false;
   return a.preset === b.preset && a.size === b.size && a.accent === b.accent && a.image === b.image;
+}
+
+/**
+ * "playing Slope" / "in the proxy, on youtube.com" / "on the apps page".
+ *
+ * Kept here rather than in the component because three surfaces need the same
+ * wording — the ghost tag, the feed and the roster — and three copies of a
+ * sentence is three chances for them to disagree.
+ */
+export function activityLine(activity: Activity | null | undefined): string | null {
+  if (!activity || !activity.label) return null;
+  switch (activity.kind) {
+    case 'game':
+      return `playing ${activity.label}`;
+    case 'app':
+      return `using ${activity.label}`;
+    case 'proxy':
+      return `in the proxy on ${activity.label}`;
+    case 'tools':
+      return `using ${activity.label}`;
+    case 'page':
+      return `on ${activity.label}`;
+    default:
+      return null;
+  }
+}
+
+/** The short verb the feed uses: "just opened", "just launched", "is on". */
+export function activityVerb(activity: Activity | null | undefined): string {
+  switch (activity?.kind) {
+    case 'game':
+      return 'launched';
+    case 'proxy':
+      return 'browsing';
+    case 'app':
+    case 'tools':
+      return 'opened';
+    default:
+      return 'is on';
+  }
 }

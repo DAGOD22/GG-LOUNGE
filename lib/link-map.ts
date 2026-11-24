@@ -222,8 +222,10 @@ export function staticAssets(): DocSection {
       { label: '/apple-icon.png', href: '/apple-icon.png' },
       { label: '/og-image.png', href: '/og-image.png', note: 'Social card' },
       { label: '/offline.html', href: '/offline.html', note: 'App worker offline fallback' },
-      { label: '/gg-app-sw.js', href: '/gg-app-sw.js', note: 'App service worker (shell, icons, played games)' },
-      { label: '/gg-sw.js', href: '/gg-sw.js', note: 'Proxy service worker (Scramjet)' },
+      // One worker owns the origin: it proxies /service/ and caches the shell.
+      // (Two registrations at scope / replace each other — see public/uv/uv.sw.js.)
+      { label: '/uv/uv.sw.js', href: '/uv/uv.sw.js', note: 'The one service worker: proxy + offline shell' },
+      { label: '/gg-sw.js', href: '/gg-sw.js', note: 'Legacy Scramjet worker (retired, unregistered on boot)' },
       { label: '/uv.sw.js', href: '/uv.sw.js', note: 'Proxy service worker' },
       { label: '/uv/uv.bundle.js', href: '/uv/uv.bundle.js' },
       { label: '/uv/uv.handler.js', href: '/uv/uv.handler.js' },

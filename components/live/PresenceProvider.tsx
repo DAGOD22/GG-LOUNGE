@@ -28,11 +28,38 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { ActivityReporter } from './ActivityReporter';
 import { GhostCursors } from './GhostCursors';
 import { ActivityFeed } from './ActivityFeed';
 import { CoopRoom } from './CoopRoom';
 import { useCustomization } from '@/components/customization/CustomizationProvider';
-import { cursorForPresence, type PresenceEvent, type PresencePeer } from '@/lib/presence';
+import {
+  cursorForPresence,
+  type Activity,
+  type PresenceEvent,
+  type PresencePeer,
+} from '@/lib/presence';
+
+/**
+ * What a page can announce.
+ *
+ * `launch`/`achievement`/`join` are game events; the rest exist because the
+ * feed was games-only and could not answer "what is everyone doing" for the
+ * eighty per cent of the site that is not a game. Every one of these is
+ * resolved to a sentence on the server from a catalogue title, a known page
+ * path, a hostname or a registry tool name — never from client text.
+ */
+export type AnnounceKind = 'launch' | 'achievement' | 'room' | 'join' | 'visited' | 'browsing' | 'tool';
+
+export type AnnounceDetail = {
+  gameId?: string | null;
+  /** A known page path, e.g. '/apps'. Only used for `visited`. */
+  page?: string;
+  /** A destination URL. Only the hostname survives, server-side. */
+  url?: string;
+  /** A tool name from the registry. Only used for `tool`. */
+  tool?: string;
+};
 
 const POLL_MS = 2500;
 const POINTER_MS = 260;
@@ -45,12 +72,29 @@ type LiveContext = {
   /** Total including this one. Never display this as "players online". */
   online: number;
   /** Announce an event to everyone else. Fire-and-forget by design. */
-  announce: (kind: 'launch' | 'achievement' | 'room' | 'join', gameId: string) => void;
+  announce: (kind: AnnounceKind, detail: AnnounceDetail) => void;
   /** Tell the room what this player is playing, for their ghost tag. */
   setActiveGame: (gameId: string | null) => void;
+  /**
+   * Tell the room what this player is *doing*, for the roster and ghost tags.
+   * Called by the page-level reporter for pages, games, apps and the proxy.
+   */
+  setActivity: (activity: Activity | null) => void;
   ghostCursors: boolean;
   activityFeed: boolean;
   hideFeed: () => void;
+  /** This client's own presence id, for labelling its roster row. */
+  selfId: string | null;
+  /** This client's own cursor, so the roster can draw it like a ghost's. */
+  selfCursor: PresencePeer['cursor'] | null;
+  /**
+   * This client's own activity, as the server will publish it.
+   *
+   * The endpoint excludes the caller from `peers` (your own ghost would fight
+   * your real cursor), so without this the roster could not show your row at
+   * all — and a roster you are missing from cannot answer "is this working?".
+   */
+  selfActivity: Activity | null;
 };
 
 const LivePresenceContext = createContext<LiveContext | null>(null);
@@ -67,6 +111,9 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const [events, setEvents] = useState<PresenceEvent[]>([]);
   const [online, setOnline] = useState(0);
   const [others, setOthers] = useState(0);
+  const [selfId, setSelfId] = useState<string | null>(null);
+  const [selfCursor, setSelfCursor] = useState<PresencePeer['cursor'] | null>(null);
+  const [selfActivity, setSelfActivity] = useState<Activity | null>(null);
 
   const ghostCursors = settings.live.ghosts;
   const activityFeed = settings.live.feed;
@@ -75,6 +122,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const sent = useRef({ x: 50, y: 50 });
   const lastSend = useRef(0);
   const activeGame = useRef<string | null>(null);
+  const activity = useRef<Activity | null>(null);
   const guestToken = useRef('');
   const inFlight = useRef(false);
   const alive = useRef(true);
@@ -149,17 +197,21 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
       const response = await fetch('/api/presence', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ cursor, game: activeGame.current }),
+        body: JSON.stringify({ cursor, game: activeGame.current, activity: activity.current }),
         cache: 'no-store',
       });
       if (!response.ok) return;
       const data = (await response.json()) as {
         online?: number;
         others?: number;
+        self?: string;
+        selfCursor?: LiveContext['selfCursor'];
         peers?: PresencePeer[];
         events?: PresenceEvent[];
       };
       if (!alive.current) return;
+      setSelfId(data.self ?? null);
+      if (data.selfCursor) setSelfCursor(data.selfCursor);
       setPeers(data.peers ?? []);
       setOnline(data.online ?? 0);
       // Prefer the server's `others`. An older deployment does not send it, so
@@ -230,14 +282,14 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(id);
   }, [ready, settings.live.enabled, send]);
 
-  const announce = useCallback((kind: 'launch' | 'achievement' | 'room' | 'join', gameId: string) => {
+  const announce = useCallback((kind: AnnounceKind, detail: AnnounceDetail) => {
     if (!settingsRef.current.live.enabled) return;
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (guestToken.current) headers['x-gg-guest'] = guestToken.current;
     fetch('/api/presence/event', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ kind, gameId }),
+      body: JSON.stringify({ kind, ...detail }),
     }).catch(() => {});
   }, []);
 
@@ -249,13 +301,41 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     void send();
   }, [send]);
 
+  /**
+   * Activity is compared shallowly and sent only when it changes.
+   *
+   * A page lease re-asserts itself every few seconds (so a client-side
+   * navigation that forgets to clear it still recovers), and without this
+   * guard every assertion would be a request.
+   */
+  const setActivity = useCallback((next: Activity | null) => {
+    const current = activity.current;
+    const same =
+      (current === null && next === null) ||
+      (current !== null && next !== null &&
+        current.kind === next.kind && current.label === next.label && current.game === next.game);
+    if (same) return;
+    activity.current = next;
+    // A game open *is* an activity; keep the legacy field in step so an older
+    // reader of this payload still sees something sensible.
+    activeGame.current = next?.kind === 'game' ? next.game : null;
+    setSelfActivity(next);
+    void send();
+  }, [send]);
+
   const hideFeed = useCallback(() => {
     update(current => ({ ...current, live: { ...current.live, feed: false } }));
   }, [update]);
 
   const value = useMemo<LiveContext>(
-    () => ({ peers, events, others, online, announce, setActiveGame, ghostCursors, activityFeed, hideFeed }),
-    [peers, events, others, online, announce, setActiveGame, ghostCursors, activityFeed, hideFeed],
+    () => ({
+      peers, events, others, online, announce, setActiveGame, setActivity,
+      ghostCursors, activityFeed, hideFeed, selfId, selfCursor, selfActivity,
+    }),
+    [
+      peers, events, others, online, announce, setActiveGame, setActivity,
+      ghostCursors, activityFeed, hideFeed, selfId, selfCursor, selfActivity,
+    ],
   );
 
   return (
@@ -263,8 +343,20 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
       {children}
       {ready && settings.live.enabled && (
         <>
+          {/* Mounted before the ghosts so the roster has this page's activity
+              on the very first heartbeat, not on the second. */}
+          <ActivityReporter />
           <GhostCursors peers={peers} enabled={ghostCursors} />
-          <ActivityFeed events={events} others={others} enabled={activityFeed} onDismiss={hideFeed} />
+          <ActivityFeed
+            events={events}
+            others={others}
+            enabled={activityFeed}
+            onDismiss={hideFeed}
+            peers={peers}
+            selfId={selfId}
+            selfCursor={selfCursor}
+            selfActivity={selfActivity}
+          />
           <CoopRoom />
         </>
       )}
