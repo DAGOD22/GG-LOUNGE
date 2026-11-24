@@ -3773,3 +3773,68 @@ body.gg-split-dragging iframe { pointer-events: none; }
   border: 1px solid var(--line);
   color: var(--foreground);
 }
+
+/* ---- first-run welcome ------------------------------------------------ */
+.gg-welcome {
+  position: fixed;
+  right: 18px;
+  top: 84px;
+  z-index: 59;
+  width: min(320px, calc(100vw - 36px));
+  padding: 14px 14px 12px;
+  border-radius: 18px;
+  background: rgba(14, 17, 24, .97);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px rgba(0,0,0,.5);
+  backdrop-filter: blur(12px);
+  animation: gg-welcome-in .32s cubic-bezier(.2,.9,.3,1) both;
+}
+.gg-welcome.is-leaving { animation: gg-welcome-out .18s ease-in both; }
+@keyframes gg-welcome-in {
+  from { opacity: 0; transform: translateY(-10px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes gg-welcome-out {
+  to { opacity: 0; transform: translateY(-8px) scale(.98); }
+}
+.gg-welcome header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.gg-welcome header button {
+  all: unset;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  width: 24px; height: 24px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.07);
+  color: var(--foreground);
+}
+.gg-welcome header button:hover { background: rgba(255,255,255,.16); }
+.gg-welcome ul { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 9px; }
+.gg-welcome li { display: flex; gap: 9px; align-items: flex-start; }
+.gg-welcome-icon {
+  flex: none;
+  width: 26px; height: 26px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: rgba(215,243,74,.12);
+  color: var(--lime);
+  border: 1px solid rgba(215,243,74,.22);
+}
+.gg-welcome li strong { display: block; font-size: 12px; font-weight: 900; }
+.gg-welcome li small { display: block; font-size: 11px; line-height: 1.45; color: var(--muted); font-weight: 600; }
+.gg-welcome-actions { display: flex; gap: 8px; }
+.gg-welcome-actions .gg-primary,
+.gg-welcome-actions .gg-secondary { flex: 1; text-align: center; }
+@media (max-width: 640px) {
+  .gg-welcome { right: 10px; left: 10px; top: auto; bottom: 132px; width: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gg-welcome, .gg-welcome.is-leaving { animation: none; }
+}

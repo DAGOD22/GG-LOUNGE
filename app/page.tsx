@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGameUrl } from '@/lib/use-game-url'
 import { useCustomization } from '@/components/customization/CustomizationProvider'
+import { WelcomeTour } from '@/components/live/WelcomeTour'
 import { THEMES } from '@/lib/customization/settings'
 import { dedupeGames } from '@/lib/game-identity'
 import { unavailableGames, getGameAssetIssues } from '@/lib/games'
@@ -27,6 +28,9 @@ type PublishedListing = { id: string; title: string; icon: string | null }
 type RequestItem = { id: string; title: string; votes: number; status: string }
 export default function Page() {
   const [query, setQuery] = useState('')
+  // The first render must not rewrite the URL — it would erase a deep link
+  // before the launcher had a chance to read it.
+  const historyReady = useRef(false)
   const [filter, setFilter] = useState('All games')
   const [favorites, setFavorites] = useState<string[]>([])
   const [activeGame, setActiveGame] = useState<Game | null>(null)
@@ -266,6 +270,37 @@ export default function Page() {
     return ()=> clearTimeout(id)
   },[query])
   useEffect(()=>{ setVisibleCount(36) },[query, filter, sortBy, hideLow, showStaffOnly])
+
+  /**
+   * `?q=<term>` is a real entry point, not decoration.
+   *
+   * The site's JSON-LD advertises `/?q={search_term_string}` as its SearchAction,
+   * which tells Google that a search box exists at that URL. It did not: the page
+   * never read `q`, so a visitor arriving from a search result landed on the
+   * unfiltered library. Read it on first paint so the promise is kept, and keep
+   * the address bar in step afterwards so a filtered view stays shareable.
+   */
+  useEffect(()=>{
+    const params = new URLSearchParams(window.location.search)
+    const wanted = params.get('q')
+    if(wanted && wanted.trim()) setQuery(wanted.trim().slice(0, 80))
+    // The installed app's jump-list shortcuts are real entry points too. They
+    // arrive as query params because a manifest shortcut cannot dispatch an
+    // event, so each one has to be honoured here or the shortcut is a lie.
+    if(params.get('customize') === '1'){ customization.openSettings(); }
+    if(params.get('coop') === '1'){ window.dispatchEvent(new CustomEvent('ggl:open-coop')); }
+  },[])
+  useEffect(()=>{
+    // Only touch history once the page is interactive, and only for the `q`
+    // param — the game launcher owns the rest of the query string.
+    if (!historyReady.current) { historyReady.current = true; return }
+    try{
+      const url = new URL(window.location.href)
+      if(query.trim()) url.searchParams.set('q', query.trim())
+      else url.searchParams.delete('q')
+      if(url.href !== window.location.href) window.history.replaceState(window.history.state, '', url)
+    }catch{}
+  },[query])
   // fetch requests for upvote list
   useEffect(()=>{
     fetch('/api/game-requests').then(r=> r.ok? r.json(): null).then((d:any)=>{
@@ -714,8 +749,10 @@ export default function Page() {
         <ShieldCheck size={19} />
         <span>Admin</span>
       </a>
+      <WelcomeTour />
       {showAchievementsHub && <AchievementsHub open={showAchievementsHub} onClose={()=> setShowAchievementsHub(false)} authUser={authUser} onPlayGame={(id)=> { const g=allGames.find(x=> x.id===id); if(g){ setShowAchievementsHub(false); launch(g) } }} />}
       {activeGame && (
+        <ErrorBoundary resetKey={activeGame.id}>
         <GameModal
           game={activeGame}
           isFavorite={favorites.includes(activeGame.id)}
@@ -723,6 +760,7 @@ export default function Page() {
           onClose={() => { closeGame(); pushHome(); if(authUser) fetch('/api/achievements/stats').then(r=> r.ok? r.json():null).then((d:any)=>{ if(d?.signedIn) setAchSummary({ total:d.total||0, unlocked:d.totalUnlocked||0, points:d.totalPoints||0 }) }).catch(()=>{}) }}
           authUser={authUser}
         />
+        </ErrorBoundary>
       )}
           </ErrorBoundary>
 </main>

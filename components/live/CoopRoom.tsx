@@ -379,6 +379,13 @@ export function CoopRoom() {
     };
   }, [status, forwardKeys, sendRaw]);
 
+  /* An installed-app shortcut (or any link) can ask for the panel directly. */
+  useEffect(() => {
+    const openPanel = () => setOpen(true);
+    window.addEventListener('ggl:open-coop', openPanel);
+    return () => window.removeEventListener('ggl:open-coop', openPanel);
+  }, []);
+
   useEffect(() => () => teardown(false), [teardown]);
 
   /* ---- panic integration --------------------------------------------- */

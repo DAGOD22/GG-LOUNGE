@@ -13,6 +13,26 @@ function Section({title,children,description}:{title:string;description?:string;
 export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onClose:()=>void;onPlayVideo:()=>void}) {
   const {settings,update,reset,capturing,setCapturing,saveError,mediaError,runPanic}=useCustomization();
   const dialog=useRef<HTMLDialogElement>(null),[tab,setTab]=useState('tab'),[error,setError]=useState(''),[busy,setBusy]=useState(false),[iconDraft,setIconDraft]=useState(settings.cloak.icon),[destination,setDestination]=useState(settings.panic.destination),[resetConfirm,setResetConfirm]=useState(false),[previewDoc,setPreviewDoc]=useState(false);
+  const bodyRef=useRef<HTMLDivElement>(null);
+  /**
+   * Switch section without losing the visitor's place in the world.
+   *
+   * Clicking a tab used to remount the panel via `key={tab}`, which threw the
+   * scroll position back to the top of a long form and left focus on the tab
+   * button — so a keyboard user's next Tab jumped into the nav instead of into
+   * the section they had just asked for. The panel still remounts (that is what
+   * resets the local draft state each tab relies on), but the scroll is restored
+   * and focus is moved into the panel.
+   */
+  const chooseTab=(id:string)=>{
+    setTab(id);
+    requestAnimationFrame(()=>{
+      const el=bodyRef.current;
+      if(!el) return;
+      el.scrollTop=0;
+      el.querySelector<HTMLElement>('button, input, select, textarea, a[href]')?.focus({preventScroll:true});
+    });
+  };
   useEffect(()=>setIconDraft(settings.cloak.icon.startsWith('data:')?'':settings.cloak.icon),[settings.cloak.icon]);
   useEffect(()=>setDestination(settings.panic.destination),[settings.panic.destination]);
   useEffect(()=>{const el=dialog.current;if(!el)return;if(open&&!el.open)el.showModal();if(!open&&el.open)el.close();if(open){const old=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=old;};}},[open]);
@@ -33,8 +53,11 @@ export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onC
   const colorLabels:Record<keyof Colors,string>={background:'Page background',surface:'Surface',panel:'Cards & panels',text:'Text',muted:'Secondary text',accent:'Accent',secondary:'Secondary accent'};
   return <dialog ref={dialog} className="gg-customization" aria-labelledby="gg-customize-title" onCancel={()=>onClose()} onClose={()=>onClose()} onClick={e=>{if(e.target===dialog.current){const rect=dialog.current.getBoundingClientRect();if(e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom)onClose();}}}>
     <header className="gg-settings-header"><div><p className="gg-overline">MAKE IT YOURS</p><h2 id="gg-customize-title">Your lounge. Your rules.</h2><p>Personalize this browser. Changes apply instantly.</p></div><button className="gg-icon-button" onClick={onClose} aria-label="Close customization"><X size={20}/></button></header>
-    <div className="gg-settings-layout"><nav aria-label="Customization sections" className="gg-settings-nav">{tabs.map(({id,label,icon:Icon})=><button type="button" key={id} aria-current={tab===id?'page':undefined} onClick={()=>setTab(id)}><Icon size={17}/>{label}</button>)}<span className="gg-local-badge">Stored on this device</span></nav>
-      <div className="gg-settings-body" key={tab}>
+    <div className="gg-settings-layout"><nav aria-label="Customization sections" className="gg-settings-nav">{tabs.map(({id,label,icon:Icon})=><button type="button" key={id} aria-current={tab===id?'page':undefined} onClick={()=>chooseTab(id)}><Icon size={17}/>{label}</button>)}<span className="gg-local-badge">Stored on this device</span></nav>
+      {/* The section is announced once, politely, instead of relying on the
+          focus ring that the tab click just left behind. */}
+      <p className="sr-only" role="status" aria-live="polite">{tabs.find(t=>t.id===tab)?.label} settings</p>
+      <div className="gg-settings-body" ref={bodyRef} key={tab}>
       {(error||saveError)&&<p className="gg-settings-error" role="alert">{error||saveError}</p>}
       {busy&&<p role="status" className="gg-help">Checking and saving your file…</p>}
       {tab==='tab'&&<>

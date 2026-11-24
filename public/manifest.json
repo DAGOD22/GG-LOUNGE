@@ -2,7 +2,9 @@
   "name": "GG-Lounge — Small games. Big energy.",
   "short_name": "GG Lounge",
   "description": "A handpicked, no-filler collection of browser games for the minutes between everything. Unblocked.",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
+  "id": "/",
+  "launch_handler": { "client_mode": "focus-existing" },
   "display": "standalone",
   "background_color": "#0b0d12",
   "theme_color": "#d7f34a",
@@ -23,7 +25,8 @@
     {
       "src": "/placeholder-logo.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "shortcuts": [
@@ -41,6 +44,16 @@
       "name": "Apps",
       "url": "/apps",
       "description": "Unblocked apps"
+    },
+    {
+      "name": "Play with a friend",
+      "url": "/?coop=1",
+      "description": "Open a co-op room"
+    },
+    {
+      "name": "Customize",
+      "url": "/?customize=1",
+      "description": "Themes, cursors and the panic key"
     }
   ]
 }

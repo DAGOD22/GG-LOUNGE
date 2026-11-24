@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Heart, Maximize2, X, Copy, ExternalLink, Gamepad2, Keyboard, Monitor, Bug, Flag, AlertCircle, Loader2, Save, Trophy, Star, Lock, Medal, Crown, Columns2, Volume2, VolumeX } from 'lucide-react'
+import { Heart, Maximize2, X, Copy, ExternalLink, Gamepad2, Keyboard, Monitor, Bug, Flag, AlertCircle, Loader2, Save, Trophy, Star, Lock, Medal, Crown, Columns2, Volume2, VolumeX, Share2, Check } from 'lucide-react'
 import type { Game } from '@/lib/games'
 import { getGameControls } from '@/lib/game-controls'
 import { inferAchievementUpdates } from '@/lib/achievement-tracker'
@@ -32,7 +32,42 @@ export function GameModal({
   const [splitGame, setSplitGame] = useState<Game | null>(null)
   const [splitPercent, setSplitPercent] = useState(50)
   const [leftMuted, setLeftMuted] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const live = useLivePresence()
+
+  /**
+   * Share the game, not the raw file.
+   *
+   * The old button copied `game.path` — `/games/slope/index.html` — which is the
+   * file the iframe loads, not a page a person should ever be sent to. A shared
+   * link now points at the game's own landing page (`/g/<id>`), which has a
+   * title, a description and an Open Graph card, so it unfurls properly in a
+   * group chat instead of arriving as a bare URL. Where the browser has a native
+   * share sheet, that is used; otherwise the link is copied and the button says
+   * so, because a copy with no feedback is indistinguishable from a broken one.
+   */
+  const shareGame = useCallback(async () => {
+    const url = `${location.origin}/g/${game.id}`
+    const payload = { title: `${game.title} — GG-Lounge`, text: `${game.title}: ${game.description}`, url }
+    try {
+      if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
+        await navigator.share(payload)
+        return
+      }
+    } catch {
+      // The person cancelled the sheet, or the browser refused. Either way the
+      // copied link below is the fallback and is never a worse outcome.
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setLinkCopied(true)
+      window.setTimeout(() => setLinkCopied(false), 1800)
+    } catch {
+      // Clipboard blocked (insecure context, permissions): open the page so the
+      // address bar can be copied by hand rather than silently doing nothing.
+      window.open(url, '_blank', 'noopener')
+    }
+  }, [game.id, game.title, game.description])
   // `allGames` is needed by the split-screen picker; the modal only receives the
   // one game, so the catalogue is imported lazily from the same module the rest
   // of the site uses rather than threaded through every prop in between.
@@ -63,6 +98,28 @@ export function GameModal({
   }, [game.id])
   const inspectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (inspectionTimer.current) clearTimeout(inspectionTimer.current) }, [])
+
+  /**
+   * Lock the page behind the game.
+   *
+   * The modal claims `aria-modal="true"`, which tells a screen reader that
+   * everything behind it is inert — but the document itself still scrolled, so
+   * on a phone a swipe inside the game panned the library underneath it. The
+   * padding compensates for the scrollbar on desktop so the layout does not jump
+   * when it disappears.
+   */
+  useEffect(() => {
+    const body = document.body
+    const previousOverflow = body.style.overflow
+    const previousPadding = body.style.paddingRight
+    const gap = window.innerWidth - document.documentElement.clientWidth
+    body.style.overflow = 'hidden'
+    if (gap > 0) body.style.paddingRight = `${gap}px`
+    return () => {
+      body.style.overflow = previousOverflow
+      body.style.paddingRight = previousPadding
+    }
+  }, [])
 
   // GOD LEVEL: a11y — ESC to close, trap focus, initial focus
   useEffect(() => {
@@ -298,13 +355,26 @@ export function GameModal({
   // timer + achievement inference loop (every 4s)
   useEffect(()=>{
     if(!game) return
+    // Seconds played in THIS session, which is what the server should receive.
+    // The old code tested `timeRef.current % 30 === 0`, but timeRef starts at the
+    // saved lifetime total and ticks by 4 — so the check was true only if the
+    // lifetime total happened to be a multiple of 30 minus a multiple of 4. In
+    // practice it was never true, and no session ever saved a single second of
+    // playtime. Accumulating unflushed seconds has no such arithmetic trap.
+    let unsaved = 0
+    const flush = (seconds: number) => {
+      if(!authUser || seconds <= 0) return
+      fetch('/api/game-stats', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ gameId: game.id, timeSeconds: seconds }) })
+        .then(() => { unsaved -= seconds })
+        .catch(()=>{ /* stays in `unsaved` and is retried on the next flush */ })
+    }
     const tick = window.setInterval(()=>{
       if(document.visibilityState==='hidden') return
       timeRef.current+=4
-      // heartbeat every 30s to server
-      if(authUser && timeRef.current % 30 === 0 && timeRef.current>0){
-        fetch('/api/game-stats', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ gameId: game.id, timeSeconds:30 }) }).catch(()=>{})
-      }
+      unsaved+=4
+      // Flush every 30s of play. The remainder is flushed on close.
+      if(authUser && unsaved >= 30) flush(unsaved)
+
       // try to infer progress from iframe
       let win: any = null
       try{ win = frameRef.current?.contentWindow as any }catch{}
@@ -344,7 +414,12 @@ export function GameModal({
       lastAchSentRef.current = key
       fetch('/api/achievements', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ updates }) }).catch(()=>{})
     }, 4000)
-    return ()=> clearInterval(tick)
+    return ()=> {
+      clearInterval(tick)
+      // Playtime is lossy if the tail is dropped: closing a game after 29
+      // seconds used to record nothing at all. Send what is left on unmount.
+      flush(unsaved)
+    }
   }, [game, authUser])
 
   // PROD: honest X-Frame check via HEAD fetch (local files have no header, external would)
@@ -627,8 +702,8 @@ export function GameModal({
           >
             <Bug size={14} /> {reportSent ? 'Reported' : 'Report'}
           </button>
-          <button onClick={() => { if (navigator.clipboard) navigator.clipboard.writeText(location.origin + (game.proxy ? `/play/${game.id}` : game.path)) }} title="Copy link" aria-label="Copy link">
-            <Copy size={16} />
+          <button onClick={shareGame} title="Share this game" aria-label="Share this game">
+            {linkCopied ? <Check size={16} /> : <Share2 size={16} />}
           </button>
           <button onClick={() => window.open(game.proxy ? `/play/${game.id}` : game.path, '_blank')} title="Open in new tab" aria-label="Open in new tab">
             <ExternalLink size={16} />

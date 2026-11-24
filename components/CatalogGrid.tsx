@@ -47,13 +47,28 @@ export function CatalogGrid({
         <div className="empty-state" role="status" aria-live="polite">
           <Zap size={22} />
           <h3>No games found for “{query || filter}”</h3>
-          <p>Try a different search or clear the filter.</p>
+          <p>
+            {query.trim()
+              // Search that found nothing is the one case where a generic
+              // "try again" is useless: the likely cause is a typo, a plural,
+              // or a genre word rather than a title, so say that.
+              ? `Nothing in the catalogue matches “${query.trim()}”. Check the spelling, or try a shorter word — “racing”, “idle”, “2 player”.`
+              : 'Nothing on this shelf is currently available. Clearing the filters shows the whole library.'}
+          </p>
           <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center',marginTop:12}}>
             <button onClick={()=> { setQuery(''); setFilter('All games'); setHideLow(false); setShowStaffOnly(false) }} style={{padding:'8px 14px',borderRadius:999,border:'1px solid var(--lime)',background:'var(--lime)',color:'#0b0d12',fontWeight:800,cursor:'pointer'}}>Clear all filters</button>
             <button onClick={shufflePick} style={{padding:'8px 14px',borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',color:'var(--foreground)',fontWeight:800,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><Shuffle size={12}/> Surprise me</button>
             {staffGames.slice(0,4).map((g:Game)=> <button key={g.id} onClick={()=> launch(g)} style={{padding:'8px 12px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',fontWeight:700,cursor:'pointer'}}>{g.title}</button>)}
           </div>
         </div>
+      )}
+      {query.trim() && visibleGames.length > 0 && (
+        <p
+          style={{ margin: '2px 0 12px', fontSize: 12, fontWeight: 800, color: 'var(--muted)' }}
+          aria-live="polite"
+        >
+          {visibleGames.length} {visibleGames.length === 1 ? 'game' : 'games'} match “{query.trim()}”
+        </p>
       )}
       {visibleGames.length > paginatedGames.length && (
         <>
