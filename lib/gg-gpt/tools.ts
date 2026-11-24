@@ -102,7 +102,14 @@ function parseRss(xml: string, limit = 8): SearchHit[] {
     // element names the publisher's own site instead.
     const publisher = item.match(/<source[^>]*url="([^"]+)"[^>]*>([\s\S]*?)<\/source>/);
     const raw = link.trim();
-    const url = raw.length > 400 ? (publisher?.[1] || "") : raw;
+    // Google News links are redirect blobs of base64 hundreds of characters
+    // long. They are unusable as a visible URL and useless to a reader, so fall
+    // back to the publisher's site, and failing that to a news search the
+    // person can actually click.
+    const url =
+      raw.length > 300
+        ? publisher?.[1] || `https://news.google.com/search?q=${encodeURIComponent(stripTags(title).slice(0, 80))}`
+        : raw;
     if (!url) continue;
     let clean = stripTags(title).replace(/\s+-\s+[^-]{2,40}$/, "").trim();
     if (publisher?.[2]) {

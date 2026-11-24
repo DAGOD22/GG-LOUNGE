@@ -11,7 +11,7 @@
  */
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth";
-import { chatComplete, imageUrl } from "@/lib/gg-gpt/engine";
+import { chatComplete, imageUrl, sanitizeAnswer } from "@/lib/gg-gpt/engine";
 import { getWeather, webSearch, renderHits, type ToolResult } from "@/lib/gg-gpt/tools";
 import { recommend, renderRecommendation } from "@/lib/gg-gpt/recommend";
 import { games } from "@/lib/games";
@@ -208,8 +208,8 @@ async function selfTest(question = "In one sentence, what is a quokka?"): Promis
     provider: result.provider,
     rateLimited: result.rateLimited,
     ms: Date.now() - started,
-    chars: result.text.length,
-    answer: result.text.slice(0, 400),
+    chars: sanitizeAnswer(result.text).length,
+    answer: sanitizeAnswer(result.text).slice(0, 400),
     attempts: result.attempts.map(a => ({ provider: a.provider, status: a.status, ms: a.ms, error: a.error })),
     imageSample: imageUrl("a red cube", { width: 256, height: 256 }),
   };

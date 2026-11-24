@@ -13,7 +13,7 @@ import {
   addMemory,
   forgetMemory,
 } from "@/lib/db/gg-gpt";
-import { chatComplete, chatStream, imageUrl, videoPlan, type ChatTurn } from "@/lib/gg-gpt/engine";
+import { chatComplete, chatStream, imageUrl, videoPlan, sanitizeAnswer, type ChatTurn } from "@/lib/gg-gpt/engine";
 import {
   webSearch,
   renderHits,
@@ -378,6 +378,7 @@ export async function POST(req: Request) {
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
         let full = "";
+        let emitted = 0;
         let provider = "none";
         let throttled = false;
         try {
@@ -385,7 +386,14 @@ export async function POST(req: Request) {
             if (event.delta) {
               full += event.delta;
               provider = event.provider || provider;
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: event.delta })}\n\n`));
+              // Emit the cleaned prefix, holding back the tail that could still
+              // be the start of a citation marker.
+              const clean = sanitizeAnswer(full);
+              if (clean.length > emitted) {
+                const delta = clean.slice(emitted);
+                emitted = clean.length;
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`));
+              }
             }
             if (event.done) {
               if (event.rateLimited) { throttled = true; provider = "rate-limited"; backOff(); }
@@ -438,7 +446,7 @@ export async function POST(req: Request) {
     queueMs: budget,
   };
   if (result.rateLimited) backOff();
-  let text = result.text;
+  let text = sanitizeAnswer(result.text);
   let provider = result.provider;
   if (!text) {
     text = deterministic || offlineAnswer(message, profile, attempted, result.rateLimited);

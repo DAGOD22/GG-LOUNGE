@@ -490,6 +490,19 @@ export async function* chatStream(
  * Image generation. Pollinations renders images from a URL-encoded prompt with
  * no key and no sign-up, which is what makes this work at all on a free tier.
  */
+/**
+ * Small models love inventing bibliographies: 【1】, [2] and friends, pointing at
+ * a source list that does not exist. There is nothing to link to, so the
+ * markers are noise — remove them rather than show a reader a broken promise.
+ */
+export function sanitizeAnswer(text: string): string {
+  return text
+    .replace(/\s*【[^】]{0,12}】/g, "")
+    .replace(/\s*\[\d{1,2}\]/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 export function imageUrl(
   prompt: string,
   opts: { width?: number; height?: number; seed?: number; model?: string } = {},

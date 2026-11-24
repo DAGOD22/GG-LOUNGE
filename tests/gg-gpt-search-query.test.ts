@@ -20,3 +20,12 @@ test("keeps the subject, drops the scaffolding", () => {
   assert.match(q, /AFL grand final/);
   assert.doesNotMatch(q, /^who /i);
 });
+
+test("strips invented citations without touching real text", async () => {
+  const { sanitizeAnswer } = await import("../lib/gg-gpt/engine");
+  assert.equal(
+    sanitizeAnswer("ISRO launched a satellite 【1】 and it worked [2]."),
+    "ISRO launched a satellite and it worked.",
+  );
+  assert.equal(sanitizeAnswer("Plain answer."), "Plain answer.");
+});
