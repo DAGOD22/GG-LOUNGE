@@ -27,8 +27,9 @@ test('every game path that is local produces a sitemap entry with one origin', a
   const { default: sitemap } = await import('@/app/sitemap');
   const entries = sitemap();
   const localPaths = games.filter(g => g.path.startsWith('/') && !g.path.startsWith('//')).length;
-  // static pages (6) + one SEO page per game + one asset entry per local game.
-  assert.equal(entries.length, 6 + games.length + localPaths);
+  // static pages (7) + one SEO page per game + one asset entry per local game.
+  // The 7th static page is /tools, added with the tools launch.
+  assert.equal(entries.length, 7 + games.length + localPaths);
   for (const entry of entries) {
     assert.match(entry.url, /^https:\/\/[^/]+\//, `URL must be absolute: ${entry.url}`);
     assert.equal(entry.url.split('://').length, 2, `one scheme only: ${entry.url}`);

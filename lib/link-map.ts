@@ -125,6 +125,7 @@ export function sitePages(): DocSection {
       { label: 'Proxy', href: '/proxy', note: 'Type any address and browse it' },
       { label: 'YouTube', href: '/youtube', note: 'Video player with same-origin media' },
       { label: 'GG-GPT', href: '/gg-gpt', note: 'Games assistant' },
+      { label: 'Tools', href: '/tools', note: '100 browser utilities: QR, calculator, converters' },
       { label: 'Request a game', href: '/request-game', note: 'Ask for a title, or report a broken one' },
       { label: 'Privacy', href: '/privacy' },
       { label: 'Terms', href: '/terms' },

@@ -77,8 +77,8 @@ export function AnnouncementBanner() {
           <Sparkles size={12} /> Summer drop
         </span>
         <p className="gg-banner-copy">
-          <strong>👀 HUGE THINGS ARE DROPPING OVER SUMMER:</strong> We&apos;re adding insane unreleased
-          games, secret features, private proxies &amp; crazy new themes — and all the new links &amp;
+          <strong>👀 HUGE THINGS ARE DROPPING OVER SUMMER:</strong> We&apos;re adding insane games,
+          secret features &amp; a steady stream of good stuff — and all the new links &amp;
           drops will ONLY go inside{' '}
           {IS_INTERNAL ? (
             <Link className="gg-banner-cta" href={ANNOUNCEMENT_DOC_URL}>

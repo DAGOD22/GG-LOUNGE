@@ -26,6 +26,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: absoluteUrl('/terms'), lastModified: now, changeFrequency: 'monthly', priority: 0.3 },
     { url: absoluteUrl('/proxy'), lastModified: now, changeFrequency: 'weekly', priority: 0.6 },
     { url: absoluteUrl('/apps'), lastModified: now, changeFrequency: 'weekly', priority: 0.6 },
+    // The tools page is a genuine landing page for search — people look for
+    // "qr code generator" and "unit converter" by name, not by brand.
+    { url: absoluteUrl('/tools'), lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
     { url: absoluteUrl('/games/youtube'), lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
   ]
   const gameSeoUrls: MetadataRoute.Sitemap = games.map(g => ({

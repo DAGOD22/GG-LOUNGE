@@ -62,6 +62,7 @@ export function SiteHeader({
         <a href="/apps" onClick={closeNav}>Apps</a>
         <a href="/gg-gpt" onClick={closeNav}>GG-GPT</a>
         <a href="/proxy" onClick={closeNav}>Proxy</a>
+        <a href="/tools" onClick={closeNav}>Tools</a>
         <button onClick={() => { onOpenAchievements(); setMobileNavOpen(() => false) }} style={{ background: 'none', border: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800 }}><Trophy size={12} /> Achievements</button>
         <a href="#about" onClick={closeNav}>Studio</a>
         <a href="/request-game" onClick={closeNav}>Request a game</a>

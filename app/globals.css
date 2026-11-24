@@ -120,7 +120,11 @@ a {
 .hero,
 .catalog,
 footer {
-  max-width: 1240px;
+  /* 1240px was narrower than the header's own contents at the width the site
+     is actually used at, so the nav, the account chip and the Install button
+     were fighting over about a hundred pixels of slack and collided. The
+     header now has room to breathe on a laptop screen. */
+  max-width: 1440px;
   margin-inline: auto;
   padding-inline: 38px;
 }
@@ -129,6 +133,10 @@ footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* A minimum gutter between the three groups. `space-between` alone let the
+     nav butt straight up against the wordmark and the account chip, which is
+     what "squashed together" looked like. */
+  gap: 18px;
   border-bottom: 1px solid var(--line);
   position: relative;
 }
@@ -161,9 +169,22 @@ footer {
 }
 .header-nav {
   display: flex;
-  gap: 34px;
+  align-items: center;
+  /* The gap tracks the viewport so the row tightens before anything wraps —
+     "GG-GPT" was breaking across two lines at 1440px because the nav had a
+     fixed 34px gap, eight items and nowhere to put them. */
+  gap: clamp(10px, 1.4vw, 30px);
   color: var(--muted);
   font-size: 12px;
+  /* If space does run out, scrolling beats wrapping: a nav item split across
+     two lines makes the header taller and reads as a layout bug. */
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow: hidden;
+}
+.header-nav > * {
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 .header-nav a:hover {
   color: var(--foreground);
@@ -2565,6 +2586,20 @@ a:focus-visible {
   place-items: center;
   cursor: pointer;
 }
+/* Between the drawer breakpoint and a full desktop the header still has all
+   eight nav items plus every action chip, which is a lot for one row. Drop the
+   lowest-value chips first — the title count, then the "Synced" pill — so the
+   nav and the Install button keep their room instead of colliding. */
+@media (max-width: 1180px) {
+  .header-status {
+    display: none;
+  }
+}
+@media (max-width: 1100px) {
+  .header-user-sync {
+    display: none;
+  }
+}
 @media (max-width: 1020px) {
   .site-header {
     gap: 12px;
@@ -2608,16 +2643,25 @@ a:focus-visible {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
+  gap: 6px;
+  /* This used to be `flex-shrink: 0`, so when the nav grew the action row
+     pushed Install past the right edge of the container instead of giving up
+     six pixels of gap. It may shrink now; the buttons themselves stay put. */
+  flex-shrink: 1;
+  min-width: 0;
+  justify-content: flex-end;
+}
+.brand {
+  flex: 0 0 auto;
+  min-width: 0;
 }
 .brand-name {
   white-space: nowrap;
   letter-spacing: 0.02em;
 }
 .icon-button {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
   border-radius: 999px;
   border: 1px solid var(--line);
@@ -2658,31 +2702,34 @@ a:focus-visible {
 }
 .header-signin,
 .header-install {
-  padding: 8px 14px;
+  padding: 6px 11px;
   border-radius: 999px;
   border: 1px solid var(--lime);
   background: var(--lime);
   color: #0b0d12;
   font-weight: 900;
-  font-size: 12px;
+  font-size: 11px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   cursor: pointer;
   white-space: nowrap;
+  /* `min-width: 0` on the parent flex row is what actually lets this shrink;
+     without it a nowrap button sets a floor and the row overflows instead. */
   flex: 0 0 auto;
 }
 .header-user {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
+  gap: 6px;
+  padding: 5px 8px;
   border-radius: 999px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.06);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
-  max-width: 190px;
+  max-width: 170px;
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -2690,16 +2737,17 @@ a:focus-visible {
 .header-user-sync {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
+  gap: 3px;
+  padding: 2px 5px;
   border-radius: 999px;
   background: rgba(34, 197, 94, 0.14);
   border: 1px solid var(--line);
-  font-size: 10px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
 }
 .header-user-logout {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
