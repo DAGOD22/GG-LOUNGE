@@ -6,8 +6,19 @@ import { defaults, sanitizeSettings, SETTINGS_KEY, THEMES, WALLPAPERS, iconHref,
 import { getMedia } from '@/lib/customization/media';
 import { watchFrameEvents } from '@/lib/customization/frame-events';
 import { ReactiveBackdrop, REACTIVE_EVENT } from './ReactiveBackdrop';
-import { CustomizationDialog } from './CustomizationDialog';
-import { PanicDoc } from '@/components/live/PanicDoc';
+import dynamic from 'next/dynamic';
+
+/**
+ * Both of these are full-page surfaces that are closed for almost every visitor:
+ * the settings dialog is ~30KB of form and gallery code, and the panic doc is a
+ * decoy page. They used to be imported eagerly here, and this provider wraps the
+ * entire site — so every page, including ones that never show a dialog, shipped
+ * both in its first bundle and server-rendered a closed <dialog> element into
+ * the HTML. Loading them on demand costs one chunk fetch the first time the
+ * visitor actually opens one.
+ */
+const CustomizationDialog = dynamic(() => import('./CustomizationDialog').then(m => m.CustomizationDialog), { ssr: false });
+const PanicDoc = dynamic(() => import('@/components/live/PanicDoc').then(m => m.PanicDoc), { ssr: false });
 
 type Context={settings:Settings;ready:boolean;update:(fn:(previous:Settings)=>Settings)=>void;openSettings:()=>void;reset:()=>void;capturing:boolean;setCapturing:(value:boolean)=>void;saveError:string;mediaError:string;runPanic:()=>void;panicDoc:boolean;closePanicDoc:()=>void;};
 const CustomizationContext=createContext<Context|null>(null);
@@ -21,7 +32,10 @@ export function CustomizationProvider({children}:{children:ReactNode}) {
   const panicDocRef=useRef(false),closePanicDocRef=useRef<()=>void>(()=>{});
   useLayoutEffect(()=>{state.current=settings;captureRef.current=capturing;openRef.current=open;},[settings,capturing,open]);
   const update=useCallback((fn:(previous:Settings)=>Settings)=>setSettings(previous=>{const value=sanitizeSettings(fn(previous));state.current=value;return value;}),[]);
-  const openSettings=useCallback(()=>{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});setOpen(true);},[]);
+  // Once a dialog has been opened its chunk is warm, so keep it mounted: closing
+  // and reopening must not re-download or lose the visitor's in-dialog draft.
+  const [everOpened,setEverOpened]=useState(false);
+  const openSettings=useCallback(()=>{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});setEverOpened(true);setOpen(true);},[]);
   const reset=useCallback(()=>{setSettings(defaults());setSaveError('');setMediaError('');},[]);
   useEffect(()=>{try{const raw=localStorage.getItem(SETTINGS_KEY);if(raw)setSettings(sanitizeSettings(JSON.parse(raw)));else if(localStorage.getItem('ggl_theme')==='light'){const d=defaults();d.theme={preset:'arctic',mode:'light',colors:{...THEMES.arctic.colors}};setSettings(d);}}catch{setSaveError('Saved settings were unreadable. Defaults are active.');}setReady(true);
     const storage=(e:StorageEvent)=>{if(e.key!==SETTINGS_KEY)return;try{setSettings(e.newValue?sanitizeSettings(JSON.parse(e.newValue)):defaults());}catch{}};window.addEventListener('storage',storage);return()=>window.removeEventListener('storage',storage);
@@ -183,8 +197,8 @@ export function CustomizationProvider({children}:{children:ReactNode}) {
     </div>
     <div className="gg-site-content">{children}</div>
     <button type="button" className="gg-customize-trigger" onClick={openSettings} aria-label="Customize lounge" title="Customize appearance, tab and panic key"><Settings2 size={17}/><span>Customize</span></button>
-    <CustomizationDialog open={open} onClose={()=>{setOpen(false);setCapturing(false);}} onPlayVideo={()=>{video.current?.play().then(()=>setMediaError('')).catch(()=>setMediaError('Playback is blocked or the format is unsupported.'));}}/>
-      {panicDoc&&<PanicDoc onExit={closePanicDoc}/>}
+      {(open || everOpened) && <CustomizationDialog open={open} onClose={()=>{setOpen(false);setCapturing(false);}} onPlayVideo={()=>{video.current?.play().then(()=>setMediaError('')).catch(()=>setMediaError('Playback is blocked or the format is unsupported.'));}}/>}
+      {panicDoc && <PanicDoc onExit={closePanicDoc}/>}
       <AnimatedCursor cursor={settings.cursor} />
   </CustomizationContext.Provider>;
 }

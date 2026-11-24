@@ -80,7 +80,7 @@ export async function reapUploads(): Promise<number> {
 }
 
 /** How many uploads are currently unfinished, and how big this one is. */
-async function uploadUsage(uploadId: string): Promise<{ open: number; bytes: number }> {
+async function uploadUsage(uploadId: string): Promise<{ open: number; bytes: number; totalBytes: number }> {
   if (getMode() === "postgres") {
     const rows = await pgQuery<{ upload_id: string; bytes: string }>(
       'SELECT "upload_id", COALESCE(SUM(LENGTH("chunk")),0)::text AS bytes FROM "upload_parts" GROUP BY "upload_id"',
@@ -88,21 +88,25 @@ async function uploadUsage(uploadId: string): Promise<{ open: number; bytes: num
     );
     let open = 0;
     let bytes = 0;
+    let totalBytes = 0;
     for (const row of rows) {
       open++;
-      if (row.upload_id === uploadId) bytes = Number(row.bytes) || 0;
+      const size = Number(row.bytes) || 0;
+      totalBytes += size;
+      if (row.upload_id === uploadId) bytes = size;
     }
-    return { open, bytes };
+    return { open, bytes, totalBytes };
   }
 
   const root = path.join(await getLocalDir(), "uploads");
   let open = 0;
   let bytes = 0;
+  let totalBytes = 0;
   let entries: string[] = [];
   try {
     entries = await fs.readdir(root);
   } catch {
-    return { open: 0, bytes: 0 };
+    return { open: 0, bytes: 0, totalBytes: 0 };
   }
   for (const entry of entries) {
     const dir = path.join(root, entry);
@@ -116,9 +120,29 @@ async function uploadUsage(uploadId: string): Promise<{ open: number; bytes: num
       continue;
     }
     open++;
+    totalBytes += size;
     if (entry === uploadId) bytes = size;
   }
-  return { open, bytes };
+  return { open, bytes, totalBytes };
+}
+
+/** A snapshot of upload storage, for /api/health. */
+export async function uploadStats(): Promise<{ open: number; bytes: number; quota: number; maxBytes: number; ttlMs: number }> {
+  const usage = await uploadUsage("").catch(() => ({ open: -1, bytes: -1, totalBytes: -1 }));
+  if (getMode() === "postgres") {
+    const totals = await pgQuery<{ bytes: string }>(
+      'SELECT COALESCE(SUM(LENGTH("chunk")),0)::text AS bytes FROM "upload_parts"',
+      [],
+    ).catch(() => [] as { bytes: string }[]);
+    return {
+      open: usage.open,
+      bytes: Number(totals[0]?.bytes) || 0,
+      quota: UPLOAD_QUOTA,
+      maxBytes: MAX_UPLOAD_BYTES,
+      ttlMs: UPLOAD_TTL_MS,
+    };
+  }
+  return { open: usage.open, bytes: usage.totalBytes, quota: UPLOAD_QUOTA, maxBytes: MAX_UPLOAD_BYTES, ttlMs: UPLOAD_TTL_MS };
 }
 
 /**

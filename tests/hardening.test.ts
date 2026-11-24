@@ -102,6 +102,25 @@ test('the upload route rate-limits, namespaces ids and reports the ceiling', () 
   assert.ok(source.includes('MAX_UPLOAD_BYTES'), 'the route must know the ceiling it enforces');
 });
 
+test('there is one rate limiter, not three', () => {
+  // Two in-memory limiters plus a third copied into middleware meant the same
+  // address could spend its budget more than once and neither layer could see
+  // the other's usage. Everything must route through lib/rate-limit.ts.
+  const middleware = read('middleware.ts');
+  assert.ok(middleware.includes('from "@/lib/rate-limit"'), 'middleware must use the shared limiter');
+  assert.ok(!middleware.includes('_rlBuckets'), 'middleware must not keep its own buckets');
+  const core = read('lib/db/core.ts');
+  assert.ok(core.includes('from "../rate-limit"'), 'db helpers must delegate to the shared limiter');
+  assert.ok(!core.includes('const rateMap = new Map'), 'db must not keep its own buckets');
+});
+
+test('every public API group in middleware has a budget', () => {
+  const middleware = read('middleware.ts');
+  for (const route of ['/api/uploads', '/api/gg-gpt', '/api/presence', '/api/report', '/api/game-stats']) {
+    assert.ok(middleware.includes(route), `${route} must be rate limited at the edge`);
+  }
+});
+
 /* ---------------- admin login ---------------- */
 
 test('admin login is rate limited and compares passwords in constant time', () => {

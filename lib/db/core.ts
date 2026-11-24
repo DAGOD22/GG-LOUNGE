@@ -1,3 +1,5 @@
+import { peekRateLimit, rateLimit } from "../rate-limit";
+
 /**
  * Shared database types, limits and helpers.
  *
@@ -64,20 +66,18 @@ export function isStrongPassword(pw: string): string | null {
   // block username-like passwords will be checked in createAuthUser
   return null
 }
-const rateMap = new Map<string, { count:number, reset:number }>()
-export function checkRateLimit(key:string, max=5, windowMs=15*60*1000): boolean {
-  const now = Date.now()
-  const e = rateMap.get(key)
-  if (!e || now > e.reset) { rateMap.set(key, { count: 1, reset: now + windowMs }); return true }
-  if (e.count >= max) return false
-  e.count++
-  return true
+/**
+ * The counters live in lib/rate-limit.ts. Two separate in-memory limiters used
+ * to exist — this one and the one behind middleware — so the same address could
+ * have a different budget depending on which layer happened to reject it first,
+ * and neither could report the other's usage. These are kept as thin wrappers
+ * because a dozen call sites import them, but they are the same bucket now.
+ */
+export function checkRateLimit(key: string, max = 5, windowMs = 15 * 60 * 1000): boolean {
+  return rateLimit(key, max, windowMs).ok;
 }
-export function getRateLimitRemaining(key:string, max=5): number {
-  const e = rateMap.get(key)
-  if (!e) return max
-  if (Date.now() > e.reset) return max
-  return Math.max(0, max - e.count)
+export function getRateLimitRemaining(key: string, max = 5): number {
+  return peekRateLimit(key, max).remaining;
 }
 
 // ---- Row shapes shared across the storage modules ----

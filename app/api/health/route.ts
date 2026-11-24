@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { getDatabaseUrl } from "@/lib/db";
+import { CANONICAL_HOST, SITE_DOMAINS } from "@/lib/site-domains";
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +47,15 @@ export async function GET() {
     checks['games'] = { ok: false, ms: 0, error: e?.message }
   }
 
+  // Storage and routing facts an operator would otherwise have to read the
+  // source to learn: how much of the upload surface is in use (the quota in
+  // lib/db/uploads.ts returns 503 when it fills, so this is the number to watch),
+  // and where the site believes it lives. `siteUrl` was the only field and it was
+  // null on every host, which told a reader nothing.
+  const uploads = await import('@/lib/db/uploads')
+    .then(m => m.uploadStats())
+    .catch(() => ({ open: -1, bytes: -1, quota: 0, maxBytes: 0, ttlMs: 0 }));
+
   const allOk = Object.values(checks).every(c => c.ok || c.error === 'fetch blocked/skipped (sandbox)')
   const ms = Date.now() - started
 
@@ -60,7 +70,10 @@ export async function GET() {
       env: {
         hasDatabase: !!getDatabaseUrl(),
         siteUrl: process.env.NEXT_PUBLIC_SITE_URL || null,
+        canonicalHost: CANONICAL_HOST,
+        addresses: SITE_DOMAINS.length,
       },
+      uploads,
     },
     { headers: { 'cache-control': 'no-store', 'x-health-ms': String(ms) } }
   )
