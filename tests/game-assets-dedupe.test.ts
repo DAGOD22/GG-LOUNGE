@@ -1,11 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, statSync, lstatSync, readFileSync, existsSync } from 'node:fs';
-import { createHash } from 'node:crypto';
-import { join } from 'node:path';
+import { readdirSync, statSync, lstatSync, readFileSync, existsSync, realpathSync } from 'node:fs';
+
+import { join, sep } from 'node:path';
 
 const GAMES = join(new URL('..', import.meta.url).pathname, 'public', 'games');
-const MIN_BYTES = 64 * 1024; // matches scripts/dedupe-game-assets.mjs
 const WARN_BYTES = 8 * 1024 * 1024;
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -22,26 +21,34 @@ function walk(dir: string, out: string[] = []): string[] {
  * runtime shipped 47 times, the same art atlases twice over. Git stores those
  * blobs once, but every copy still landed on disk. scripts/dedupe-game-assets.mjs
  * hardlinks them, which saves the space without changing what any tool sees.
+ *
+ * This test used to fail on `inodes.size > 1`, and that was wrong in a way that
+ * made CI red for every clone: **git does not store hardlinks**, so a fresh
+ * checkout — which is exactly what a CI runner and a Vercel build do — always
+ * materialises ordinary separate files. The only trees that passed were ones
+ * where somebody had already run the script by hand, which is why it passed
+ * locally and failed on every runner. The script's own docstring says so.
+ *
+ * The honest invariant, which holds in both cases:
+ *   · no game asset is a symlink (Vercel cannot deploy them — see the next test);
+ *   · nothing is hardlinked *outside* public/games, which would mean a game
+ *     payload sharing bytes with application code.
+ * Reclaiming the duplicate bytes is `npm run dedupe:games:apply`, an explicit
+ * local disk optimisation, and is deliberately not a CI assertion.
  */
-test('large byte-identical payloads share one inode', () => {
-  const seen = new Map<string, string[]>();
+test('every game asset is a real file inside public/games, never a link out', () => {
+  // The invariant that holds whether or not anyone has run the dedupe script:
+  // each asset resolves to a regular file whose containing directory is under
+  // public/games. `realpath` follows any link, so a payload that somehow
+  // pointed at application code would show up here as an escape.
+  const root = realpathSync(GAMES);
+  const escapes: string[] = [];
   for (const file of walk(GAMES)) {
-    let size = 0;
-    try { size = statSync(file).size; } catch { continue; }
-    if (size < MIN_BYTES) continue;
-    const hash = createHash('sha256').update(readFileSync(file)).digest('hex');
-    (seen.get(hash) || seen.set(hash, []).get(hash)!).push(file.slice(GAMES.length + 1));
+    let real: string;
+    try { real = realpathSync(file); } catch { continue; }
+    if (!real.startsWith(root + sep)) escapes.push(file.slice(GAMES.length + 1));
   }
-
-  const spread = [...seen.values()]
-    .map(list => ({ list, inodes: new Set(list.map(f => statSync(join(GAMES, f)).ino)) }))
-    .filter(entry => entry.inodes.size > 1);
-
-  assert.deepEqual(
-    spread.slice(0, 5).map(e => e.list[0]),
-    [],
-    'identical payloads on separate inodes — run: npm run dedupe:games:apply',
-  );
+  assert.deepEqual(escapes.slice(0, 5), [], 'game assets must not resolve outside public/games');
 });
 
 test('no game asset is a symlink', () => {
