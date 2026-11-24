@@ -22,6 +22,7 @@ import {
   convertUnit,
   cryptoPrice,
   defineWord,
+  lookupTopic,
   searchCatalogue,
   type CatalogueEntry,
   type ToolResult,
@@ -296,6 +297,7 @@ export async function POST(req: Request) {
     intent.currency ? run(convertCurrency(intent.currency.amount, intent.currency.from, intent.currency.to), "currency") : null,
     intent.crypto ? run(cryptoPrice(intent.crypto.ids), "crypto") : null,
     intent.define ? run(defineWord(intent.define.word), "dictionary") : null,
+    intent.topic ? run(lookupTopic(intent.topic.term), "encyclopedia") : null,
   ].filter(Boolean) as Array<Promise<void>>);
 
   if (intent.unit) {
@@ -475,7 +477,7 @@ function directAnswer(results: ToolResult[]): string | null {
   if (!results.length) return null;
   // A search result is raw material for a model, never the answer itself.
   // Matching source names by hand missed every engine added later.
-  const solid = results.filter(r => !r.source.startsWith("search:"));
+  const solid = results.filter(r => !r.source.startsWith("search:") || r.source === "wikipedia");
   if (!solid.length || solid.length !== results.length) return null;
   const lines = solid.map(r => `**${r.text}**`);
   return lines.length === 1 ? lines[0] : lines.join("\n\n");

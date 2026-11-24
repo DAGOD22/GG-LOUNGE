@@ -12,7 +12,7 @@
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth";
 import { chatComplete, imageUrl, sanitizeAnswer } from "@/lib/gg-gpt/engine";
-import { getWeather, webSearch, renderHits, type ToolResult } from "@/lib/gg-gpt/tools";
+import { getWeather, webSearch, renderHits, lookupTopic, type ToolResult } from "@/lib/gg-gpt/tools";
 import { recommend, renderRecommendation } from "@/lib/gg-gpt/recommend";
 import { games } from "@/lib/games";
 import { detectIntent, type Intent } from "@/lib/gg-gpt/intent";
@@ -189,7 +189,7 @@ async function selfTest(question = "In one sentence, what is a quokka?"): Promis
    * answer, do not hand it to a model. Asking a model to repeat a list of
    * games is how it invents "Zen Garden Escape", a game we do not have.
    */
-  const solid = tools.filter(t => !t.source.startsWith("search:"));
+  const solid = tools.filter(t => !t.source.startsWith("search:") && t.source !== "wikipedia");
   const toolOnly = solid.length === tools.length && tools.length > 0 ? tools.map(t => t.text).join("\n\n") : null;
 
   const result = toolOnly
@@ -221,6 +221,10 @@ async function gatherTools(intent: Intent): Promise<ToolResult[]> {
   if (intent.weather) {
     const w = await getWeather(intent.weather.place).catch(() => null);
     if (w) tools.push(w);
+  }
+  if (intent.topic) {
+    const t = await lookupTopic(intent.topic.term).catch(() => null);
+    if (t) tools.push(t);
   }
   if (intent.catalogue) {
     const cat = games.map(g => ({ id: g.id, title: g.title, genre: g.genre, tone: g.tone, description: g.description }));

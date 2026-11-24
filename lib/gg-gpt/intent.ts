@@ -28,6 +28,8 @@ export interface Intent {
   catalogue?: { query: string };
   image?: { prompt: string; width?: number; height?: number };
   video?: { prompt: string };
+  /** A factual "what is X" that deserves a sourced summary. */
+  topic?: { term: string };
   /** The message is a follow-up that needs no fresh tool data. */
   conversational?: boolean;
 }
@@ -262,6 +264,19 @@ export function detectIntent(message: string): Intent {
   if (word && !STOPWORDS.test(word) && !/\b(mean by|you mean)\b/i.test(lower)) {
     intent.define = { word: word.toLowerCase() };
     return intent;
+  }
+
+  /* ---- topic: a factual question about a thing ---- */
+  // Only for "what/who is X" aimed at a short noun phrase. Anything with a
+  // recency word belongs to search, which runs later in this function.
+  const topicMatch =
+    /^(?:hey,?\s+)?(?:what|who)(?:'s| is| are| was| were)\s+(?:a|an|the)?\s*([a-z0-9][a-z0-9 '\-]{1,60}?)\??$/i.exec(message.replace(/\s+/g, " ").trim());
+  if (topicMatch) {
+    const term = topicMatch[1].trim();
+    if (!RECENCY.test(term) && !/\b(game|games|play|recommend)\b/i.test(term) && term.split(/\s+/).length <= 5) {
+      intent.topic = { term };
+      return intent;
+    }
   }
 
   /* ---- catalogue: recommendations ---- */

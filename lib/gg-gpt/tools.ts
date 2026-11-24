@@ -167,6 +167,45 @@ async function bingNews(query: string): Promise<SearchHit[]> {
   return parseRss(await res.text(), 6);
 }
 
+/**
+ * A short, sourced answer about a thing — "what is a quokka".
+ *
+ * A small free model asked this answered "native to Western Australia, known
+ * for its tree-climbing habits". Both halves are wrong, and wrong in the
+ * confident register that makes an assistant useless. Wikipedia's summary
+ * endpoint is one request and gives the first paragraph of the article, so the
+ * model can paraphrase a source instead of recalling one.
+ */
+export async function lookupTopic(term: string): Promise<ToolResult | null> {
+  const title = term.trim().replace(/\s+/g, " ").slice(0, 80);
+  if (!title || title.split(" ").length > 6) return null;
+  try {
+    const res = await fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, "_"))}?redirect=true`,
+      { headers: { "user-agent": API_UA, accept: "application/json" }, signal: AbortSignal.timeout(9000) },
+    );
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      type?: string;
+      title?: string;
+      extract?: string;
+      description?: string;
+      content_urls?: { desktop?: { page?: string } };
+    };
+    // Disambiguation pages are a list of meanings, not a meaning.
+    if (json.type === "disambiguation" || !json.extract) return null;
+    const extract = json.extract.replace(/\s+/g, " ").trim().slice(0, 600);
+    if (extract.length < 40) return null;
+    return {
+      source: "wikipedia",
+      text: `${json.title}${json.description ? ` — ${json.description}` : ""}: ${extract}`,
+      data: { title: json.title, url: json.content_urls?.desktop?.page },
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function wikipediaSearch(query: string): Promise<SearchHit[]> {
   const res = await fetch(
     `https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=5&srsearch=${encodeURIComponent(query)}`,
