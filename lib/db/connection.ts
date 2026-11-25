@@ -237,6 +237,20 @@ export function migrate(): Promise<void> {
         );
         CREATE INDEX IF NOT EXISTS "coop_room_touched_idx" ON "coop_room" ("touched_at" DESC);
 
+        /* Relay queue: the fallback transport for a room whose peers cannot
+           reach each other directly. Bounded by an aggressive delete on read,
+           because this is a pipe and not a history. The seq is per-room so
+           each side can keep a simple integer cursor. */
+        CREATE TABLE IF NOT EXISTS "coop_relay" (
+          "code" TEXT NOT NULL,
+          "seq" BIGINT NOT NULL,
+          "from_side" TEXT NOT NULL DEFAULT 'host',
+          "body" TEXT NOT NULL,
+          "at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY ("code", "seq")
+        );
+        CREATE INDEX IF NOT EXISTS "coop_relay_at_idx" ON "coop_relay" ("at");
+
         /* ---- CHATVERSE --------------------------------------------------
            The private chat behind the admin door. Rooms and messages are
            separate tables so listing rooms stays one cheap query, and the
