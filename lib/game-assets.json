@@ -1050,6 +1050,18 @@
     "available": true,
     "issues": []
   },
+  "sumo-bump": {
+    "available": true,
+    "issues": []
+  },
+  "merge-reactor": {
+    "available": true,
+    "issues": []
+  },
+  "lane-guard": {
+    "available": true,
+    "issues": []
+  },
   "youtube": {
     "available": true,
     "issues": []

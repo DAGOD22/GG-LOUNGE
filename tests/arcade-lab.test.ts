@@ -255,6 +255,46 @@ test('split screen: both panes are grid tracks, not floating boxes', () => {
   assert.match(css, /@media \(pointer: coarse\)/);
 });
 
+test('every GG-LOUNGE original parses and loads the shared engine', () => {
+  // These are plain files in public/, so nothing type-checks them. A syntax
+  // error here is a black screen with no console message on the site.
+  const originals = ['orbital-drift', 'neon-runner', 'block-fall', 'pulse-grid', 'sumo-bump', 'merge-reactor', 'lane-guard'];
+  const engine = readFileSync(new URL('../public/games/_shared/gg-arcade.js', import.meta.url), 'utf8');
+  assert.doesNotThrow(() => new Function(engine), 'the shared engine must parse');
+
+  for (const id of originals) {
+    const html = readFileSync(new URL(`../public/games/${id}/index.html`, import.meta.url), 'utf8');
+    assert.match(html, /<script src="\.\.\/_shared\/gg-arcade\.js"><\/script>/, `${id} does not load the engine`);
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => match[1]);
+    assert.ok(scripts.length, `${id} has no game script`);
+    for (const script of scripts) {
+      assert.doesNotThrow(() => new Function(script), `${id} has a syntax error`);
+    }
+    // The catalogue must actually link to the file that exists.
+    assert.match(html, new RegExp(`<title>`), `${id} has no title`);
+  }
+});
+
+test('every original is in the catalogue and marked available', async () => {
+  const { games } = await import('../lib/games');
+  for (const id of ['orbital-drift', 'neon-runner', 'block-fall', 'pulse-grid', 'sumo-bump', 'merge-reactor', 'lane-guard']) {
+    assert.ok(games.some(game => game.id === id), `${id} is missing from the catalogue`);
+  }
+});
+
+test('the first-party originals sort ahead of the imported catalogue', async () => {
+  // Unranked ids sort to the tail, so an original added without a curated rank
+  // is invisible on page one — which is how three of these shipped the first time.
+  const { curatedRank, CURATED_ORDER } = await import('../lib/games');
+  for (const id of ['orbital-drift', 'neon-runner', 'block-fall', 'pulse-grid', 'sumo-bump', 'merge-reactor', 'lane-guard']) {
+    assert.ok(curatedRank(id) < 20, `${id} does not sort near the front (rank ${curatedRank(id)})`);
+  }
+  // Every original must appear in the curated list, or the rank above is luck.
+  for (const id of ['orbital-drift', 'neon-runner', 'block-fall', 'pulse-grid', 'sumo-bump', 'merge-reactor', 'lane-guard']) {
+    assert.ok(CURATED_ORDER.includes(id), `${id} is missing from CURATED_ORDER`);
+  }
+});
+
 test('play time formats as a person would say it', () => {
   assert.equal(formatDuration(20_000), 'under a minute');
   assert.equal(formatDuration(9 * 60_000), '9m');
