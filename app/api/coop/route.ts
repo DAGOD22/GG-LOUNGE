@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { answerRoom, closeRoom, createRoom, getRoom, touchRoom } from '@/lib/db/coop';
 import { cleanName } from '@/lib/db/presence';
 import { consumeSharedBudget, callerKey } from '@/lib/live-budget';
-import { isValidRoomCode, normalizeRoomCode, roomCodeFrom } from '@/lib/coop';
+import { decodeSignal, isValidRoomCode, normalizeRoomCode, roomCodeFrom } from '@/lib/coop';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -43,7 +43,19 @@ export async function POST(req: Request) {
         room = await createRoom(code, offer, name);
       }
     }
-    if (!room) return NextResponse.json({ error: 'Could not open a room' }, { status: 503 });
+    if (!room) {
+      // Distinguish "your offer was rejected" from "we could not store it":
+      // they need completely different answers from the player, and collapsing
+      // them into one message is how the base64/SDP bug stayed invisible.
+      return NextResponse.json(
+        {
+          error: decodeSignal(offer)
+            ? 'The room server could not store that room. Try again in a moment.'
+            : 'That connection offer was not readable. Reload the page and try again.',
+        },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ code: room.code, status: room.status });
   }
 

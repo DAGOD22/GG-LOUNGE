@@ -16,6 +16,7 @@
  */
 import { getMode, pgQuery, migrate } from './connection';
 import { withLocalLock } from './local-store';
+import { decodeSignal } from '@/lib/coop';
 
 /** A room is dead 10 minutes after it was made, or 3 minutes after last use. */
 const ROOM_TTL_MS = 10 * 60_000;
@@ -43,8 +44,17 @@ function prune(store: Store, now = Date.now()): Store {
   return store;
 }
 
+/**
+ * The client sends `encodeOffer`/`encodeAnswer` output — a base64url JSON
+ * envelope `{v:1,t:'offer'|'answer',sdp}` — not a raw SDP. This used to test
+ * for a literal `v=0` substring, which base64 can never contain, so *every*
+ * genuine create/answer failed validation and the room button answered
+ * "Could not open a room" every single time. Decode the envelope instead and
+ * check the SDP inside it.
+ */
 function validSdp(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0 && value.length <= MAX_SDP && value.includes('v=0');
+  if (typeof value !== 'string' || value.length === 0 || value.length > MAX_SDP) return false;
+  return decodeSignal(value) !== null;
 }
 
 async function readStore(): Promise<Store> {
