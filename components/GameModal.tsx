@@ -89,8 +89,9 @@ export function GameModal({
       if (target) setSplitGame(target)
     },
     launchTwoPlayer: (gameId: string) => {
-      // Two players share *this* screen, so the game takes the whole modal and
-      // the split pane (which is for one person watching two games) is closed.
+      // The modal is already open on one game, so "launch" means: close the
+      // split pane (which is for one person watching two games, not for two
+      // people sharing one) and let the page swap the active game.
       setSplitGame(null)
       window.dispatchEvent(new CustomEvent('ggl:launch-game', { detail: { gameId } }))
     },

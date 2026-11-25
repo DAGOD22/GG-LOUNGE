@@ -454,8 +454,12 @@ export function CoopRoom() {
       const entry = twoPlayerGame(gameId);
       if (!entry) return;
       setRoomGame(gameId);
-      bridgeRef.current?.launchTwoPlayer?.(gameId);
-      window.dispatchEvent(new CustomEvent('ggl:launch-game', { detail: { gameId } }));
+      // Exactly one launch request. When a launcher is mounted the bridge takes
+      // it (it also closes the split pane, since two players share one screen);
+      // otherwise the page-level listener opens the modal from scratch. Asking
+      // both meant two events per click in the common case.
+      if (bridgeRef.current) bridgeRef.current.launchTwoPlayer(gameId);
+      else window.dispatchEvent(new CustomEvent('ggl:launch-game', { detail: { gameId } }));
       if (status === 'connected') {
         sendRaw({ t: 'launch', gameId });
         push('system', `Opened ${gameId.replace(/-/g, ' ')} for two players.`);
