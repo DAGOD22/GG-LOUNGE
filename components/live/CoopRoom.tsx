@@ -58,6 +58,14 @@ export function CoopRoom() {
   const [joinCode, setJoinCode] = useState('');
   const [peerName, setPeerName] = useState('');
   const [error, setError] = useState('');
+  /**
+   * The deployment itself cannot host a room.
+   *
+   * Separate from `error` because it is not something the player did and not
+   * something retrying will fix: without a database there is nowhere to park
+   * the handshake. The panel shows the fix instead of inviting another try.
+   */
+  const [needsDatabase, setNeedsDatabase] = useState(false);
   const [copied, setCopied] = useState(false);
   const [chat, setChat] = useState<ChatLine[]>([]);
   const [draft, setDraft] = useState('');
@@ -336,6 +344,7 @@ export function CoopRoom() {
         body: JSON.stringify({ action: 'create', offer: encoded, name: myName }),
       });
       const data = await response.json();
+      if (data?.needsDatabase) setNeedsDatabase(true);
       if (!response.ok || !data?.code) throw new Error(data?.error || 'Could not open a room');
       setCode(data.code);
       setStatus('waiting');
@@ -595,7 +604,13 @@ export function CoopRoom() {
             {status === 'error' && (error || 'Something went wrong.')}
           </p>
 
-          {error && status !== 'error' && <p className="gg-live-error" role="alert">{error}</p>}
+          {needsDatabase && (
+            <p className="gg-live-error" role="alert">
+              Rooms need a database on this deployment. Connect Postgres and set DATABASE_URL, then
+              redeploy — nothing else is broken.
+            </p>
+          )}
+          {error && status !== 'error' && !needsDatabase && <p className="gg-live-error" role="alert">{error}</p>}
 
           {status === 'off' || status === 'error' ? (
             <div className="gg-coop-start">

@@ -62,3 +62,31 @@ test('the API distinguishes an unreadable offer from a storage failure', () => {
   assert.match(source, /decodeSignal\(offer\)/, 'the create path must branch on decodability');
   assert.match(source, /was not readable/);
 });
+
+test('a serverless deploy with no database says so, rather than returning a 500', async () => {
+  // On Vercel without DATABASE_URL the local store refuses to write (ephemeral
+  // read-only filesystem), and that rejection used to escape the handler: the
+  // browser got a 500 with an HTML body and showed a generic failure. The fix
+  // is a guard, so the guard is what is asserted — plus the fact that both
+  // verbs have one.
+  const route = readFileSync(new URL('../app/api/coop/route.ts', import.meta.url), 'utf8');
+  assert.match(route, /function storeAvailable\(\)/, 'there is an explicit availability check');
+  assert.match(route, /isEphemeralHost\(\)[\s\S]{0,80}getMode\(\)/, 'it knows about ephemeral hosts');
+  assert.match(route, /needsDatabase: true/, 'the client is told why, in a field it can act on');
+
+  const post = route.slice(route.indexOf('export async function POST'));
+  assert.match(post, /if \(!storeAvailable\(\)\)[\s\S]{0,220}503/, 'POST refuses before touching the store');
+
+  const get = route.slice(route.indexOf('export async function GET'));
+  assert.match(get, /storeAvailable\(\)/, 'GET is guarded too — the join field asks it');
+
+  // Every store call must sit inside the try/catch wrapper, or a dead database
+  // still escapes as a 500.
+  assert.match(route, /try \{\s*return await handle\(req\);/, 'the work is wrapped');
+  assert.match(route, /catch \(cause\)/, 'and a failure is caught');
+
+  // The panel must show the database message instead of the generic one.
+  const panel = readFileSync(new URL('../components/live/CoopRoom.tsx', import.meta.url), 'utf8');
+  assert.match(panel, /needsDatabase/, 'the panel reads the field');
+  assert.match(panel, /Rooms need a database on this deployment/i, 'and explains the fix');
+});

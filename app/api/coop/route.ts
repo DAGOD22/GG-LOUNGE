@@ -3,6 +3,7 @@ import { answerRoom, closeRoom, createRoom, getRoom, touchRoom } from '@/lib/db/
 import { cleanName } from '@/lib/db/presence';
 import { consumeSharedBudget, callerKey } from '@/lib/live-budget';
 import { decodeSignal, isValidRoomCode, normalizeRoomCode, roomCodeFrom } from '@/lib/coop';
+import { getMode, isEphemeralHost } from '@/lib/db/connection';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,11 +20,44 @@ export const dynamic = 'force-dynamic';
  * look like SDP and are size-capped), so nothing here trusts the body beyond
  * "is this shaped like a session description".
  */
+/**
+ * Can this deployment store a room at all?
+ *
+ * The signalling row lives in Postgres, or in the local JSON fallback during
+ * development. On a serverless host with no database there is no third option:
+ * the fallback refuses to write (because the filesystem is both ephemeral and
+ * read-only), and every request threw out of the handler, so the browser got a
+ * 500 with an HTML body and reported it as a generic failure. Saying so plainly
+ * beats a stack trace nobody can act on.
+ */
+function storeAvailable(): boolean {
+  return !isEphemeralHost() || getMode() === 'postgres';
+}
+
+const NO_STORE_MESSAGE =
+  'Rooms need a database on this deployment. Connect Postgres (or the Neon/Vercel Postgres integration) and set DATABASE_URL, then redeploy.';
+
 export async function POST(req: Request) {
   if (!(await consumeSharedBudget(`coop:${callerKey(req)}`, 120, 60))) {
     return NextResponse.json({ error: 'Slow down' }, { status: 429 });
   }
+  if (!storeAvailable()) {
+    return NextResponse.json({ error: NO_STORE_MESSAGE, needsDatabase: true }, { status: 503 });
+  }
 
+  try {
+    return await handle(req);
+  } catch (cause) {
+    // A database that is configured but unreachable is a different problem from
+    // one that is not configured, and both are worth one readable sentence.
+    return NextResponse.json(
+      { error: `The room server is unavailable: ${(cause as Error).message || 'unknown error'}` },
+      { status: 503 },
+    );
+  }
+}
+
+async function handle(req: Request) {
   const body = await req.json().catch(() => ({}));
   const action = typeof body?.action === 'string' ? body.action : '';
   const name = cleanName(body?.name) ?? 'Player';
@@ -92,8 +126,13 @@ export async function POST(req: Request) {
 
 /** A cheap existence check so the join field can say "not open" before typing. */
 export async function GET(req: Request) {
+  if (!storeAvailable()) return NextResponse.json({ open: false, needsDatabase: true, error: NO_STORE_MESSAGE });
   const code = normalizeRoomCode(new URL(req.url).searchParams.get('code') ?? '');
   if (!isValidRoomCode(code)) return NextResponse.json({ open: false });
-  const room = await getRoom(code);
-  return NextResponse.json({ open: Boolean(room), status: room?.status ?? null });
+  try {
+    const room = await getRoom(code);
+    return NextResponse.json({ open: Boolean(room), status: room?.status ?? null });
+  } catch {
+    return NextResponse.json({ open: false });
+  }
 }
