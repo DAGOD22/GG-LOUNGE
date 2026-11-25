@@ -66,12 +66,55 @@ export function getPool(): Pool {
 }
 
 let migratePromise: Promise<void> | null = null;
-export function migrate(): Promise<void> {
-  if (getMode() !== "postgres") return Promise.resolve();
-  if (!migratePromise) {
-    migratePromise = (async () => {
-      const p = getPool();
-      await p.query(`
+
+/**
+ * Run a migration script one statement at a time.
+ *
+ * Postgres runs a multi-statement `pool.query()` as an implicit transaction: the
+ * first error aborts everything after it, and the caller sees one opaque
+ * message. That is how a single stale index took the whole schema down — a
+ * `chat_message` left over from an older build without a "room" column made
+ * `CREATE INDEX ... ("room","id")` fail, and every table declared *after* it in
+ * the script was then never created.
+ *
+ * Each statement is independent here, failures are collected rather than
+ * thrown, and the caller decides what to do with them. A statement that cannot
+ * run is a bug to fix, not a reason to leave the rest of the schema unbuilt.
+ */
+export function splitStatements(sql: string): string[] {
+  const withoutComments = sql
+    // Block comments first, so a semicolon inside one is not a separator.
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .split("\n")
+    .map((line) => line.replace(/(^|\s)--.*$/, "$1"))
+    .join("\n");
+  return withoutComments
+    .split(";")
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+}
+
+export async function runStatements(
+  query: (sql: string) => Promise<unknown>,
+  sql: string,
+): Promise<{ ran: number; failed: Array<{ statement: string; message: string }> }> {
+  const failed: Array<{ statement: string; message: string }> = [];
+  let ran = 0;
+  for (const statement of splitStatements(sql)) {
+    try {
+      await query(statement);
+      ran += 1;
+    } catch (err) {
+      failed.push({
+        statement: statement.replace(/\s+/g, " ").slice(0, 120),
+        message: (err as Error)?.message ?? "unknown error",
+      });
+    }
+  }
+  return { ran, failed };
+}
+
+export const SCHEMA_STATEMENTS = `
         CREATE TABLE IF NOT EXISTS "banned_user" (
           "id" TEXT PRIMARY KEY,
           "identifier" TEXT UNIQUE NOT NULL,
@@ -235,7 +278,6 @@ export function migrate(): Promise<void> {
           "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           "touched_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
-        CREATE INDEX IF NOT EXISTS "coop_room_touched_idx" ON "coop_room" ("touched_at" DESC);
 
         /* Relay queue: the fallback transport for a room whose peers cannot
            reach each other directly. Bounded by an aggressive delete on read,
@@ -249,7 +291,6 @@ export function migrate(): Promise<void> {
           "at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           PRIMARY KEY ("code", "seq")
         );
-        CREATE INDEX IF NOT EXISTS "coop_relay_at_idx" ON "coop_relay" ("at");
 
         /* ---- CHATVERSE --------------------------------------------------
            The private chat behind the admin door. Rooms and messages are
@@ -265,7 +306,6 @@ export function migrate(): Promise<void> {
           "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           "last_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
-        CREATE INDEX IF NOT EXISTS "chat_room_last_idx" ON "chat_room" ("last_at" DESC);
         CREATE TABLE IF NOT EXISTS "chat_message" (
           "id" BIGSERIAL PRIMARY KEY,
           "room" TEXT NOT NULL,
@@ -275,7 +315,6 @@ export function migrate(): Promise<void> {
           "media_name" TEXT NOT NULL DEFAULT '',
           "at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
-        CREATE INDEX IF NOT EXISTS "chat_message_room_idx" ON "chat_message" ("room", "id");
         CREATE TABLE IF NOT EXISTS "chat_presence" (
           "room" TEXT NOT NULL,
           "who" TEXT NOT NULL,
@@ -294,20 +333,116 @@ export function migrate(): Promise<void> {
           "name" TEXT NOT NULL DEFAULT '',
           "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
-        CREATE INDEX IF NOT EXISTS "chat_media_created_idx" ON "chat_media" ("created_at" DESC);
-      `);
-      // Tolerate tables created by older schemas.
-      await p.query(`ALTER TABLE "banned_user" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMPTZ`);
-      await p.query(`ALTER TABLE "visits" ADD COLUMN IF NOT EXISTS "userId" TEXT`);
-      await p.query(`ALTER TABLE "visits" ADD COLUMN IF NOT EXISTS "username" TEXT`);
-      await p.query(`CREATE INDEX IF NOT EXISTS "visits_userId_idx" ON "visits" ("userId")`);
-      await p.query(`ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'pending'`);
-      await p.query(`ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "votes" INTEGER NOT NULL DEFAULT 1`);
-      await p.query(`ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "html" TEXT`);
-    })().catch((err) => {
-      migratePromise = null;
-      throw err;
-    });
+`;
+
+/**
+ * Repairs and indexes, run after SCHEMA_STATEMENTS and each on their own.
+ *
+ * Order matters. Columns first: a table created by an older build is skipped by
+ * "CREATE TABLE IF NOT EXISTS", so a column added since then does not exist
+ * yet, and an index over it is what actually fails. Indexes last, once every
+ * column above is guaranteed present.
+ */
+export const REPAIR_STATEMENTS = [
+  // Columns older tables are missing.
+  `ALTER TABLE "banned_user" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMPTZ`,
+  `ALTER TABLE "visits" ADD COLUMN IF NOT EXISTS "userId" TEXT`,
+  `ALTER TABLE "visits" ADD COLUMN IF NOT EXISTS "username" TEXT`,
+  `ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'pending'`,
+  `ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "votes" INTEGER NOT NULL DEFAULT 1`,
+  `ALTER TABLE "game_request" ADD COLUMN IF NOT EXISTS "html" TEXT`,
+  `ALTER TABLE "coop_room" ADD COLUMN IF NOT EXISTS "offer" TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE "coop_room" ADD COLUMN IF NOT EXISTS "answer" TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE "coop_room" ADD COLUMN IF NOT EXISTS "host_name" TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE "coop_room" ADD COLUMN IF NOT EXISTS "guest_name" TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE "coop_room" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'waiting'`,
+  `ALTER TABLE "coop_room" ADD COLUMN IF NOT EXISTS "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+  `ALTER TABLE "coop_room" ADD COLUMN IF NOT EXISTS "touched_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+  `ALTER TABLE "coop_relay" ADD COLUMN IF NOT EXISTS "from_side" TEXT NOT NULL DEFAULT 'host'`,
+  `ALTER TABLE "chat_room" ADD COLUMN IF NOT EXISTS "topic" TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE "chat_room" ADD COLUMN IF NOT EXISTS "created_by" TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE "chat_room" ADD COLUMN IF NOT EXISTS "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+  `ALTER TABLE "chat_room" ADD COLUMN IF NOT EXISTS "last_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+  // The production failure: an old chat_message had room_id, so this column
+  // did not exist and the app could not read or write a single message.
+  `ALTER TABLE "chat_message" ADD COLUMN IF NOT EXISTS "room" TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE "chat_message" ADD COLUMN IF NOT EXISTS "author" TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE "chat_message" ADD COLUMN IF NOT EXISTS "body" TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE "chat_message" ADD COLUMN IF NOT EXISTS "media" TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE "chat_message" ADD COLUMN IF NOT EXISTS "media_name" TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE "chat_message" ADD COLUMN IF NOT EXISTS "at" TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+  `ALTER TABLE "chat_presence" ADD COLUMN IF NOT EXISTS "seen_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+  // Indexes, only now that the columns exist.
+  `CREATE INDEX IF NOT EXISTS "visits_userId_idx" ON "visits" ("userId")`,
+  `CREATE INDEX IF NOT EXISTS "coop_room_touched_idx" ON "coop_room" ("touched_at" DESC)`,
+  `CREATE INDEX IF NOT EXISTS "coop_relay_at_idx" ON "coop_relay" ("at")`,
+  `CREATE INDEX IF NOT EXISTS "chat_room_last_idx" ON "chat_room" ("last_at" DESC)`,
+  `CREATE INDEX IF NOT EXISTS "chat_message_room_idx" ON "chat_message" ("room", "id")`,
+  `CREATE INDEX IF NOT EXISTS "chat_media_created_idx" ON "chat_media" ("created_at" DESC)`,
+];
+
+/**
+ * Statements for a legacy `room_id` column, which only some databases have.
+ *
+ * Adding "room" is not enough on a table that still carries the old
+ * `room_id TEXT NOT NULL`: the app never writes that column, so every insert
+ * would fail the not-null check even though the query itself is valid. Relaxing
+ * it keeps the old data and lets the new column be the one that matters.
+ *
+ * These are best-effort. On a database that never had room_id they fail with
+ * "column does not exist", which is not an error worth reporting.
+ */
+export const LEGACY_ROOM_ID_STATEMENTS = [
+  `ALTER TABLE "chat_message" ALTER COLUMN "room_id" DROP NOT NULL`,
+  `ALTER TABLE "chat_message" ALTER COLUMN "room_id" SET DEFAULT ''`,
+  `UPDATE "chat_message" SET "room" = "room_id" WHERE "room" = ''`,
+];
+
+/**
+ * How the schema is applied.
+ *
+ * Every statement is independent and failures are collected, never thrown: one
+ * stale index used to abort the whole batch, leaving every table declared after
+ * it missing and the room API reporting "column does not exist". A statement
+ * that cannot run is a bug to fix, not a reason to leave the rest unbuilt.
+ */
+export async function applySchema(
+  query: (sql: string) => Promise<unknown>,
+): Promise<Array<{ statement: string; message: string }>> {
+  const failures: Array<{ statement: string; message: string }> = [];
+  const note = ({ failed }: { failed: Array<{ statement: string; message: string }> }) => {
+    failures.push(...failed);
+  };
+
+  note(await runStatements(query, SCHEMA_STATEMENTS));
+  for (const statement of REPAIR_STATEMENTS) {
+    note(await runStatements(query, statement));
+  }
+  // Best effort: room_id only exists on a database old enough to need it.
+  for (const statement of LEGACY_ROOM_ID_STATEMENTS) {
+    try {
+      await query(statement);
+    } catch {
+      /* no room_id column: nothing to migrate */
+    }
+  }
+
+  if (failures.length && process.env.NODE_ENV !== "test") {
+    console.warn(`[db] migrate: ${failures.length} statement(s) failed`, failures.slice(0, 5));
+  }
+  return failures;
+}
+
+export function migrate(): Promise<void> {
+  if (getMode() !== "postgres") return Promise.resolve();
+  if (!migratePromise) {
+    migratePromise = applySchema((sql) => getPool().query(sql)).then(
+      () => undefined,
+      (err) => {
+        migratePromise = null;
+        throw err;
+      },
+    );
   }
   return migratePromise;
 }

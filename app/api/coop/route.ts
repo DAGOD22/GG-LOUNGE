@@ -4,6 +4,7 @@ import { cleanName } from '@/lib/db/presence';
 import { consumeSharedBudget, callerKey } from '@/lib/live-budget';
 import { decodeSignal, isValidRoomCode, normalizeRoomCode, roomCodeFrom } from '@/lib/coop';
 import { getMode, isEphemeralHost } from '@/lib/db/connection';
+import { describeDbError } from '@/lib/db/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,8 +51,11 @@ export async function POST(req: Request) {
   } catch (cause) {
     // A database that is configured but unreachable is a different problem from
     // one that is not configured, and both are worth one readable sentence.
+    // Raw SQL never reaches the browser: the detail goes to the log instead.
+    const info = describeDbError(cause);
+    console.error('[coop]', info.detail);
     return NextResponse.json(
-      { error: `The room server is unavailable: ${(cause as Error).message || 'unknown error'}` },
+      { error: info.message, schema: info.schema },
       { status: 503 },
     );
   }
