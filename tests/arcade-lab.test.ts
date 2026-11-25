@@ -255,44 +255,49 @@ test('split screen: both panes are grid tracks, not floating boxes', () => {
   assert.match(css, /@media \(pointer: coarse\)/);
 });
 
-test('every GG-LOUNGE original parses and loads the shared engine', () => {
-  // These are plain files in public/, so nothing type-checks them. A syntax
-  // error here is a black screen with no console message on the site.
-  const originals = ['orbital-drift', 'neon-runner', 'block-fall', 'pulse-grid', 'sumo-bump', 'merge-reactor', 'lane-guard'];
-  const engine = readFileSync(new URL('../public/games/_shared/gg-arcade.js', import.meta.url), 'utf8');
-  assert.doesNotThrow(() => new Function(engine), 'the shared engine must parse');
-
-  for (const id of originals) {
-    const html = readFileSync(new URL(`../public/games/${id}/index.html`, import.meta.url), 'utf8');
-    assert.match(html, /<script src="\.\.\/_shared\/gg-arcade\.js"><\/script>/, `${id} does not load the engine`);
-    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => match[1]);
-    assert.ok(scripts.length, `${id} has no game script`);
-    for (const script of scripts) {
-      assert.doesNotThrow(() => new Function(script), `${id} has a syntax error`);
-    }
-    // The catalogue must actually link to the file that exists.
-    assert.match(html, new RegExp(`<title>`), `${id} has no title`);
+test('the removed first-party originals are gone, not merely unlinked', async () => {
+  // These were hand-built engine demos. They were removed by instruction, and
+  // the risk is that they linger in the catalogue (a dead tile) or on disk
+  // (extra weight nobody asked for). Both directions are asserted.
+  const { existsSync } = await import('node:fs');
+  const removed = ['orbital-drift', 'neon-runner', 'block-fall', 'pulse-grid', 'sumo-bump', 'merge-reactor', 'lane-guard'];
+  const { games, catalogGames } = await import('../lib/games');
+  for (const id of removed) {
+    assert.ok(!catalogGames.some(game => game.id === id), `${id} is still in the catalogue`);
+    assert.ok(!games.some(game => game.id === id), `${id} is still offered`);
+    assert.equal(existsSync(new URL(`../public/games/${id}`, import.meta.url)), false, `${id} still on disk`);
+    assert.equal(existsSync(new URL(`../game-icons/${id}.webp`, import.meta.url)), false, `${id} icon still on disk`);
   }
+  // `_shared` itself must STAY: it holds gg-save.js, which 2048, Candy Crush and
+  // Doodle Jump load for their save slots. Deleting the whole directory took
+  // three working games offline — the engine was one file, not the folder.
+  assert.equal(existsSync(new URL('../public/games/_shared/gg-arcade.js', import.meta.url)), false, 'the old engine is still on disk');
+  assert.equal(existsSync(new URL('../public/games/_shared/gg-save.js', import.meta.url)), true, 'gg-save.js must survive: real games load it');
 });
 
-test('every original is in the catalogue and marked available', async () => {
+test('two-player picks are only titles that prove a second player exists', async () => {
+  const { TWO_PLAYER_GAMES } = await import('../lib/two-player');
   const { games } = await import('../lib/games');
-  for (const id of ['orbital-drift', 'neon-runner', 'block-fall', 'pulse-grid', 'sumo-bump', 'merge-reactor', 'lane-guard']) {
-    assert.ok(games.some(game => game.id === id), `${id} is missing from the catalogue`);
+  assert.ok(TWO_PLAYER_GAMES.length >= 5, 'a room needs something to offer');
+
+  for (const entry of TWO_PLAYER_GAMES) {
+    // Every pick must actually be launchable, or the room opens a dead tile.
+    assert.ok(games.some(game => game.id === entry.id), `${entry.id} is offered but not in the catalogue`);
+    assert.ok(entry.controls.trim().length > 0, `${entry.id} does not say what to press`);
+    assert.match(entry.evidence, /^[A-Za-z0-9_]+$/, `${entry.id} has an unusable evidence token`);
   }
 });
 
-test('the first-party originals sort ahead of the imported catalogue', async () => {
-  // Unranked ids sort to the tail, so an original added without a curated rank
-  // is invisible on page one — which is how three of these shipped the first time.
-  const { curatedRank, CURATED_ORDER } = await import('../lib/games');
-  for (const id of ['orbital-drift', 'neon-runner', 'block-fall', 'pulse-grid', 'sumo-bump', 'merge-reactor', 'lane-guard']) {
-    assert.ok(curatedRank(id) < 20, `${id} does not sort near the front (rank ${curatedRank(id)})`);
-  }
-  // Every original must appear in the curated list, or the rank above is luck.
-  for (const id of ['orbital-drift', 'neon-runner', 'block-fall', 'pulse-grid', 'sumo-bump', 'merge-reactor', 'lane-guard']) {
-    assert.ok(CURATED_ORDER.includes(id), `${id} is missing from CURATED_ORDER`);
-  }
+test('the two-player list does not drift from the shipped game source', async () => {
+  // `scripts/audit-two-player.mjs` re-proves every claim against public/games.
+  // Running it here means a game update that removes the 2P mode fails CI rather
+  // than shipping a room tile that cannot take two players.
+  const { execFileSync } = await import('node:child_process');
+  const output = execFileSync(process.execPath, ['scripts/audit-two-player.mjs'], {
+    cwd: new URL('..', import.meta.url).pathname,
+    encoding: 'utf8',
+  });
+  assert.match(output, /(\d+)\/\1 two-player claims verified/, output);
 });
 
 test('GG-GPT: a vision request never reaches a text-only provider', async () => {

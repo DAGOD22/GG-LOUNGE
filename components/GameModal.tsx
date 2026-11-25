@@ -88,6 +88,12 @@ export function GameModal({
       const target = catalogue.find(entry => entry.id === gameId)
       if (target) setSplitGame(target)
     },
+    launchTwoPlayer: (gameId: string) => {
+      // Two players share *this* screen, so the game takes the whole modal and
+      // the split pane (which is for one person watching two games) is closed.
+      setSplitGame(null)
+      window.dispatchEvent(new CustomEvent('ggl:launch-game', { detail: { gameId } }))
+    },
     applyRemoteInput: (frame: InputFrame) => {
       try { dispatchKey(frameRef.current?.contentWindow, frame) } catch { /* cross-origin */ }
     },

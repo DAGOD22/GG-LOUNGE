@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import React from 'react';
+import { readFileSync } from 'node:fs';
 
 /**
  * The co-op panel, as a person meets it.
@@ -164,4 +165,64 @@ test('a room that cannot connect says so instead of pretending', async () => {
     assert.ok(status.length > 4 || error.length > 4, 'something is said about the state');
   }
   await room.unmount();
+});
+
+/**
+ * The room offers two-player games, and the offer is honest.
+ *
+ * Before this, the panel's only game control was "send this game" for whatever
+ * was already open — which is useless when the open game has one player in it.
+ * These tests pin the picker: it appears while the room is still waiting for the
+ * friend, it lists only verified two-player titles, its controls text is shown
+ * (nobody should have to guess which half of the keyboard they own), and
+ * choosing one asks the launcher to open it for both people.
+ */
+test('the room lists two-player games before the friend has even joined', async () => {
+  const room = await mountRoom();
+  await room.click(room.host.querySelector('.gg-coop-trigger') as HTMLElement);
+  await room.click([...room.host.querySelectorAll('button')].find(b => /Create a room/i.test(b.textContent || ''))!);
+  // The create call is answered by the stubbed fetch, so a code comes back.
+  await new Promise(resolve => setTimeout(resolve, 50));
+
+  const tiles = [...room.host.querySelectorAll('.gg-coop-game')] as HTMLElement[];
+  assert.ok(tiles.length >= 5, `the picker shows ${tiles.length} games, expected a real list`);
+
+  // The controls line is the difference between a playable game and a guessing
+  // game, so every tile must carry one.
+  for (const tile of tiles) {
+    assert.ok((tile.querySelector('span')?.textContent || '').length > 3, `${tile.textContent} has no controls hint`);
+  }
+  await room.unmount();
+});
+
+test('picking a two-player game asks the launcher to open it', async () => {
+  const room = await mountRoom();
+  const launched: string[] = [];
+  const listener = (event: Event) => launched.push((event as CustomEvent<{ gameId: string }>).detail.gameId);
+  room.dom.window.addEventListener('ggl:launch-game', listener as EventListener);
+
+  await room.click(room.host.querySelector('.gg-coop-trigger') as HTMLElement);
+  await room.click([...room.host.querySelectorAll('button')].find(b => /Create a room/i.test(b.textContent || ''))!);
+  await new Promise(resolve => setTimeout(resolve, 50));
+
+  const tile = [...room.host.querySelectorAll('.gg-coop-game')].find(t => /level devil/i.test(t.textContent || '')) as HTMLElement;
+  assert.ok(tile, 'Level Devil is offered');
+  await room.click(tile);
+
+  assert.deepEqual(launched, ['level-devil'], 'the launcher is told exactly once, with the right id');
+  assert.equal(tile.getAttribute('aria-pressed'), 'true', 'the chosen tile shows as chosen');
+  room.dom.window.removeEventListener('ggl:launch-game', listener as EventListener);
+  await room.unmount();
+});
+
+test('the seat toggle explains that a friend drives player two', async () => {
+  // Deliberately a source assertion: the toggle lives behind a *connected* room,
+  // and jsdom has no RTCPeerConnection, so a mounted test cannot reach it. What
+  // must not regress is the wording — "send my keys to their game" did not say
+  // whose character moved, which is exactly the confusion that made forwarding
+  // look broken even when the transport was fine.
+  const source = readFileSync(new URL('../components/live/CoopRoom.tsx', import.meta.url), 'utf8');
+  assert.match(source, /I am player two/, 'the toggle says which seat you are taking');
+  assert.match(source, /your presses arrive on player two/i, 'the room says where the keys land');
+  assert.ok(!/>Send my keys to their game</.test(source), 'the ambiguous wording is gone');
 });

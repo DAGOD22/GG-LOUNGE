@@ -285,13 +285,6 @@ export const catalogGames: Game[] = [
   // GG-LOUNGE originals. These are written here, in public/games/, as plain
   // canvas code against _shared/gg-arcade.js — no iframe, no third-party build,
   // nothing to go stale when a CDN moves.
-  { id: 'orbital-drift', title: 'Orbital Drift', subtitle: 'Fall in. Fly out.', description: "Ride the sun's gravity through an asteroid field: hold to fall into orbit, release to coast outward. Every rock you clear adds distance, and the field gets denser the longer you last.", genre: 'Arcade', tone: 'Reflex', mark: 'OD', color: 'aqua', path: '/games/orbital-drift/index.html', icon: getGameIconUrl('orbital-drift'), featured: true },
-  { id: 'neon-runner', title: 'Neon Runner', subtitle: 'Three lanes. No brakes.', description: 'An endless synthwave lane runner — jump the low barriers, slide under the tall ones, and hold the line as the closing wall speeds up behind you.', genre: 'Arcade', tone: 'Endless', mark: 'NR', color: 'plasma', path: '/games/neon-runner/index.html', icon: getGameIconUrl('neon-runner') },
-  { id: 'block-fall', title: 'Block Fall', subtitle: 'One well, ten columns.', description: 'A falling-block puzzle with a seven-bag randomiser, a hold slot, a ghost piece and wall kicks. Clear four rows at once for the score that matters.', genre: 'Puzzle', tone: 'Stacking', mark: 'BF', color: 'frost', path: '/games/block-fall/index.html', icon: getGameIconUrl('block-fall') },
-  { id: 'pulse-grid', title: 'Pulse Grid', subtitle: 'Watch. Repeat. Survive.', description: 'Four pads, four tones, one growing sequence. A memory game with synthesised sound and a pip counter that tells you exactly how far in you are.', genre: 'Puzzle', tone: 'Memory', mark: 'PG', color: 'cookie', path: '/games/pulse-grid/index.html', icon: getGameIconUrl('pulse-grid') },
-  { id: 'sumo-bump', title: 'Sumo Bump', subtitle: 'Two players. One ring.', description: 'A local two-player sumo ring that shrinks while you fight. WASD against the arrow keys, no weapons, first to three rounds — the whole game is momentum and nerve.', genre: 'Arcade', tone: '2 Player', mark: 'SB', color: 'twenty', path: '/games/sumo-bump/index.html', icon: getGameIconUrl('sumo-bump') },
-  { id: 'merge-reactor', title: 'Merge Reactor', subtitle: 'Keep the core cool.', description: 'Drop cells into a five-column reactor and let matching tiers snap together. A tier-8 cell clears its whole column — but every drop adds heat, and a hot core ends the run.', genre: 'Puzzle', tone: 'Merge', mark: 'MR', color: 'sunset', path: '/games/merge-reactor/index.html', icon: getGameIconUrl('merge-reactor'), featured: true },
-  { id: 'lane-guard', title: 'Lane Guard', subtitle: 'Hold the line.', description: 'Tower defence on a track that bends back on itself: three tower types with real range and slow effects, wave scaling, and a starting budget that never quite covers the lane.', genre: 'Strategy', tone: 'Tower defence', mark: 'LG', color: 'forest', path: '/games/lane-guard/index.html', icon: getGameIconUrl('lane-guard') },
         ]
 
 const audited = assetAudit as Record<string, { available: boolean; issues: string[] }>;
@@ -305,10 +298,10 @@ export const pubColors = ['cookie', 'drive', 'mining', 'devil', 'stack', 'hextri
 // so the titles people actually open first sit at the top instead of whatever
 // order the catalog was assembled in. Anything not listed keeps catalog order.
 export const CURATED_ORDER = [
-  // GG-LOUNGE originals first: they are the only entries here we maintain, so
-  // they are the ones that should greet a visitor and the ones that never go
-  // stale when an upstream CDN moves.
-  'orbital-drift','merge-reactor','neon-runner','block-fall','lane-guard','pulse-grid','sumo-bump',
+  // Two-player favourites first: a room code is only interesting if the game
+  // behind it can actually take two players, and these are the titles people
+  // already know (Level Devil and Tank Trouble both ship a real 2P mode).
+  'level-devil','tank-trouble-2','bomberman','pong','basketball-stars','classic-pool','vex-8',
   'quake','webretro','doom-js13k','sm64','wolf3d-classic','wolfenstein',
   'prince-of-persia','diablo','mykonos','series-of-tubes','candy-crush',
   'eaglercraftx','geometry-dash','ragdoll-archers','slope','slope-2','retro-bowl',
@@ -327,8 +320,8 @@ export function curatedRank(id: string): number {
 }
 // The first four are GG-LOUNGE originals: our own code, so they belong at the
 // top of the shelf where a first-time visitor lands, not buried in the grid.
-export const FEATURED_IDS = ['orbital-drift','neon-runner','block-fall','pulse-grid','eaglercraftx','geometry-dash','ragdoll-archers','slope','retro-bowl','drive-mad','moto-x3m','among-us','smashkarts','cookie-clicker']
-export const STAFF_PICKS = ['orbital-drift','neon-runner','block-fall','pulse-grid','eaglercraftx','geometry-dash','ragdoll-archers','slope','retro-bowl','drive-mad','moto-x3m','basket-random','bloonstd2','2048']
+export const FEATURED_IDS = ['level-devil','tank-trouble-2','bomberman','pong','eaglercraftx','geometry-dash','ragdoll-archers','slope','retro-bowl','drive-mad','moto-x3m','among-us','smashkarts','cookie-clicker']
+export const STAFF_PICKS = ['level-devil','tank-trouble-2','bomberman','basketball-stars','eaglercraftx','geometry-dash','ragdoll-archers','slope','retro-bowl','drive-mad','moto-x3m','basket-random','bloonstd2','2048']
 export const LOW_QUALITY_HINTS = new Set(['spiral-roll','shape-transform','mr-dude','obby-snowboard','spiders','summer','real-pool-3d','gta-mods','cheese-chompers-3d','bad-simulator','volley-random','soccer-random','basket-bros','build-defend','red-vs-blue','gunspin','steep-descent','crazy-crash-landing','cyber-cars','extreme-racing','monster-truck'])
 // Controls are per-game now — see lib/game-controls.ts. This keeps the
 // genre-keyed object only as a last-resort fallback for the placeholder text.

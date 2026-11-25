@@ -128,19 +128,64 @@ function fromBase64Url(value: string): string {
  * player cannot quietly stream their keystrokes.
  */
 export type InputFrame =
-  | { t: 'down'; c: string; k: string }
-  | { t: 'up'; c: string }
-  | { t: 'release-all' };
+  | { t: 'down'; c: string; k: string; seat?: 2 }
+  | { t: 'up'; c: string; seat?: 2 }
+  | { t: 'release-all'; seat?: 2 };
 
 export function parseInputFrame(value: unknown): InputFrame | null {
   if (!value || typeof value !== 'object') return null;
   const frame = value as Record<string, unknown>;
+  // `seat` is deliberately binary, not a free-form number: there is exactly one
+  // remote player, and an unbounded field is an unbounded thing to reason about.
+  const seat = frame.seat === 2 ? (2 as const) : undefined;
   if (frame.t === 'down' && typeof frame.c === 'string') {
-    return { t: 'down', c: frame.c.slice(0, 32), k: typeof frame.k === 'string' ? frame.k.slice(0, 16) : '' };
+    return { t: 'down', c: frame.c.slice(0, 32), k: typeof frame.k === 'string' ? frame.k.slice(0, 16) : '', ...(seat ? { seat } : {}) };
   }
-  if (frame.t === 'up' && typeof frame.c === 'string') return { t: 'up', c: frame.c.slice(0, 32) };
-  if (frame.t === 'release-all') return { t: 'release-all' };
+  if (frame.t === 'up' && typeof frame.c === 'string') {
+    return { t: 'up', c: frame.c.slice(0, 32), ...(seat ? { seat } : {}) };
+  }
+  if (frame.t === 'release-all') return { t: 'release-all', ...(seat ? { seat } : {}) };
   return null;
+}
+
+/**
+ * The two control schemes a same-screen two-player game can use, in the order
+ * we try them.
+ *
+ * `legacy` is the pair the old Flash-era ports still read — arrows for P1 and
+ * WASD for P2. `modern` is what a newer engine reads — WASD for P1 and arrows
+ * for P2. Which one a given game wants cannot be discovered from outside its
+ * frame (the key handler is a closure), so the seat *swaps* instead: the friend
+ * presses one key and both schemes are covered, because the swap is the only
+ * difference between them.
+ */
+export const SEAT_KEYS: Record<'legacy' | 'modern', Record<'move' | 'action', string[]>> = {
+  legacy: {
+    move: ['KeyW', 'KeyA', 'KeyS', 'KeyD'],
+    action: ['ShiftLeft', 'Space', 'KeyZ', 'KeyX'],
+  },
+  modern: {
+    move: ['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'],
+    action: ['Slash', 'ShiftRight', 'Enter', 'KeyM'],
+  },
+};
+
+/** Map a player-one key onto the equivalent player-two key. */
+export function toSeatKey(code: string, seat: 2 | undefined, scheme: 'legacy' | 'modern'): string {
+  if (seat !== 2) return code;
+  const pairs: Record<string, string> = {
+    ArrowUp: SEAT_KEYS[scheme].move[0],
+    ArrowLeft: SEAT_KEYS[scheme].move[1],
+    ArrowDown: SEAT_KEYS[scheme].move[2],
+    ArrowRight: SEAT_KEYS[scheme].move[3],
+    KeyW: SEAT_KEYS[scheme].move[0],
+    KeyA: SEAT_KEYS[scheme].move[1],
+    KeyS: SEAT_KEYS[scheme].move[2],
+    KeyD: SEAT_KEYS[scheme].move[3],
+    Space: SEAT_KEYS[scheme].action[1] ?? 'Space',
+    ShiftLeft: SEAT_KEYS[scheme].action[0] ?? 'ShiftRight',
+  };
+  return pairs[code] ?? code;
 }
 
 /**
@@ -151,24 +196,61 @@ export function parseInputFrame(value: unknown): InputFrame | null {
  * are left false: forwarding a remote Ctrl could trigger browser shortcuts in
  * the host's window.
  */
-export function dispatchKey(target: Window | null | undefined, frame: InputFrame): boolean {
+export function dispatchKey(
+  target: Window | null | undefined,
+  frame: InputFrame,
+  scheme: 'legacy' | 'modern' = 'legacy',
+): boolean {
   if (!target) return false;
   try {
     const doc = target.document;
-    const focusTarget = (doc.activeElement as HTMLElement | null) ?? doc.body ?? doc.documentElement;
     if (frame.t === 'release-all') {
-      for (const code of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Enter', 'KeyZ', 'KeyX']) {
-        emit(doc, 'keyup', code);
-      }
+      // Release every key either scheme could be holding, so a friend who
+      // disconnects mid-jump does not leave their avatar running.
+      const codes = new Set([
+        ...SEAT_KEYS.legacy.move, ...SEAT_KEYS.legacy.action,
+        ...SEAT_KEYS.modern.move, ...SEAT_KEYS.modern.action,
+        'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Enter',
+      ]);
+      for (const code of codes) emit(doc, 'keyup', code);
       return true;
     }
-    emit(doc, frame.t === 'down' ? 'keydown' : 'keyup', frame.c);
-    // Some games only read the event on the focused element.
-    void focusTarget;
+    emit(doc, frame.t === 'down' ? 'keydown' : 'keyup', toSeatKey(frame.c, frame.seat, scheme));
     return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * Legacy key tables.
+ *
+ * Our catalogue is a mix of engines from 2013 and 2024. The old ones read
+ * `event.keyCode` (or `which`), and a `KeyboardEvent` built from an init
+ * dictionary reports `keyCode === 0` no matter what you pass — the field is
+ * read-only and derived from `key` by the browser's own tables, which jsdom
+ * and older engines do not reproduce. So a forwarded arrow reached the game,
+ * looked like key code zero, and was ignored: room connected, chat fine, the
+ * friend pressed W and nothing at all happened.
+ *
+ * Each event is therefore also given explicit `keyCode`/`which`/`charCode`,
+ * defined as own properties on the instance. That is the only way to satisfy a
+ * listener that reads the deprecated field.
+ */
+const LEGACY_CODES: Record<string, number> = {
+  ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40,
+  Space: 32, Enter: 13, Escape: 27, Tab: 9, Backspace: 8,
+  ShiftLeft: 16, ShiftRight: 16, ControlLeft: 17, ControlRight: 17,
+  KeyA: 65, KeyB: 66, KeyC: 67, KeyD: 68, KeyE: 69, KeyF: 70, KeyG: 71,
+  KeyH: 72, KeyI: 73, KeyJ: 74, KeyK: 75, KeyL: 76, KeyM: 77, KeyN: 78,
+  KeyO: 79, KeyP: 80, KeyQ: 81, KeyR: 82, KeyS: 83, KeyT: 84, KeyU: 85,
+  KeyV: 86, KeyW: 87, KeyX: 88, KeyY: 89, KeyZ: 90,
+};
+
+export function legacyKeyCode(code: string): number {
+  if (LEGACY_CODES[code] !== undefined) return LEGACY_CODES[code];
+  if (code.startsWith('Digit')) return Number(code.slice(5)) + 48;
+  return 0;
 }
 
 function emit(doc: Document, type: 'keydown' | 'keyup', code: string) {
@@ -180,6 +262,17 @@ function emit(doc: Document, type: 'keydown' | 'keyup', code: string) {
     cancelable: true,
     composed: true,
   });
+  const legacy = legacyKeyCode(code);
+  if (legacy) {
+    // Own properties beat the (zero) prototype getters, which is the point.
+    for (const field of ['keyCode', 'which', 'charCode'] as const) {
+      try {
+        Object.defineProperty(event, field, { value: legacy, configurable: true });
+      } catch {
+        /* a frozen event: new-style readers still work */
+      }
+    }
+  }
   doc.dispatchEvent(event);
 }
 

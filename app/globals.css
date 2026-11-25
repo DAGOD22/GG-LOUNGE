@@ -4206,6 +4206,64 @@ body.gg-split-dragging iframe { pointer-events: none; }
   border: 1px solid var(--line);
   color: var(--foreground);
 }
+/* The seat note wraps under the key chips rather than squeezing them. */
+.gg-coop-p2-keys small {
+  flex-basis: 100%;
+  font-weight: 600;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* ---- two-player picks in the room ------------------------------------ */
+/*
+ * The room used to offer "send this game" for whatever happened to be open,
+ * which is useless for a title with one player in it. These tiles are the
+ * verified two-player list, and they are shown while the room is still waiting
+ * for the friend so both people can see the same short menu.
+ */
+.gg-coop-games {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--line);
+}
+.gg-coop-games .gg-overline { margin: 0; }
+.gg-coop-games-list {
+  display: grid;
+  gap: 6px;
+  /* Two columns on a wide panel, one on a phone: the controls line needs the
+     room and a squeezed two-column grid wraps it into unreadable fragments. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  max-height: 216px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.gg-coop-game {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.04);
+  color: var(--foreground);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.gg-coop-game:hover { border-color: rgba(215,243,74,.45); background: rgba(215,243,74,.08); }
+.gg-coop-game:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+.gg-coop-game.is-current { border-color: var(--lime); background: rgba(215,243,74,.14); }
+.gg-coop-game strong {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+  letter-spacing: .01em;
+}
+.gg-coop-game span { font-size: 10px; color: var(--muted); line-height: 1.35; }
+.gg-coop-games .gg-help { margin: 0; font-size: 10px; }
 
 /* ---- first-run welcome ------------------------------------------------ */
 .gg-welcome {

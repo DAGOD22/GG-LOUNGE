@@ -353,6 +353,20 @@ export default function Page() {
 
   const closeGame = useCallback(() => setActiveGame(null), [])
 
+  /**
+   * The co-op room can open a game before any modal exists — a friend joining a
+   * room picks a two-player title and neither person is currently playing
+   * anything. The room owns no launcher, so it asks for one by event.
+   */
+  useEffect(() => {
+    const onLaunch = (event: Event) => {
+      const id = (event as CustomEvent<{ gameId?: string }>).detail?.gameId
+      if (id) openGameById(id)
+    }
+    window.addEventListener('ggl:launch-game', onLaunch as EventListener)
+    return () => window.removeEventListener('ggl:launch-game', onLaunch as EventListener)
+  }, [openGameById])
+
   const isProxyGame = useCallback((id: string) => Boolean(allGames.find(g => g.id === id)?.proxy), [allGames])
   const knowsGame = useCallback((id: string) => allGames.some(g => g.id === id), [allGames])
 

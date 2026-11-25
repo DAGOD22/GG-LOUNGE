@@ -38,6 +38,7 @@ import {
 import { useCustomization } from '@/components/customization/CustomizationProvider';
 import { useOptionalGameBridge } from './GameBridge';
 import { GameBubble } from './arcade/GameBubble';
+import { TWO_PLAYER_GAMES, twoPlayerGame } from '@/lib/two-player';
 
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -63,6 +64,14 @@ export function CoopRoom() {
   const [forwardKeys, setForwardKeys] = useState(false);
   const [reactions, setReactions] = useState<{ id: number; emoji: string }[]>([]);
   const [expanded, setExpanded] = useState(true);
+  /**
+   * The two-player title this room agreed on.
+   *
+   * Held here rather than read from the launcher because the room outlives any
+   * one game session: two people pick a title *before* either of them opens it,
+   * and both need to arrive at the same one.
+   */
+  const [roomGame, setRoomGame] = useState<string | null>(null);
 
   const connection = useRef<RTCPeerConnection | null>(null);
   const channel = useRef<RTCDataChannel | null>(null);
@@ -181,7 +190,9 @@ export function CoopRoom() {
         case 'launch':
           // The friend picked a game; the same title opens here so both are in
           // the same place without either of them hunting for it.
+          setRoomGame(message.gameId);
           bridgeRef.current?.launchGame?.(message.gameId, 'Friend started this game');
+          window.dispatchEvent(new CustomEvent('ggl:launch-game', { detail: { gameId: message.gameId } }));
           push('system', `${peerNameRef.current || 'Your friend'} launched a game.`);
           break;
         case 'chat':
@@ -401,22 +412,49 @@ export function CoopRoom() {
       if (!shouldForwardKey(event.code)) return;
       const target = event.target as Element | null;
       if (target?.closest?.('input,textarea,[contenteditable="true"]')) return;
-      sendRaw({ t: 'input', frame: { t: 'down', c: event.code, k: event.key } });
+      // Seat 2: the friend is player two, not a second pair of hands on player
+      // one's keys. `dispatchKey` maps these onto the other control scheme.
+      sendRaw({ t: 'input', frame: { t: 'down', c: event.code, k: event.key, seat: 2 } });
     };
     const up = (event: KeyboardEvent) => {
       if (!shouldForwardKey(event.code)) return;
       const target = event.target as Element | null;
       if (target?.closest?.('input,textarea,[contenteditable="true"]')) return;
-      sendRaw({ t: 'input', frame: { t: 'up', c: event.code } });
+      sendRaw({ t: 'input', frame: { t: 'up', c: event.code, seat: 2 } });
     };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     return () => {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
-      sendRaw({ t: 'input', frame: { t: 'release-all' } });
+      sendRaw({ t: 'input', frame: { t: 'release-all', seat: 2 } });
     };
   }, [status, forwardKeys, sendRaw]);
+
+  /**
+   * Open a verified two-player title for this room.
+   *
+   * The pick travels over the data channel (`{t:'launch'}`) and is also applied
+   * locally, so both players land in the same game without either of them
+   * hunting for it. The active game is recorded even before the modal exists,
+   * which is why the launcher listens for `ggl:launch-game` rather than relying
+   * on a bridge being registered.
+   */
+  const openTwoPlayer = useCallback(
+    (gameId: string) => {
+      const entry = twoPlayerGame(gameId);
+      if (!entry) return;
+      setRoomGame(gameId);
+      bridgeRef.current?.launchTwoPlayer?.(gameId);
+      window.dispatchEvent(new CustomEvent('ggl:launch-game', { detail: { gameId } }));
+      if (status === 'connected') {
+        sendRaw({ t: 'launch', gameId });
+        push('system', `Opened ${gameId.replace(/-/g, ' ')} for two players.`);
+        push('system', 'Press W or an arrow key — your presses arrive on player two.');
+      }
+    },
+    [push, sendRaw, status],
+  );
 
   /* An installed-app shortcut (or any link) can ask for the panel directly. */
   useEffect(() => {
@@ -596,20 +634,49 @@ export function CoopRoom() {
             </div>
           )}
 
+          {(
+            <div className="gg-coop-games" aria-label="Two-player games">
+              <p className="gg-overline">TWO-PLAYER PICKS</p>
+              <div className="gg-coop-games-list">
+                {TWO_PLAYER_GAMES.map(entry => (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    className={`gg-coop-game${roomGame === entry.id ? ' is-current' : ''}`}
+                    onClick={() => openTwoPlayer(entry.id)}
+                    aria-pressed={roomGame === entry.id}
+                  >
+                    <strong>{entry.id.replace(/-/g, ' ')}</strong>
+                    <span>{entry.controls}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="gg-help">
+                {status === 'off'
+                  ? 'These titles ship a real second player. Open a room and picking one starts it for both of you.'
+                  : 'These titles ship a real second player. Picking one opens it on both screens.'}
+              </p>
+            </div>
+          )}
+
           {expanded && connected && (
             <>
               <div className="gg-coop-tools">
                 <label className="gg-coop-toggle">
                   <input type="checkbox" checked={forwardKeys} onChange={event => setForwardKeys(event.target.checked)} />
                   <Keyboard size={14} />
-                  <span>Send my keys to their game</span>
+                  <span>I am player two</span>
                 </label>
                 {forwardKeys && (
-                  <div className="gg-coop-p2-keys" aria-hidden="true">
-                    <span>Player 2 drives</span>
+                  <div className="gg-coop-p2-keys">
+                    <span>Your keys land on player two</span>
                     <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>
                     <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>
                     <kbd>Space</kbd><kbd>Shift</kbd>
+                    <small>
+                      Both schemes are covered — whichever one the game uses for player two,
+                      one of these reaches it. Their screen shows the same game.
+                    </small>
                   </div>
                 )}
                 <button

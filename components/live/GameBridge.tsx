@@ -22,6 +22,14 @@ export type GameBridge = {
   activeGameId: () => string | null;
   /** Open a game by id — used when a friend presses "send this game". */
   launchGame: (gameId: string, reason?: string) => void;
+  /**
+   * Open a game *for two players* — used by the room's picker.
+   *
+   * Distinct from `launchGame` because a two-player game has to open full
+   * width, not in the split pane: both players are looking at the same screen,
+   * even when they are in different buildings.
+   */
+  launchTwoPlayer: (gameId: string) => void;
   /** Deliver a remote key press to the active frame. */
   applyRemoteInput: (frame: InputFrame) => void;
   /** A friend started the same game; used for the room status line. */
