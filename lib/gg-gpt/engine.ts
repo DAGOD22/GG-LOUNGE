@@ -26,6 +26,15 @@ export type ChatRole = "system" | "user" | "assistant";
 export interface ChatTurn {
   role: ChatRole;
   content: string;
+  /**
+   * Images attached to this turn, as `data:image/...;base64,...` URLs.
+   *
+   * Only providers that declare `vision` receive them; everyone else gets the
+   * text alone. Silently dropping an image would make the model confidently
+   * wrong about a screenshot it never saw, so the chain skips those providers
+   * entirely for a vision request.
+   */
+  images?: string[];
 }
 
 export interface ChatResult {
@@ -48,6 +57,10 @@ interface Provider {
   /** Higher runs first. Keyed providers are pushed to the top. */
   tier: number;
   model: string;
+  /** Can this provider actually see an image? */
+  vision?: boolean;
+  /** Extra ordering weight per task, added to `tier`. */
+  affinity?: Partial<Record<TaskKind, number>>;
   /** Build the actual request. */
   request: (turns: ChatTurn[], opts: CallOptions) => { url: string; init: RequestInit };
   /** Pull the assistant text out of whatever came back. */
@@ -61,6 +74,8 @@ export interface CallOptions {
   temperature?: number;
   maxTokens?: number;
   timeoutMs?: number;
+  /** Orders the chain: a code task puts the code-tuned providers first. */
+  task?: TaskKind;
 }
 
 const MODELS = {
@@ -68,7 +83,31 @@ const MODELS = {
   groq: "llama-3.3-70b-versatile",
   hf: "meta-llama/Llama-3.1-8B-Instruct",
   pollinations: "openai",
+  /**
+   * Z.ai's GLM. The id MUST stay lowercase: the free tier is selected by the
+   * lowercase alias, and `GLM-4.7-Flash` is a paid model id that answers 402.
+   */
+  zai: "glm-4.7-flash",
 };
+
+/**
+ * Which job is being done, so the chain can be ordered for it.
+ *
+ * A single global ordering makes every request pay for every use case: the best
+ * reasoning model is not the best at rewriting a 400-line file, and neither is
+ * the best at describing a screenshot. The caller (route) works out the task
+ * from the request, and each provider says which tasks it is best at.
+ */
+export type TaskKind = "chat" | "code" | "vision" | "long";
+
+/** Vision needs a model that can actually see; every provider without it is
+ *  skipped rather than asked to guess at a screenshot. */
+export interface Turn {
+  role: "system" | "user" | "assistant";
+  content: string;
+  /** data: URLs of attached images. Only sent to providers that accept them. */
+  images?: string[];
+}
 
 /* ------------------------------ providers ------------------------------ */
 
@@ -119,9 +158,87 @@ function isSseFrame(chunk: string): boolean {
   return /^(?:data|event|id|retry):/m.test(chunk);
 }
 
+/**
+ * Turn a turn's text + images into the OpenAI-compatible content shape.
+ *
+ * OpenAI-compatible gateways accept either a string or an array of parts. When
+ * there are no images we keep the string, because a couple of the free gateways
+ * reject the array form even for text.
+ */
+function contentFor(turn: ChatTurn): unknown {
+  if (!turn.images?.length) return turn.content;
+  return [
+    { type: "text", text: turn.content },
+    ...turn.images.slice(0, 4).map(url => ({ type: "image_url", image_url: { url } })),
+  ];
+}
+
+/** Messages array shaped for a gateway that understands images. */
+function visionMessages(turns: ChatTurn[]) {
+  return turns.map(turn => ({ role: turn.role, content: contentFor(turn) }));
+}
+
 function providers(): Provider[] {
   const list: Provider[] = [];
   const json = { "content-type": "application/json" };
+
+  /**
+   * ---- Z.ai (GLM) --------------------------------------------------------
+   *
+   * An OpenAI-compatible gateway, keyed. It is listed first when a key is set
+   * because it is the one provider that is both strong at code and billed by
+   * the task rather than the token, so a long file rewrite does not get the
+   * whole install rate-limited.
+   *
+   * `GG_GPT_KEY` is reused as a generic key so one env var can mean "the keyed
+   * provider"; `ZAI_API_KEY` is the explicit name. The base URL is configurable
+   * because Z.ai has both a global and a mainland endpoint.
+   */
+  const zaiKey = process.env.ZAI_API_KEY || process.env.Z_AI_API_KEY || process.env.GG_GPT_KEY;
+  if (zaiKey) {
+    const base = (process.env.ZAI_BASE_URL || "https://z.ai").replace(/\/+$/, "");
+    const model = process.env.ZAI_MODEL || MODELS.zai;
+    list.push({
+      name: "zai",
+      tier: 96,
+      model,
+      // GLM-4.7-Flash accepts image parts on the same endpoint.
+      vision: true,
+      // Its strength is code and long single-shot rewrites.
+      affinity: { code: 8, long: 6, vision: 2 },
+      request: (turns, o) => ({
+        url: `${base}/api/paas/v4/chat/completions`,
+        init: {
+          method: "POST",
+          headers: { ...json, authorization: `Bearer ${zaiKey}` },
+          body: JSON.stringify({
+            model,
+            messages: visionMessages(turns),
+            temperature: o.temperature ?? 0.7,
+            max_tokens: o.maxTokens ?? 4096,
+          }),
+        },
+      }),
+      parse: (_p, raw) => {
+        try { return openAiShape(JSON.parse(raw)); } catch { return ""; }
+      },
+      stream: (turns, o) => ({
+        url: `${base}/api/paas/v4/chat/completions`,
+        init: {
+          method: "POST",
+          headers: { ...json, authorization: `Bearer ${zaiKey}` },
+          body: JSON.stringify({
+            model,
+            messages: visionMessages(turns),
+            temperature: o.temperature ?? 0.7,
+            max_tokens: o.maxTokens ?? 4096,
+            stream: true,
+          }),
+        },
+      }),
+      parseStream: sseDeltas,
+    });
+  }
 
   // ---- keyed, highest quality ----
   const openrouter = process.env.GG_GPT_KEY || process.env.OPENROUTER_API_KEY;
@@ -344,7 +461,53 @@ function providers(): Provider[] {
     },
   });
 
-  return list.sort((a, b) => b.tier - a.tier);
+  return list;
+}
+
+/**
+ * Order the chain for the job, and drop providers that cannot do it.
+ *
+ * A vision request to a text-only provider does not fail loudly — it answers
+ * confidently about an image it never saw, which is the worst possible outcome.
+ * So the filter comes first, and only then the ordering, which adds each
+ * provider's affinity for this task to its base tier.
+ */
+export function orderProviders(list: Provider[], task: TaskKind = "chat"): Provider[] {
+  const usable = task === "vision" ? list.filter(p => p.vision) : list;
+  const scored = usable.map(p => ({ p, score: p.tier + (p.affinity?.[task] ?? 0) }));
+  return scored.sort((a, b) => b.score - a.score).map(entry => entry.p);
+}
+
+/**
+ * Is any image-capable provider configured right now?
+ *
+ * The route asks before it accepts an image, because the alternative — a
+ * vision-ordered chain with nothing in it — is an error the person cannot act
+ * on, after they already attached the screenshot.
+ */
+export function hasVision(): boolean {
+  return providers().some(p => p.vision);
+}
+
+/** What the chat UI shows in its model picker: honest capability, not a list
+ *  of names that may or may not exist on this deployment. */
+export function availableModels(): Array<{ id: string; label: string; vision: boolean; task: TaskKind }> {
+  // Ordered the way a normal chat would be attempted, so the first entry in the
+  // picker is the one that will actually answer.
+  const list = orderProviders(providers(), "chat");
+  const seen = new Set<string>();
+  const out: Array<{ id: string; label: string; vision: boolean; task: TaskKind }> = [];
+  for (const provider of list) {
+    if (seen.has(provider.name)) continue;
+    seen.add(provider.name);
+    out.push({
+      id: provider.name,
+      label: provider.name === "zai" ? `Z.ai · ${provider.model}` : provider.name,
+      vision: Boolean(provider.vision),
+      task: provider.affinity?.code ? "code" : "chat",
+    });
+  }
+  return out;
 }
 
 /* ------------------------------- calling ------------------------------- */
@@ -415,7 +578,7 @@ export async function chatComplete(
   turns: ChatTurn[],
   opts: CallOptions = {},
 ): Promise<ChatResult & { attempts: AttemptLog[]; rateLimited: boolean }> {
-  const chain = providers();
+  const chain = orderProviders(providers(), opts.task ?? "chat");
   const attempts: AttemptLog[] = [];
   let sawRateLimit = false;
 
@@ -462,7 +625,7 @@ export async function* chatStream(
   turns: ChatTurn[],
   opts: CallOptions = {},
 ): AsyncGenerator<{ delta?: string; provider?: string; model?: string; done?: boolean; rateLimited?: boolean }> {
-  const chain = providers().filter(p => p.stream && p.parseStream);
+  const chain = orderProviders(providers(), opts.task ?? "chat").filter(p => p.stream && p.parseStream);
   for (const p of chain) {
     const started = Date.now();
     let opened = false;

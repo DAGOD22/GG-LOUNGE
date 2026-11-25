@@ -224,7 +224,18 @@ export type RoomMessage =
   | { t: 'launch'; gameId: string }
   | { t: 'chat'; text: string }
   | { t: 'reaction'; emoji: string }
-  | { t: 'input'; frame: InputFrame };
+  | { t: 'input'; frame: InputFrame }
+  /**
+   * A pre-encoded SDP for an inbound video stream.
+   *
+   * The extra peer connection exists because the data channel that carries
+   * input and chat is created before the game starts, while a video track has
+   * to be added when there is a canvas to capture. Re-negotiating the original
+   * connection would drop the data channel for a frame or two — mid-game — so
+   * the bubble gets its own tiny connection and this message carries its
+   * offer/answer over the channel that is already open.
+   */
+  | { t: 'video'; sdp: string; kind: 'offer' | 'answer' };
 
 export const REACTION_SET = ['👋', '🔥', '😂', '😱', '🏆', '💀'] as const;
 
@@ -260,6 +271,14 @@ export function parseRoomMessage(value: unknown): RoomMessage | null {
       const frame = parseInputFrame(raw.frame);
       return frame ? { t: 'input', frame } : null;
     }
+    case 'video':
+      // A session description is a few hundred characters of base64-ish text.
+      // The cap keeps a hostile peer from pushing a megabyte through the
+      // channel and into setRemoteDescription.
+      return typeof raw.sdp === 'string' && raw.sdp.length > 0 && raw.sdp.length <= 8192
+        && (raw.kind === 'offer' || raw.kind === 'answer')
+        ? { t: 'video', sdp: raw.sdp, kind: raw.kind }
+        : null;
     default:
       return null;
   }

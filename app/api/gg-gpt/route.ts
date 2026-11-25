@@ -13,7 +13,7 @@ import {
   addMemory,
   forgetMemory,
 } from "@/lib/db/gg-gpt";
-import { chatComplete, chatStream, imageUrl, sanitizeAnswer, type ChatTurn } from "@/lib/gg-gpt/engine";
+import { availableModels, chatComplete, chatStream, hasVision, imageUrl, sanitizeAnswer, type ChatTurn, type TaskKind } from "@/lib/gg-gpt/engine";
 import { videoPlan, describeVideoPlan } from "@/lib/gg-gpt/video";
 import {
   webSearch,
@@ -143,10 +143,34 @@ const CATALOGUE: CatalogueEntry[] = games.map(g => ({
 
 /* ------------------------------ GET: state ------------------------------ */
 export async function GET(req: Request) {
+  const url = new URL(req.url);
+
+  /**
+   * The model picker's data.
+   *
+   * Deliberately derived from what this deployment can actually reach, not from
+   * a hard-coded wish list: a picker that offers a provider with no key is a
+   * picker that fails on the first use. `models` is ordered the way the chain
+   * orders them for a normal chat, and each entry says whether it can see an
+   * image so the UI can grey out vision for the rest.
+   */
+  if (url.searchParams.get("models") === "1") {
+    return NextResponse.json(
+      { models: availableModels() },
+      { headers: { "cache-control": "no-store" } },
+    );
+  }
+
   const { user } = await whoami(req);
-  if (!user) return NextResponse.json({ signedIn: false, chats: [], memories: [] });
+  if (!user) return NextResponse.json({ signedIn: false, chats: [], memories: [], models: availableModels() });
   const [chats, memories] = await Promise.all([listChats(user.id), listMemories(user.id)]);
-  return NextResponse.json({ signedIn: true, username: user.username, chats, memories });
+  return NextResponse.json({
+    signedIn: true,
+    username: user.username,
+    chats,
+    memories,
+    models: availableModels(),
+  });
 }
 
 /* ------------------------------ POST: talk ------------------------------ */
@@ -166,6 +190,13 @@ export async function POST(req: Request) {
     /** Force a tool on or off for one turn. */
     tool?: string;
     stream?: boolean;
+    /**
+     * Images the user attached, as data: URLs (already resized client-side).
+     * Presence of one of these is what makes a turn a vision turn.
+     */
+    images?: string[];
+    /** Chosen in the UI; "auto" (or absent) lets the router decide. */
+    task?: "auto" | TaskKind;
   };
   const action = body.action || "chat";
 
@@ -486,10 +517,48 @@ export async function POST(req: Request) {
     now: new Date(),
     notes: [...notes, `[plan] ${plannerNote}`],
   });
+  /**
+   * What job is this?
+   *
+   * Explicit wins: if the person picked "code" in the picker, send it to the
+   * code-tuned provider even if the wording is ambiguous. Otherwise infer it,
+   * but only from evidence strong enough to be worth reordering the chain:
+   * an image makes it vision, and a message that is clearly a programming
+   * request (or contains a code fence) makes it code. Everything else is chat.
+   *
+   * This is not sentiment analysis; a wrong guess costs a slightly worse model
+   * ordering, and the chain still answers either way.
+   */
+  const images = Array.isArray(body.images)
+    ? body.images.filter(url => typeof url === "string" && /^data:image\/(png|jpe?g|webp|gif|avif);base64,/i.test(url)).slice(0, 4)
+    : [];
+  const inferred: TaskKind = images.length
+    ? "vision"
+    : /```|\b(function|class|const|let|import|export|sql|regex|python|javascript|typescript|react|css|html|api|bug|stack ?trace|refactor)\b/i.test(message)
+      ? "code"
+      : "chat";
+  const task: TaskKind = body.task && body.task !== "auto" ? body.task : inferred;
+
+  /**
+   * An attached image with no vision-capable model configured is a dead end, so
+   * say so before spending a request: a text-only model asked about a
+   * screenshot invents an answer, which is worse than being told to add a key.
+   */
+  if (images.length && !hasVision()) {
+    return NextResponse.json({
+      text:
+        "I can see that you attached an image, but no image-capable model is configured on this deployment yet. " +
+        "Add a key for one (Z.ai's `ZAI_API_KEY`, or `OPENROUTER_API_KEY`) and I'll read screenshots, diagrams and photos directly. " +
+        "In the meantime, describe what is in it and I'll work from that.",
+      provider: "none",
+      model: "none",
+    });
+  }
+
   const turns: ChatTurn[] = [
     { role: "system", content: system },
     ...history,
-    { role: "user", content: message },
+    { role: "user", content: message, images: images.length ? images : undefined },
   ];
 
   // Stream when the client asks for it; otherwise answer in one shot.
@@ -502,7 +571,7 @@ export async function POST(req: Request) {
         let provider = "none";
         let throttled = false;
         try {
-          for await (const event of exclusiveStream(() => chatStream(turns))) {
+          for await (const event of exclusiveStream(() => chatStream(turns, { task }))) {
             if (event.delta) {
               full += event.delta;
               provider = event.provider || provider;
@@ -557,7 +626,7 @@ export async function POST(req: Request) {
   }
 
   const budget = waitEstimate();
-  const result = (await exclusive(() => chatComplete(turns))) ?? {
+  const result = (await exclusive(() => chatComplete(turns, { task }))) ?? {
     text: "",
     provider: "queued",
     model: "none",

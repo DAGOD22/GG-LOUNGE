@@ -1,8 +1,9 @@
 'use client';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Brain, Image as ImageIcon, Loader2, Plus, Search, Send, Sparkles, Trash2, Video, X } from 'lucide-react';
+import { ArrowLeft, Brain, Cpu, Image as ImageIcon, Loader2, PlayCircle, Plus, Search, Send, Sparkles, Trash2, Video, X } from 'lucide-react';
 import { BrowserVideo } from '@/components/gg-gpt/BrowserVideo';
+import { CodeSandbox } from '@/components/gg-gpt/CodeSandbox';
 
 type Chat = { id: string; title: string; updatedAt: string };
 type ToolCard = { label: string; source: string; data?: Record<string, unknown> };
@@ -186,6 +187,39 @@ const ABILITIES = [
   { label: 'Quiz', ask: 'Quiz me on the catalogue' },
 ];
 
+
+/**
+ * Downscale an image to something a model can use.
+ *
+ * 1024px on the long edge, JPEG at 0.82 — the point at which a screenshot's
+ * text is still legible to a vision model but the payload is ~120 KB instead of
+ * several megabytes. Transparent PNGs stay PNG so nothing gains a black box.
+ */
+function shrinkImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error('That file is not a readable image.'));
+      image.onload = () => {
+        const max = 1024;
+        const scale = Math.min(1, max / Math.max(image.width, image.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('Canvas unavailable.'));
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const keepAlpha = /png|webp|avif/i.test(file.type);
+        resolve(canvas.toDataURL(keepAlpha ? 'image/webp' : 'image/jpeg', 0.82));
+      };
+      image.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function GgGptPage() {
   const [signedIn, setSignedIn] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
@@ -194,6 +228,20 @@ export default function GgGptPage() {
   const [chatId, setChatId] = useState<string>('');
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
+  /**
+   * Attachments and model choice.
+   *
+   * Images are resized here, in the browser, before they go anywhere: a phone
+   * screenshot is 4-8 MB, the model only needs about 1024px, and uploading the
+   * original would make the feature unusable on a school connection. The
+   * resized data URL is what travels.
+   */
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [attaching, setAttaching] = useState(false);
+  const [models, setModels] = useState<Array<{ id: string; label: string; vision: boolean }>>([]);
+  const [task, setTask] = useState<'auto' | 'chat' | 'code' | 'vision' | 'long'>('auto');
+  const [sandbox, setSandbox] = useState<{ markdown?: string } | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [showMemory, setShowMemory] = useState(false);
@@ -239,6 +287,7 @@ export default function GgGptPage() {
         setUsername(d.username ?? null);
         setChats(d.chats ?? []);
         setMemories(d.memories ?? []);
+        setModels(d.models ?? []);
         if (d.chats?.length) loadChat(d.chats[0].id);
       })
       .catch(() => setError('Could not reach GG-GPT.'));
@@ -275,8 +324,17 @@ export default function GgGptPage() {
       const res = await fetch('/api/gg-gpt', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'chat', message, chatId, stream: true }),
+        body: JSON.stringify({
+          action: 'chat',
+          message,
+          chatId,
+          stream: true,
+          images: attachments.length ? attachments : undefined,
+          task,
+        }),
       });
+      // Attachments belong to the message that carried them, not to the next one.
+      setAttachments([]);
 
       // A non-streaming response (media, rate limit, error) still arrives as JSON.
       const contentType = res.headers.get('content-type') || '';
@@ -505,6 +563,19 @@ export default function GgGptPage() {
               </div>
             ))}
 
+            {messages.map((m, index) => (
+              m.role === 'assistant' && /```/.test(m.content) ? (
+                <button
+                  key={`run-${index}`}
+                  type="button"
+                  className="gg-run-code"
+                  onClick={() => setSandbox({ markdown: m.content })}
+                >
+                  <PlayCircle size={13} /> Run this code
+                </button>
+              ) : null
+            ))}
+
             {busy && (
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', opacity: 0.7, fontSize: 12.5 }}>
                 <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> GG-GPT is thinking…
@@ -522,31 +593,139 @@ export default function GgGptPage() {
             onSubmit={e => { e.preventDefault(); send(); }}
             style={{ padding: '0 18px 18px', display: 'flex', gap: 10, alignItems: 'flex-end' }}
           >
-            <div style={{ flex: 1, display: 'flex', gap: 8, alignItems: 'flex-end', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 14, padding: '8px 10px' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 14, padding: '8px 10px' }}>
+              {attachments.length > 0 && (
+                <div className="gg-attach-row">
+                  {attachments.map((src, index) => (
+                    <span key={index} className="gg-attach">
+                      <img src={src} alt={`Attachment ${index + 1}`} />
+                      <button
+                        type="button"
+                        aria-label={`Remove attachment ${index + 1}`}
+                        onClick={() => setAttachments(list => list.filter((_, i) => i !== index))}
+                      >
+                        <X size={11} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
               <textarea
                 ref={inputRef}
                 value={input}
                 onChange={e => setInput(e.target.value)}
+                onPaste={async e => {
+                  // Pasting a screenshot is how people actually send images.
+                  const files = Array.from(e.clipboardData?.files ?? []).filter(file => file.type.startsWith('image/'));
+                  if (!files.length) return;
+                  e.preventDefault();
+                  setAttaching(true);
+                  try {
+                    const made = await Promise.all(files.slice(0, 4).map(shrinkImage));
+                    setAttachments(list => [...list, ...made].slice(0, 4));
+                  } catch (cause) { setError((cause as Error).message); }
+                  finally { setAttaching(false); }
+                }}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                placeholder="Ask GG-GPT anything — or say “generate an image of …”"
+                placeholder="Ask GG-GPT anything — attach an image, or say “write a game and run it”"
                 rows={1}
                 style={{ flex: 1, background: 'transparent', border: 0, color: 'inherit', resize: 'none', outline: 'none', fontSize: 13.5, lineHeight: 1.5, maxHeight: 160, fontFamily: 'inherit' }}
               />
-              <div style={{ display: 'flex', gap: 4, opacity: 0.5 }} title="GG-GPT can search the web and make images or videos">
-                <Search size={15} /><ImageIcon size={15} /><Video size={15} />
+              <label title="Attach an image or video" className="gg-icon-btn">
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  multiple
+                  hidden
+                  onChange={async event => {
+                    const files = Array.from(event.target.files ?? []).slice(0, 4);
+                    event.target.value = '';
+                    if (!files.length) return;
+                    setAttaching(true);
+                    try {
+                      const images = files.filter(file => file.type.startsWith('image/'));
+                      if (images.length < files.length) {
+                        setError('Video attachments need a link — paste a YouTube or Vimeo URL and GG-GPT will play it inline.');
+                      }
+                      const made = await Promise.all(images.map(shrinkImage));
+                      setAttachments(list => [...list, ...made].slice(0, 4));
+                      if (files.some(file => file.type.startsWith('video/'))) {
+                        setTask('vision');
+                      }
+                    } catch (cause) { setError((cause as Error).message); }
+                    finally { setAttaching(false); }
+                  }}
+                />
+                {attaching ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <ImageIcon size={15} />}
+              </label>
+              <button
+                type="button"
+                className="gg-icon-btn"
+                title={`Task: ${task} — GG-GPT routes to the model best at it`}
+                onClick={() => { const order = ['auto', 'code', 'vision', 'chat', 'long'] as const; setTask(current => order[(order.indexOf(current) + 1) % order.length]); }}
+              >
+                <Search size={15} />
+              </button>
+              {models.length > 0 && (
+                <div className="gg-models">
+                  <button type="button" className="gg-icon-btn" onClick={() => setPickerOpen(open => !open)} title="Model routing">
+                    <Cpu size={15} />
+                  </button>
+                  {pickerOpen && (
+                    <div className="gg-models-menu" role="menu">
+                      {(['auto', 'chat', 'code', 'vision', 'long'] as const).map(kind => (
+                        <button
+                          key={kind}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={task === kind}
+                          className={task === kind ? 'on' : ''}
+                          onClick={() => { setTask(kind); setPickerOpen(false); }}
+                        >
+                          {kind}
+                        </button>
+                      ))}
+                      <div className="gg-models-list">
+                        {models.map(model => (
+                          <span key={model.id} title={model.vision ? 'Can read images' : 'Text only'}>
+                            {model.label}{model.vision ? ' · vision' : ''}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              <Video size={15} style={{ opacity: 0.35 }} />
               </div>
             </div>
-            <button type="submit" disabled={busy || !input.trim()} style={{
+            <button type="submit" disabled={busy || (!input.trim() && !attachments.length)} style={{
               display: 'flex', alignItems: 'center', gap: 7, padding: '11px 18px', borderRadius: 12,
-              background: busy || !input.trim() ? 'rgba(255,255,255,.08)' : 'var(--lime)',
-              color: busy || !input.trim() ? 'inherit' : '#0b0d12', border: 0, fontWeight: 900, fontSize: 13, cursor: busy || !input.trim() ? 'default' : 'pointer',
+              background: busy || (!input.trim() && !attachments.length) ? 'rgba(255,255,255,.08)' : 'var(--lime)',
+              color: busy || (!input.trim() && !attachments.length) ? 'inherit' : '#0b0d12', border: 0, fontWeight: 900, fontSize: 13, cursor: busy || (!input.trim() && !attachments.length) ? 'default' : 'pointer',
             }}>
               <Send size={15} /> Send
             </button>
           </form>
         </div>
       </div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:700px){aside{display:none}}`}</style>
+      {sandbox && <CodeSandbox initial={sandbox} onClose={() => setSandbox(null)} />}
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:700px){aside{display:none}}
+        .gg-icon-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;border:0;background:transparent;color:inherit;opacity:.6;cursor:pointer}
+        .gg-icon-btn:hover{opacity:1;background:rgba(255,255,255,.08)}
+        .gg-attach-row{display:flex;gap:6px;flex-wrap:wrap}
+        .gg-attach{position:relative;display:inline-flex;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.16)}
+        .gg-attach img{width:56px;height:56px;object-fit:cover;display:block}
+        .gg-attach button{position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;border:0;background:rgba(0,0,0,.7);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+        .gg-models{position:relative}
+        .gg-models-menu{position:absolute;bottom:34px;right:0;z-index:40;min-width:190px;padding:6px;border-radius:12px;background:#12151c;border:1px solid rgba(255,255,255,.14);box-shadow:0 18px 40px rgba(0,0,0,.5)}
+        .gg-models-menu>button{display:block;width:100%;text-align:left;padding:6px 9px;border-radius:7px;border:0;background:transparent;color:inherit;font-size:12.5px;cursor:pointer;text-transform:capitalize}
+        .gg-models-menu>button:hover{background:rgba(255,255,255,.07)}
+        .gg-models-menu>button.on{background:rgba(190,242,100,.16);color:var(--lime)}
+        .gg-run-code{display:inline-flex;align-items:center;gap:6px;margin:0 18px 10px;padding:6px 11px;border-radius:9px;border:1px solid rgba(190,242,100,.35);background:rgba(190,242,100,.1);color:var(--lime);font-size:12px;font-weight:700;cursor:pointer;align-self:flex-start}
+        .gg-models-list{display:flex;flex-direction:column;gap:2px;padding:6px 9px 2px;margin-top:4px;border-top:1px solid rgba(255,255,255,.1);font-size:11px;opacity:.6}
+      `}</style>
     </main>
   );
 }

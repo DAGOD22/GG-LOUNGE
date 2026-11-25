@@ -234,6 +234,31 @@ export function GhostCursors({
         }
       }
 
+      /**
+       * 1b. publish the nearest ghost for the hum.
+       *
+       * Throttled to ~8 Hz: a stereo panner and two filter cutoffs are cheap,
+       * but 60 audio-parameter writes a second is pointless — the ear cannot
+       * resolve the difference and the automation queue starts to lag.
+       */
+      if (now - (step as unknown as { lastHum?: number }).lastHum! > 120) {
+        (step as unknown as { lastHum?: number }).lastHum = now;
+        let nearest: { x: number; y: number } | null = null;
+        let best = Infinity;
+        for (const ghost of tracked.current.values()) {
+          const distance = Math.hypot(ghost.x - vw / 2, ghost.y - vh / 2);
+          if (distance < best) {
+            best = distance;
+            nearest = { x: ghost.x, y: ghost.y };
+          }
+        }
+        window.dispatchEvent(
+          new CustomEvent('gg:ghosts', {
+            detail: { x: nearest?.x ?? vw / 2, y: nearest?.y ?? vh / 2, count: tracked.current.size },
+          }),
+        );
+      }
+
       /* 2. draw ------------------------------------------------------------ */
       ctx!.clearRect(0, 0, vw, vh);
 

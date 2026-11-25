@@ -26,6 +26,9 @@ export type GameBridge = {
   applyRemoteInput: (frame: InputFrame) => void;
   /** A friend started the same game; used for the room status line. */
   onPeerGame: (gameId: string) => void;
+  /** The live `<iframe>` hosting the game, for modules that capture or filter
+   *  it. Null when no game is open. */
+  frame: () => HTMLIFrameElement | null;
 };
 
 type Registry = {

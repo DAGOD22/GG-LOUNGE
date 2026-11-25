@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Pulse Grid</title>
+<style>
+  html,body{margin:0;height:100%;background:#07090e;overflow:hidden;
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#e8edf4;
+    -webkit-tap-highlight-color:transparent}
+  #stage{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
+  .hud{position:fixed;left:14px;top:12px;pointer-events:none;font:800 12px/1.4 ui-monospace,SFMono-Regular,monospace;
+    letter-spacing:.08em;color:#bef264;text-shadow:0 2px 14px rgba(0,0,0,.7)}
+  .hud small{display:block;font-size:10px;letter-spacing:.14em;opacity:.55;color:#e8edf4;margin-top:3px}
+  .overlay{position:fixed;inset:0;display:grid;place-items:center;background:rgba(5,7,11,.82);
+    backdrop-filter:blur(6px);text-align:center;padding:24px;z-index:5}
+  .overlay[hidden]{display:none}
+  .card{max-width:360px}
+  .card h1{margin:0 0 6px;font-size:26px;letter-spacing:-.03em}
+  .card p{margin:0 0 16px;font-size:13.5px;line-height:1.6;color:#a9b4c4}
+  .card .stat{font:800 40px/1 ui-monospace,monospace;color:#bef264;margin:10px 0 4px}
+  .keys{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:14px 0 18px}
+  .keys span{font:800 10.5px/1 ui-monospace,monospace;letter-spacing:.06em;padding:6px 9px;border-radius:8px;
+    border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:#cbd5e1}
+  button{appearance:none;border:0;background:#bef264;color:#0b0d12;font:900 13px/1 inherit;
+    padding:12px 22px;border-radius:11px;cursor:pointer;letter-spacing:.02em}
+  button.ghost{background:transparent;color:#e8edf4;border:1px solid rgba(255,255,255,.18);margin-left:8px}
+  .foot{position:fixed;right:14px;bottom:12px;font:700 10px/1 ui-monospace,monospace;
+    letter-spacing:.14em;color:rgba(232,237,244,.32);pointer-events:none}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div class="hud" id="hud"></div>
+<div class="overlay" id="intro">
+  <div class="card">
+    <h1>Pulse Grid</h1>
+    <p>Watch the sequence, then repeat it. Every round is one longer, and the tones climb with you.</p>
+    <div class="keys"><span>CLICK / 1-4</span>
+    <span>PAD</span>
+    <span>Q W A S</span>
+    <span>PAD</span></div>
+    <button id="go">Play</button>
+    <button class="ghost" id="mute" aria-pressed="false">Sound on</button>
+  </div>
+</div>
+<div class="overlay" id="over" hidden>
+  <div class="card">
+    <p id="overwhy">Run over.</p>
+    <div class="stat" id="score">0</div>
+    <p id="best" style="margin:0"></p>
+    <div style="margin-top:18px">
+      <button id="again">Again</button>
+    </div>
+  </div>
+</div>
+<div class="foot">GG-LOUNGE ORIGINALS</div>
+<script src="../_shared/gg-arcade.js"></script>
+<script>/* Pulse Grid — a rhythm-lite memory game: repeat the growing light sequence. */
+(function () {
+  'use strict';
+  var view = GGA.createCanvas(document.getElementById('stage'));
+  var ctx = view.ctx;
+  var hud = document.getElementById('hud');
+  var intro = document.getElementById('intro');
+  var over = document.getElementById('over');
+  var scoreEl = document.getElementById('score');
+  var bestEl = document.getElementById('best');
+  var whyEl = document.getElementById('overwhy');
+
+  var PADS = [
+    { colour: '#bef264', tone: 329.63 },
+    { colour: '#7dd3ff', tone: 392.00 },
+    { colour: '#f0abfc', tone: 493.88 },
+    { colour: '#fdba74', tone: 587.33 }
+  ];
+
+  var state = 'intro';   // intro | show | input | dead
+  var sequence, step, lit, litUntil, acceptAt, score, best, spin, audio, muted;
+
+  best = GGA.store('best', 0) || 0;
+  muted = GGA.store('muted', false) === true;
+
+  /**
+   * Sound is synthesised, not sampled: four sine tones through a soft envelope.
+   * An AudioContext has to be created after a gesture, which is why it is built
+   * lazily on the first Play press rather than at load.
+   */
+  function beep(tone, duration) {
+    if (muted) return;
+    try {
+      if (!audio) {
+        var Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) return;
+        audio = new Ctor();
+      }
+      if (audio.state === 'suspended') audio.resume();
+      var osc = audio.createOscillator();
+      var gain = audio.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = tone;
+      var now = audio.currentTime;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.16, now + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + (duration || 0.26));
+      osc.connect(gain);
+      gain.connect(audio.destination);
+      osc.start(now);
+      osc.stop(now + (duration || 0.26) + 0.02);
+    } catch (error) { /* audio is a bonus, never a blocker */ }
+  }
+
+  function reset() {
+    sequence = [];
+    step = 0;
+    lit = -1;
+    litUntil = 0;
+    acceptAt = 0;
+    score = 0;
+    spin = 0;
+  }
+
+  function nextRound() {
+    sequence.push(GGA.randInt(0, 3));
+    step = 0;
+    state = 'show';
+    // Playback is scheduled off a clock, not a timer chain: a dropped frame
+    // must not shift the rhythm, and every pad is lit from the same source.
+    var at = performance.now() + 420;
+    sequence.forEach(function (pad, index) {
+      window.setTimeout(function () {
+        lit = pad;
+        litUntil = performance.now() + 300;
+        beep(PADS[pad].tone);
+        if (index === sequence.length - 1) {
+          window.setTimeout(function () {
+            lit = -1;
+            acceptAt = performance.now() + 120;
+            state = 'input';
+          }, 330);
+        }
+      }, at - performance.now() + index * 430);
+    });
+  }
+
+  function press(pad) {
+    if (state !== 'input' || performance.now() < acceptAt) return;
+    beep(PADS[pad].tone, 0.18);
+    lit = pad;
+    litUntil = performance.now() + 160;
+    if (sequence[step] === pad) {
+      step++;
+      if (step === sequence.length) {
+        score += sequence.length * 10;
+        window.setTimeout(nextRound, 420);
+      }
+    } else {
+      state = 'dead';
+      whyEl.textContent = 'Wrong pad — the sequence was ' + (step + 1) + ' long.';
+      scoreEl.textContent = score;
+      if (score > best) { best = score; GGA.store('best', best); }
+      bestEl.textContent = 'Best ' + best;
+      over.hidden = false;
+    }
+  }
+
+  /**
+   * Which pad is under the pointer.
+   *
+   * Screen coordinates, not element coordinates: the pads are laid out from the
+   * canvas centre, and `padAt` is only ever called from a pointer event whose
+   * clientX/clientY are already in the same space as the canvas box (the canvas
+   * fills the viewport).
+   */
+  function padAt(x, y) {
+    var box = view.canvas.getBoundingClientRect();
+    var cx = box.left + view.size.w / 2;
+    var cy = box.top + view.size.h / 2;
+    var col = x < cx ? 0 : 1;
+    var row = y < cy ? 0 : 1;
+    return row * 2 + col;
+  }
+
+  view.canvas.addEventListener('pointerdown', function (event) {
+    if (state !== 'input') return;
+    press(padAt(event.clientX, event.clientY));
+  });
+
+  window.addEventListener('keydown', function (event) {
+    var map = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, KeyQ: 0, KeyW: 1, KeyA: 2, KeyS: 3 };
+    if (map[event.code] !== undefined) press(map[event.code]);
+  });
+
+  function update(dt) {
+    spin += dt;
+    hud.innerHTML = (state === 'intro' ? '' : score + ' pts') +
+      '<small>' + (state === 'show' ? 'WATCH' : state === 'input' ? 'YOUR TURN' : '') +
+      ' · LENGTH ' + sequence.length + '</small>';
+  }
+
+  function draw() {
+    var w = view.size.w, h = view.size.h;
+    ctx.fillStyle = '#07090e';
+    ctx.fillRect(0, 0, w, h);
+    GGA.grid(ctx, w, h, spin * 18, 74, 'rgba(125,211,255,.05)');
+
+    var cx = w / 2, cy = h / 2;
+    var size = Math.min(w, h) * 0.34;
+    var gap = size * 0.08;
+
+    for (var pad = 0; pad < 4; pad++) {
+      var col = pad % 2, row = Math.floor(pad / 2);
+      var x = cx + (col ? gap / 2 : -size - gap / 2);
+      var y = cy + (row ? gap / 2 : -size - gap / 2);
+      var isLit = lit === pad && performance.now() < litUntil;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(x, y, size, size, size * 0.16) : ctx.rect(x, y, size, size);
+      ctx.fillStyle = isLit ? PADS[pad].colour : 'rgba(255,255,255,.05)';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = PADS[pad].colour;
+      ctx.globalAlpha = isLit ? 1 : 0.42;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      if (isLit) GGA.glow(ctx, x + size / 2, y + size / 2, size * 0.75, PADS[pad].colour, 0.5);
+    }
+
+    // Progress pips: how far through the sequence you are.
+    var pipW = 10, pipGap = 6;
+    var total = sequence.length;
+    var startX = cx - (total * (pipW + pipGap)) / 2;
+    for (var i = 0; i < total; i++) {
+      ctx.fillStyle = i < step ? '#bef264' : 'rgba(255,255,255,.16)';
+      ctx.fillRect(startX + i * (pipW + pipGap), cy + size + gap * 3, pipW, 5);
+    }
+  }
+
+  var runner = GGA.loop(update, draw);
+
+  var muteBtn = document.getElementById('mute');
+  function paintMute() {
+    muteBtn.textContent = muted ? 'Sound off' : 'Sound on';
+    muteBtn.setAttribute('aria-pressed', String(muted));
+  }
+  muteBtn.addEventListener('click', function () {
+    muted = !muted;
+    GGA.store('muted', muted);
+    paintMute();
+  });
+  paintMute();
+
+  function begin() {
+    reset();
+    state = 'show';
+    intro.hidden = true;
+    over.hidden = true;
+    runner.start();
+    nextRound();
+  }
+  document.getElementById('go').addEventListener('click', begin);
+  document.getElementById('again').addEventListener('click', begin);
+
+  reset();
+  draw();
+  runner.start();
+})();
+</script>
+</body>
+</html>

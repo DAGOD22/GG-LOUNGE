@@ -8,6 +8,8 @@ import { inferAchievementUpdates } from '@/lib/achievement-tracker'
 import { getAchievementsForGame, RARITY_COLOR } from '@/lib/achievements'
 import { MiniPlayer } from '@/components/live/MiniPlayer'
 import { SplitScreen } from '@/components/live/SplitScreen'
+import { ArcadeLab } from '@/components/live/arcade/ArcadeLab'
+import { SessionClock, UpNext, VoteButtons, useSessionTimer } from '@/components/ArcadeExtras'
 import { useRegisterGameBridge } from '@/components/live/GameBridge'
 import { useLivePresence } from '@/components/live/PresenceProvider'
 import { dispatchKey, type InputFrame } from '@/lib/coop'
@@ -28,6 +30,8 @@ export function GameModal({
   authUser: { id: string; username: string } | null
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null)
+  // Time in the launcher is recorded on close, once — see useSessionTimer.
+  const session = useSessionTimer(game.id)
   const wrapRef = useRef<HTMLDivElement>(null)
   // Split screen and pane mute. `splitGame` is the *right* pane; the left pane
   // is this modal's own frame, so the save and achievement code keeps working
@@ -88,6 +92,7 @@ export function GameModal({
       try { dispatchKey(frameRef.current?.contentWindow, frame) } catch { /* cross-origin */ }
     },
     onPeerGame: () => {},
+    frame: () => frameRef.current,
   })
 
   // Report the launch once, both to the Most Played counter (already handled by
@@ -605,7 +610,7 @@ export function GameModal({
               NOW PLAYING — {game.genre.toUpperCase()} / {game.tone.toUpperCase()} · {sessionLabel(estimatedSessionMinutes(game.genre)).toUpperCase()}
             </span>
             <strong style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {game.title} {isFavorite && <Heart size={14} fill="var(--coral)" color="var(--coral)" />}
+              {game.title} {isFavorite && <Heart size={14} fill="var(--coral)" color="var(--coral)" />} <SessionClock startedAt={session.startedAt} />
             </strong>
           </div>
         </div>
@@ -739,6 +744,14 @@ export function GameModal({
           >
             <Columns2 size={14} /> Split
           </button>
+
+          {/* The wrap element is resolved lazily by the lab, so this render
+              never reads a ref: the node it wants is the one this component
+              already owns, and a snapshot here would be null on first paint. */}
+          <ArcadeLab
+            frame={() => frameRef.current}
+            wrap={() => wrapRef.current}
+          />
           <button
             onClick={() => {
               const el = wrapRef.current || frameRef.current
@@ -749,11 +762,30 @@ export function GameModal({
           >
             <Maximize2 size={18} />
           </button>
-          <button onClick={onClose} aria-label="Close game">
+          <button
+            onClick={() => {
+              session.finish('close')
+              onClose()
+            }}
+            aria-label="Close game"
+          >
             <X size={20} />
           </button>
         </div>
       </div>
+      <div className="gg-modal-extras">
+        <VoteButtons gameId={game.id} />
+        <UpNext
+          game={game}
+          catalogue={catalogue}
+          playCounts={{}}
+          onLaunch={candidate => {
+            session.finish('switch')
+            setSplitGame(candidate)
+          }}
+        />
+      </div>
+
       {splitGame && (
         <div className="gg-split-leftbar">
           <span>{game.title} <em>· left pane</em></span>

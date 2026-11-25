@@ -37,6 +37,7 @@ import {
 } from '@/lib/coop';
 import { useCustomization } from '@/components/customization/CustomizationProvider';
 import { useOptionalGameBridge } from './GameBridge';
+import { GameBubble } from './arcade/GameBubble';
 
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -81,6 +82,14 @@ export function CoopRoom() {
   const forwardRef = useRef(false);
   const peerNameRef = useRef('');
   const bridgeRef = useRef(bridge);
+  /**
+   * Video signalling listeners.
+   *
+   * The bubble subscribes rather than living inside the room's state machine:
+   * a stream that is being renegotiated must not re-render the roster, and the
+   * room must keep forwarding input frames at 60 Hz while it happens.
+   */
+  const videoListeners = useRef(new Set<(message: { sdp: string; kind: 'offer' | 'answer' }) => void>());
 
   useEffect(() => {
     forwardRef.current = forwardKeys;
@@ -186,6 +195,11 @@ export function CoopRoom() {
           break;
         case 'input':
           bridgeRef.current?.applyRemoteInput?.(message.frame);
+          break;
+        case 'video':
+          // The bubble owns its own peer connection; the room just delivers the
+          // signal, because the room is the only path that is already open.
+          for (const handler of videoListeners.current) handler({ sdp: message.sdp, kind: message.kind });
           break;
       }
     },
@@ -463,6 +477,29 @@ export function CoopRoom() {
 
   const connected = status === 'connected';
 
+  /**
+   * The bubble's send/listen pair.
+   *
+   * `send` goes through the room's own framing so the peer validates it with
+   * everything else; `listen` registers a handler that the message switch
+   * calls. Both are stable callbacks — the bubble re-negotiates on identity
+   * change, and an unstable pair here would restart every stream on any render.
+   */
+  const videoSend = useCallback(
+    (payload: unknown) => {
+      const message = payload as { t?: string; kind?: 'offer' | 'answer'; sdp?: string };
+      if (message?.t !== 'video' || !message.sdp || !message.kind) return false;
+      return sendRaw({ t: 'video', kind: message.kind, sdp: message.sdp });
+    },
+    [sendRaw],
+  );
+  const videoListen = useCallback((handler: (message: { sdp: string; kind: 'offer' | 'answer' }) => void) => {
+    videoListeners.current.add(handler);
+    return () => {
+      videoListeners.current.delete(handler);
+    };
+  }, []);
+
   return (
     <>
       {/* reactions float above everything, briefly */}
@@ -484,6 +521,15 @@ export function CoopRoom() {
         <span>{connected ? 'In a room' : 'Play with a friend'}</span>
         {connected && <span className="gg-coop-dot" aria-hidden="true" />}
       </button>
+
+      {connected && (
+        <GameBubble
+          target={bridge?.frame?.() ?? null}
+          send={videoSend}
+          listen={videoListen}
+          active={connected}
+        />
+      )}
 
       {open && (
         <div className="gg-coop-panel" id="gg-coop-panel" role="dialog" aria-label="Play with a friend">

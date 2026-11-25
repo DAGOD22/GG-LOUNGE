@@ -80,6 +80,28 @@ export function SplitScreen({
 
   const nudge = (delta: number) => setSplit(Math.max(22, Math.min(78, split + delta)));
 
+  /* ---- keyboard for the right pane -------------------------------------
+   *
+   * The left pane gets its keystrokes from the modal's own touch pad and from
+   * the frame having focus. The right pane had neither: on a phone in split
+   * screen the second game could be seen but not played. These helpers push the
+   * same synthetic events into the right frame that the modal pushes into the
+   * left one, so both panes are playable from one control cluster.
+   */
+  const press = useCallback((code: string, type: 'keydown' | 'keyup') => {
+    const frame = rightFrame.current;
+    const win = frame?.contentWindow as (Window & typeof globalThis) | null;
+    const doc = frame?.contentDocument;
+    if (!win || !doc) return;
+    const options = { key: code.startsWith('Key') ? code.slice(3).toLowerCase() : code === 'Space' ? ' ' : code, code, bubbles: true, cancelable: true } as KeyboardEventInit;
+    try { win.dispatchEvent(new KeyboardEvent(type, options)); } catch { /* frame replaced */ }
+    try { doc.dispatchEvent(new KeyboardEvent(type, options)); } catch { /* frame replaced */ }
+  }, []);
+  const tap = useCallback((code: string) => {
+    press(code, 'keydown');
+    setTimeout(() => press(code, 'keyup'), 160);
+  }, [press]);
+
   /* ---- per-pane mute --------------------------------------------------- */
   const applyMute = useCallback((frame: HTMLIFrameElement | null, muted: boolean) => {
     if (!frame) return;
@@ -111,13 +133,18 @@ export function SplitScreen({
   }, [picker, rightGame]);
 
   return (
-    <div className="gg-split" data-split={Math.round(split)}>
-      <div className="gg-split-divider" style={{ left: `${split}%` }} />
+    <div
+      className="gg-split"
+      data-split={Math.round(split)}
+      // One variable drives the grid tracks, the divider and the handle, so the
+      // three can never disagree about where the seam is.
+      style={{ ['--gg-split' as string]: `${split}%` }}
+    >
+      <div className="gg-split-divider" />
 
       {/* the divider handle sits above both panes and is the drag target */}
       <div
         className="gg-split-handle"
-        style={{ left: `${split}%` }}
         role="separator"
         aria-orientation="vertical"
         aria-label="Resize the split"
@@ -155,7 +182,7 @@ export function SplitScreen({
       {/* right pane controls live in the modal bar; the pane itself is just
           the frame so nothing overlaps the game's own UI */}
       {rightGame ? (
-        <div className="gg-split-pane gg-split-right" style={{ left: `${split}%` }}>
+        <div className="gg-split-pane gg-split-right">
           <div className="gg-split-bar">
             <span className="gg-split-name">{rightGame.title}</span>
             <button
@@ -191,9 +218,31 @@ export function SplitScreen({
             allowFullScreen
             onLoad={() => applyMute(rightFrame.current, rightMuted)}
           />
+          <div className="gg-split-touch" role="group" aria-label={`Controls for ${rightGame.title}`}>
+            {([
+              ['ArrowUp', '▲'],
+              ['ArrowLeft', '◀'],
+              ['ArrowDown', '▼'],
+              ['ArrowRight', '▶'],
+            ] as const).map(([code, glyph]) => (
+              <button
+                key={code}
+                type="button"
+                aria-label={code.replace('Arrow', '')}
+                onTouchStart={event => { event.preventDefault(); tap(code); }}
+                onMouseDown={() => tap(code)}
+                onContextMenu={event => event.preventDefault()}
+              >
+                {glyph}
+              </button>
+            ))}
+            <button type="button" className="gg-split-touch-space" onTouchStart={event => { event.preventDefault(); tap('Space'); }} onMouseDown={() => tap('Space')}>
+              SPACE
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="gg-split-pane gg-split-right gg-split-empty" style={{ left: `${split}%` }}>
+        <div className="gg-split-pane gg-split-right gg-split-empty">
           <button type="button" className="gg-secondary" onClick={() => setPicker(true)}>
             <Columns2 size={14} /> Pick a game for the right pane
           </button>

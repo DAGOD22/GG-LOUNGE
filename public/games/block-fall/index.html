@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Block Fall</title>
+<style>
+  html,body{margin:0;height:100%;background:#07090e;overflow:hidden;
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#e8edf4;
+    -webkit-tap-highlight-color:transparent}
+  #stage{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
+  .hud{position:fixed;left:14px;top:12px;pointer-events:none;font:800 12px/1.4 ui-monospace,SFMono-Regular,monospace;
+    letter-spacing:.08em;color:#bef264;text-shadow:0 2px 14px rgba(0,0,0,.7)}
+  .hud small{display:block;font-size:10px;letter-spacing:.14em;opacity:.55;color:#e8edf4;margin-top:3px}
+  .overlay{position:fixed;inset:0;display:grid;place-items:center;background:rgba(5,7,11,.82);
+    backdrop-filter:blur(6px);text-align:center;padding:24px;z-index:5}
+  .overlay[hidden]{display:none}
+  .card{max-width:360px}
+  .card h1{margin:0 0 6px;font-size:26px;letter-spacing:-.03em}
+  .card p{margin:0 0 16px;font-size:13.5px;line-height:1.6;color:#a9b4c4}
+  .card .stat{font:800 40px/1 ui-monospace,monospace;color:#bef264;margin:10px 0 4px}
+  .keys{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:14px 0 18px}
+  .keys span{font:800 10.5px/1 ui-monospace,monospace;letter-spacing:.06em;padding:6px 9px;border-radius:8px;
+    border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:#cbd5e1}
+  button{appearance:none;border:0;background:#bef264;color:#0b0d12;font:900 13px/1 inherit;
+    padding:12px 22px;border-radius:11px;cursor:pointer;letter-spacing:.02em}
+  button.ghost{background:transparent;color:#e8edf4;border:1px solid rgba(255,255,255,.18);margin-left:8px}
+  .foot{position:fixed;right:14px;bottom:12px;font:700 10px/1 ui-monospace,monospace;
+    letter-spacing:.14em;color:rgba(232,237,244,.32);pointer-events:none}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div class="hud" id="hud"></div>
+<div class="overlay" id="intro">
+  <div class="card">
+    <h1>Block Fall</h1>
+    <p>A falling-block puzzle with a hold slot, a ghost piece and wall kicks. Ten lines raises the level.</p>
+    <div class="keys"><span>← →</span>
+    <span>MOVE</span>
+    <span>↑ / Z</span>
+    <span>ROTATE</span>
+    <span>↓</span>
+    <span>SOFT DROP</span>
+    <span>C</span>
+    <span>HOLD</span></div>
+    <button id="go">Play</button>
+    <button class="ghost" id="mute" aria-pressed="false">Sound on</button>
+  </div>
+</div>
+<div class="overlay" id="over" hidden>
+  <div class="card">
+    <p id="overwhy">Run over.</p>
+    <div class="stat" id="score">0</div>
+    <p id="best" style="margin:0"></p>
+    <div style="margin-top:18px">
+      <button id="again">Again</button>
+    </div>
+  </div>
+</div>
+<div class="foot">GG-LOUNGE ORIGINALS</div>
+<script src="../_shared/gg-arcade.js"></script>
+<script>/* Block Fall — a drop puzzle with hold, ghost piece, wall kicks and a clear cascade. */
+(function () {
+  'use strict';
+  var view = GGA.createCanvas(document.getElementById('stage'));
+  var ctx = view.ctx;
+  var input = GGA.input(view.canvas);
+  var hud = document.getElementById('hud');
+  var intro = document.getElementById('intro');
+  var over = document.getElementById('over');
+  var scoreEl = document.getElementById('score');
+  var bestEl = document.getElementById('best');
+  var whyEl = document.getElementById('overwhy');
+
+  var COLS = 10, ROWS = 20;
+  var SHAPES = {
+    I: { cells: [[0, 1], [1, 1], [2, 1], [3, 1]], size: 4, colour: '#7dd3ff' },
+    J: { cells: [[0, 0], [0, 1], [1, 1], [2, 1]], size: 3, colour: '#93c5fd' },
+    L: { cells: [[2, 0], [0, 1], [1, 1], [2, 1]], size: 3, colour: '#fdba74' },
+    O: { cells: [[0, 0], [1, 0], [0, 1], [1, 1]], size: 2, colour: '#fde68a' },
+    S: { cells: [[1, 0], [2, 0], [0, 1], [1, 1]], size: 3, colour: '#bef264' },
+    T: { cells: [[1, 0], [0, 1], [1, 1], [2, 1]], size: 3, colour: '#f0abfc' },
+    Z: { cells: [[0, 0], [1, 0], [1, 1], [2, 1]], size: 3, colour: '#fca5a5' }
+  };
+  var KEYS = Object.keys(SHAPES);
+
+  var state = 'intro';
+  var board, piece, next, hold, holdUsed, score, lines, level, dropAt, best, bag, flash;
+
+  best = GGA.store('best', 0) || 0;
+
+  function emptyBoard() {
+    var rows = [];
+    for (var y = 0; y < ROWS; y++) {
+      rows.push(new Array(COLS).fill(null));
+    }
+    return rows;
+  }
+
+  /** Seven-bag randomiser: every piece appears before any repeats. */
+  function nextKey() {
+    if (!bag || !bag.length) {
+      bag = KEYS.slice();
+      for (var i = bag.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = bag[i]; bag[i] = bag[j]; bag[j] = tmp;
+      }
+    }
+    return bag.pop();
+  }
+
+  function makePiece(key) {
+    return { key: key, cells: SHAPES[key].cells.map(function (c) { return [c[0], c[1]]; }), x: 3, y: 0, size: SHAPES[key].size };
+  }
+
+  function reset() {
+    board = emptyBoard();
+    next = nextKey();
+    piece = makePiece(nextKey());
+    next = nextKey();
+    hold = null;
+    holdUsed = false;
+    score = 0;
+    lines = 0;
+    level = 1;
+    dropAt = 0;
+    flash = 0;
+    bag = null;
+    state = state === 'play' ? 'play' : state;
+    input.reset();
+  }
+
+  function rotate(dir) {
+    var size = piece.size;
+    var rotated = piece.cells.map(function (cell) {
+      return dir > 0 ? [size - 1 - cell[1], cell[0]] : [cell[1], size - 1 - cell[0]];
+    });
+    // Wall kicks: try in place, then one step each way, then two. Simple, and
+    // it covers every case that matters on a 10-wide board.
+    var kicks = [0, -1, 1, -2, 2];
+    for (var i = 0; i < kicks.length; i++) {
+      var candidate = rotated.map(function (cell) { return [cell[0] + piece.x + kicks[i], cell[1] + piece.y]; });
+      if (fits(candidate)) {
+        piece.cells = rotated;
+        piece.x += kicks[i];
+        return;
+      }
+    }
+  }
+
+  function fits(cells) {
+    for (var i = 0; i < cells.length; i++) {
+      var x = cells[i][0], y = cells[i][1];
+      if (x < 0 || x >= COLS || y >= ROWS) return false;
+      if (y >= 0 && board[y][x]) return false;
+    }
+    return true;
+  }
+
+  function drop() {
+    var cells = piece.cells.map(function (cell) { return [cell[0] + piece.x, cell[1] + piece.y + 1]; });
+    if (fits(cells)) { piece.y++; return true; }
+    lock();
+    return false;
+  }
+
+  function lock() {
+    for (var i = 0; i < piece.cells.length; i++) {
+      var x = piece.cells[i][0] + piece.x;
+      var y = piece.cells[i][1] + piece.y;
+      if (y < 0) { state = 'dead'; finish('You topped out.'); return; }
+      board[y][x] = SHAPES[piece.key].colour;
+    }
+    // Clear full rows, from the bottom up.
+    var cleared = 0;
+    for (var row = ROWS - 1; row >= 0; row--) {
+      var full = true;
+      for (var col = 0; col < COLS; col++) if (!board[row][col]) { full = false; break; }
+      if (full) {
+        board.splice(row, 1);
+        board.unshift(new Array(COLS).fill(null));
+        cleared++;
+        row++;
+      }
+    }
+    if (cleared) {
+      lines += cleared;
+      // Quadratic scoring is what makes clearing four rows at once worth the risk.
+      score += [0, 100, 300, 520, 800][cleared] * level;
+      level = 1 + Math.floor(lines / 10);
+      flash = 1;
+    }
+    holdUsed = false;
+    piece = makePiece(next);
+    next = nextKey();
+    if (!fits(piece.cells.map(function (cell) { return [cell[0] + piece.x, cell[1] + piece.y]; }))) {
+      state = 'dead';
+      finish('No room for the next piece.');
+    }
+  }
+
+  function useHold() {
+    if (holdUsed) return;
+    var incoming = piece.key;
+    if (hold) { piece = makePiece(hold); } else { piece = makePiece(next); next = nextKey(); }
+    hold = incoming;
+    holdUsed = true;
+  }
+
+  function finish(reason) {
+    whyEl.textContent = reason;
+    scoreEl.textContent = score;
+    if (score > best) { best = score; GGA.store('best', best); }
+    bestEl.textContent = 'Best ' + best;
+    over.hidden = false;
+  }
+
+  input.onPress(function (name) {
+    if (state !== 'play') return;
+    if (name === 'left') { var l = piece.cells.map(function (c) { return [c[0] + piece.x - 1, c[1] + piece.y]; }); if (fits(l)) piece.x--; }
+    if (name === 'right') { var r = piece.cells.map(function (c) { return [c[0] + piece.x + 1, c[1] + piece.y]; }); if (fits(r)) piece.x++; }
+    if (name === 'up') rotate(1);
+    if (name === 'down') { if (drop()) score += 1; }
+    if (name === 'action') {
+      // Soft drop on a tap, hard drop with a double tap: the second tap within
+      // 180 ms falls the whole way, which is how every falling-block game works.
+      var now = performance.now();
+      if (now - (useHold.lastTap || 0) < 180) { while (drop()) score += 2; useHold.lastTap = 0; }
+      else useHold.lastTap = now;
+    }
+  });
+
+  var holdPressed = false;
+  window.addEventListener('keydown', function (event) {
+    if (event.code === 'KeyC' && state === 'play' && !holdPressed) { holdPressed = true; useHold(); }
+  });
+  window.addEventListener('keyup', function (event) { if (event.code === 'KeyC') holdPressed = false; });
+  window.addEventListener('keydown', function (event) {
+    if (event.code === 'KeyR' && state === 'play') rotate(-1);
+  });
+
+  function update(dt) {
+    if (flash > 0) flash -= dt * 2.6;
+    if (state !== 'play') return;
+    dropAt += dt;
+    var interval = Math.max(0.075, 0.72 - (level - 1) * 0.065);
+    // Holding down is a soft drop, which is both faster and scored.
+    if (input.keys.down) interval = Math.min(interval, 0.055);
+    if (dropAt >= interval) {
+      dropAt = 0;
+      if (drop() && input.keys.down) score += 1;
+    }
+    hud.innerHTML = score + ' pts<small>LEVEL ' + level + ' · ' + lines + ' LINES</small>';
+  }
+
+  function cellSize() {
+    var w = view.size.w, h = view.size.h;
+    return Math.floor(Math.min((w * 0.62) / COLS, (h * 0.9) / ROWS));
+  }
+
+  function draw() {
+    var w = view.size.w, h = view.size.h;
+    ctx.fillStyle = '#07090e';
+    ctx.fillRect(0, 0, w, h);
+    GGA.grid(ctx, w, h, 0, 64, 'rgba(240,171,252,.045)');
+
+    var cell = cellSize();
+    var boardW = cell * COLS, boardH = cell * ROWS;
+    var ox = Math.round((w - boardW) / 2);
+    var oy = Math.round((h - boardH) / 2);
+
+    // Well.
+    ctx.fillStyle = 'rgba(255,255,255,.03)';
+    ctx.fillRect(ox, oy, boardW, boardH);
+    ctx.strokeStyle = 'rgba(190,242,100,.22)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(ox + 0.5, oy + 0.5, boardW - 1, boardH - 1);
+
+    for (var y = 0; y < ROWS; y++) {
+      for (var x = 0; x < COLS; x++) {
+        if (!board[y][x]) continue;
+        block(ox + x * cell, oy + y * cell, cell, board[y][x], 1);
+      }
+    }
+
+    if (flash > 0) {
+      ctx.globalAlpha = Math.max(0, flash) * 0.35;
+      ctx.fillStyle = '#bef264';
+      ctx.fillRect(ox, oy, boardW, boardH);
+      ctx.globalAlpha = 1;
+    }
+
+    if (state === 'play' || state === 'dead') {
+      // Ghost: where the piece lands if it falls now.
+      var ghostY = piece.y;
+      while (fits(piece.cells.map(function (c) { return [c[0] + piece.x, c[1] + ghostY + 1]; }))) ghostY++;
+      ctx.globalAlpha = 0.22;
+      piece.cells.forEach(function (c) { block(ox + (c[0] + piece.x) * cell, oy + (c[1] + ghostY) * cell, cell, SHAPES[piece.key].colour, 1); });
+      ctx.globalAlpha = 1;
+      piece.cells.forEach(function (c) {
+        if (c[1] + piece.y >= 0) block(ox + (c[0] + piece.x) * cell, oy + (c[1] + piece.y) * cell, cell, SHAPES[piece.key].colour, 1);
+      });
+    }
+
+    // Next and hold, drawn small at the side of the well.
+    ctx.font = '800 ' + Math.max(9, cell * 0.32) + 'px ui-monospace,monospace';
+    ctx.fillStyle = 'rgba(232,237,244,.45)';
+    ctx.fillText('NEXT', ox + boardW + 18, oy + 18);
+    if (next) drawMini(ox + boardW + 18, oy + 30, cell * 0.6, next);
+    ctx.fillStyle = 'rgba(232,237,244,.45)';
+    ctx.fillText('HOLD', ox + boardW + 18, oy + 30 + cell * 3.2);
+    if (hold) drawMini(ox + boardW + 18, oy + 42 + cell * 3.2, cell * 0.6, hold);
+  }
+
+  function drawMini(x, y, unit, key) {
+    SHAPES[key].cells.forEach(function (c) {
+      ctx.fillStyle = SHAPES[key].colour;
+      ctx.globalAlpha = 0.85;
+      ctx.fillRect(x + c[0] * unit, y + c[1] * unit, unit - 1.5, unit - 1.5);
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  function block(x, y, size, colour, alpha) {
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = colour;
+    ctx.fillRect(x + 1, y + 1, size - 2, size - 2);
+    // A lighter top edge reads as a bevel without a second draw call per side.
+    ctx.fillStyle = 'rgba(255,255,255,.20)';
+    ctx.fillRect(x + 1, y + 1, size - 2, Math.max(1.5, size * 0.09));
+    ctx.globalAlpha = 1;
+  }
+
+  var runner = GGA.loop(update, draw);
+
+  function begin() {
+    reset();
+    state = 'play';
+    intro.hidden = true;
+    over.hidden = true;
+    runner.start();
+  }
+  document.getElementById('go').addEventListener('click', begin);
+  document.getElementById('again').addEventListener('click', begin);
+
+  reset();
+  state = 'intro';
+  draw();
+  runner.start();
+})();
+</script>
+</body>
+</html>

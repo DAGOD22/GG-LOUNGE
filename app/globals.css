@@ -3506,6 +3506,14 @@ h4,
 /* ---- split screen ---------------------------------------------------- */
 /* The area is the same 1280px column the frame normally occupies, so the
    divider percentage and the game's own edges line up at every width. */
+/* Why this is a grid and not two absolutely-positioned frames:
+   the right pane used to be `position:absolute; left:var(--gg-split)`, which
+   meant it only occupied the box it was painted into and only matched the left
+   pane at exactly 50%. Every game whose own layout reads its viewport (nearly
+   all canvas games, which size to `innerWidth`/`innerHeight`) then got a pane
+   that was the right size only by luck. A two-track grid gives both panes a
+   real box at every percentage, and `minmax(0, …)` stops a wide game from
+   forcing the grid to overflow. */
 .gg-split-area {
   position: relative;
   flex: 1 1 auto;
@@ -3513,24 +3521,42 @@ h4,
   max-width: 1280px;
   margin: 0 auto;
   min-height: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
 }
-.gg-split-area .frame-wrap { flex: 1; min-width: 0; max-width: none; margin: 0; }
-.gg-split-area.is-split .frame-wrap { flex: 0 0 var(--gg-split, 50%); }
+.gg-split-area.is-split {
+  grid-template-columns: minmax(0, var(--gg-split, 50%)) minmax(0, 1fr);
+  gap: 0;
+}
+.gg-split-area .frame-wrap { flex: 1; min-width: 0; max-width: none; margin: 0; grid-column: 1; grid-row: 1; }
+/* A portrait-shaped pane cannot show a landscape game at a usable size, so
+   under 900px of window the split becomes a stacked pair: two full-width games
+   is worth more than two unplayable slivers. */
+@media (max-width: 900px) {
+  .gg-split-area.is-split {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .gg-split-area.is-split .frame-wrap { grid-column: 1; grid-row: 1; }
+  .gg-split-area.is-split .gg-split-right { grid-column: 1; grid-row: 2; }
+  .gg-split-handle, .gg-split-divider { display: none; }
+}
 .gg-split {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  pointer-events: none;
+  display: contents;
 }
+/* The right pane is a grid track, not a floating box. It keeps `pointer-events`
+   on so its own bar and frame are interactive while the overlay above it
+   (`.gg-split`) stays transparent to clicks for the left pane. */
 .gg-split-right {
-  position: absolute;
-  top: 0; right: 0; bottom: 0;
-  left: var(--gg-split, 50%);
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
   display: flex;
   flex-direction: column;
-  pointer-events: auto;
+  min-width: 0;
+  min-height: 0;
   background: #07090e;
+  border-left: 1px solid var(--line);
 }
 .gg-split-bar {
   display: flex;
@@ -3572,8 +3598,10 @@ h4,
 .gg-split-divider {
   position: absolute;
   top: 0; bottom: 0;
+  left: var(--gg-split, 50%);
   width: 2px;
   margin-left: -1px;
+  z-index: 6;
   background: linear-gradient(180deg, transparent, var(--lime), transparent);
   opacity: .5;
   pointer-events: none;
@@ -3581,6 +3609,7 @@ h4,
 .gg-split-handle {
   position: absolute;
   top: 0; bottom: 0;
+  left: var(--gg-split, 50%);
   width: 22px;
   margin-left: -11px;
   display: grid;
@@ -3602,6 +3631,104 @@ h4,
 .gg-split-handle:focus-visible { outline: none; }
 body.gg-split-dragging { cursor: col-resize; user-select: none; }
 body.gg-split-dragging iframe { pointer-events: none; }
+
+.gg-modal-extras {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto 6px;
+  padding: 0 2px;
+}
+.gg-votes { display: inline-flex; gap: 4px; }
+.gg-votes button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.05);
+  color: var(--foreground);
+  border-radius: 9px;
+  padding: 5px 10px;
+  font: 800 11px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+.gg-votes button:hover { background: rgba(255,255,255,.1); }
+.gg-votes button.on { border-color: var(--lime); color: var(--lime); background: rgba(190,242,100,.14); }
+.gg-votes button.on.bad { border-color: #ff8f96; color: #ffb4b8; background: rgba(255,92,92,.14); }
+.gg-session-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font: 700 10.5px/1 ui-monospace, monospace;
+  color: var(--muted);
+}
+.gg-playtime {
+  position: absolute;
+  top: 10px;
+  left: 34px;
+  z-index: 3;
+  font: 800 9px/1 ui-monospace, monospace;
+  letter-spacing: .02em;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(11,13,18,.82);
+  color: var(--lime);
+  border: 1px solid rgba(190,242,100,.3);
+}
+.gg-upnext { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.gg-upnext-label {
+  display: inline-flex; align-items: center; gap: 4px;
+  font: 800 10px/1 system-ui, sans-serif; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted);
+}
+.gg-upnext button {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); background: rgba(255,255,255,.05);
+  color: var(--foreground); border-radius: 999px; padding: 4px 10px 4px 4px;
+  font: 700 11px/1 system-ui, sans-serif; cursor: pointer; max-width: 190px;
+}
+.gg-upnext button:hover { background: rgba(255,255,255,.1); border-color: var(--lime); }
+.gg-upnext button > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gg-upnext .game-badge { width: 22px; height: 22px; font-size: 8px; }
+.gg-playtime-note {
+  display: flex; align-items: center; gap: 6px;
+  margin: 0 0 6px; padding: 7px 11px; border-radius: 10px;
+  background: rgba(190,242,100,.1); border: 1px solid rgba(190,242,100,.28);
+  font: 700 11.5px/1.2 system-ui, sans-serif;
+}
+.gg-playtime-note button {
+  margin-left: auto; border: 0; background: transparent; color: inherit;
+  cursor: pointer; display: grid; place-items: center; opacity: .6;
+}
+
+.gg-split-touch {
+  display: none;
+  grid-template-columns: repeat(4, 1fr) 1.4fr;
+  gap: 6px;
+  padding: 6px;
+  border-top: 1px solid var(--line);
+  background: rgba(11,13,18,.92);
+}
+.gg-split-touch button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255,255,255,.06);
+  color: var(--foreground);
+  font: 800 12px/1 system-ui, sans-serif;
+  cursor: pointer;
+  touch-action: none;
+}
+.gg-split-touch button:active { background: var(--lime); color: #0b0d12; }
+/* Only on touch-sized screens: a mouse user has the keyboard, and five extra
+   buttons under a game they are playing with WASD is just clutter. */
+@media (pointer: coarse), (max-width: 900px) {
+  .gg-split-touch { display: grid; }
+}
 
 .gg-split-leftbar {
   width: 100%;

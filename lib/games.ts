@@ -282,6 +282,13 @@ export const catalogGames: Game[] = [
   { id: 'you-are-bezos', title: 'You Are Jeff Bezos', subtitle: 'Spend it all.', description: "You have $156 billion and a list of very expensive mistakes.", genre: 'Sim', tone: 'Satire', mark: 'YB', color: 'cookie', path: '/games/you-are-bezos/index.html', icon: getGameIconUrl('you-are-bezos') },
   { id: 'grindcraft', title: 'Grindcraft', subtitle: 'Mine, craft, repeat.', description: "A pixel mining and crafting idle game with real progression.", genre: 'Idle', tone: 'Mining', mark: 'GC', color: 'drive', path: '/games/grindcraft/index.html', icon: getGameIconUrl('grindcraft') },
   { id: 'motox3m', title: 'Moto X3M (Original)', subtitle: 'Ride the impossible.', description: "The original Moto X3M stunt courses, flipping bike and all.", genre: 'Racing', tone: 'Stunts', mark: 'MX', color: 'drive', path: '/games/motox3m/index.html', icon: getGameIconUrl('motox3m') },
+  // GG-LOUNGE originals. These are written here, in public/games/, as plain
+  // canvas code against _shared/gg-arcade.js — no iframe, no third-party build,
+  // nothing to go stale when a CDN moves.
+  { id: 'orbital-drift', title: 'Orbital Drift', subtitle: 'Fall in. Fly out.', description: "Ride the sun's gravity through an asteroid field: hold to fall into orbit, release to coast outward. Every rock you clear adds distance, and the field gets denser the longer you last.", genre: 'Arcade', tone: 'Reflex', mark: 'OD', color: 'aqua', path: '/games/orbital-drift/index.html', icon: getGameIconUrl('orbital-drift'), featured: true },
+  { id: 'neon-runner', title: 'Neon Runner', subtitle: 'Three lanes. No brakes.', description: 'An endless synthwave lane runner — jump the low barriers, slide under the tall ones, and hold the line as the closing wall speeds up behind you.', genre: 'Arcade', tone: 'Endless', mark: 'NR', color: 'plasma', path: '/games/neon-runner/index.html', icon: getGameIconUrl('neon-runner') },
+  { id: 'block-fall', title: 'Block Fall', subtitle: 'One well, ten columns.', description: 'A falling-block puzzle with a seven-bag randomiser, a hold slot, a ghost piece and wall kicks. Clear four rows at once for the score that matters.', genre: 'Puzzle', tone: 'Stacking', mark: 'BF', color: 'frost', path: '/games/block-fall/index.html', icon: getGameIconUrl('block-fall') },
+  { id: 'pulse-grid', title: 'Pulse Grid', subtitle: 'Watch. Repeat. Survive.', description: 'Four pads, four tones, one growing sequence. A memory game with synthesised sound and a pip counter that tells you exactly how far in you are.', genre: 'Puzzle', tone: 'Memory', mark: 'PG', color: 'cookie', path: '/games/pulse-grid/index.html', icon: getGameIconUrl('pulse-grid') },
         ]
 
 const audited = assetAudit as Record<string, { available: boolean; issues: string[] }>;
@@ -311,8 +318,10 @@ export function curatedRank(id: string): number {
   const rank = CURATED_RANK.get(id)
   return rank === undefined ? CURATED_ORDER.length : rank
 }
-export const FEATURED_IDS = ['eaglercraftx','geometry-dash','ragdoll-archers','slope','retro-bowl','drive-mad','moto-x3m','among-us','smashkarts','cookie-clicker']
-export const STAFF_PICKS = ['eaglercraftx','geometry-dash','ragdoll-archers','slope','retro-bowl','drive-mad','moto-x3m','basket-random','bloonstd2','2048']
+// The first four are GG-LOUNGE originals: our own code, so they belong at the
+// top of the shelf where a first-time visitor lands, not buried in the grid.
+export const FEATURED_IDS = ['orbital-drift','neon-runner','block-fall','pulse-grid','eaglercraftx','geometry-dash','ragdoll-archers','slope','retro-bowl','drive-mad','moto-x3m','among-us','smashkarts','cookie-clicker']
+export const STAFF_PICKS = ['orbital-drift','neon-runner','block-fall','pulse-grid','eaglercraftx','geometry-dash','ragdoll-archers','slope','retro-bowl','drive-mad','moto-x3m','basket-random','bloonstd2','2048']
 export const LOW_QUALITY_HINTS = new Set(['spiral-roll','shape-transform','mr-dude','obby-snowboard','spiders','summer','real-pool-3d','gta-mods','cheese-chompers-3d','bad-simulator','volley-random','soccer-random','basket-bros','build-defend','red-vs-blue','gunspin','steep-descent','crazy-crash-landing','cyber-cars','extreme-racing','monster-truck'])
 // Controls are per-game now — see lib/game-controls.ts. This keeps the
 // genre-keyed object only as a last-resort fallback for the placeholder text.

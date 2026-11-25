@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Neon Runner</title>
+<style>
+  html,body{margin:0;height:100%;background:#07090e;overflow:hidden;
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#e8edf4;
+    -webkit-tap-highlight-color:transparent}
+  #stage{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
+  .hud{position:fixed;left:14px;top:12px;pointer-events:none;font:800 12px/1.4 ui-monospace,SFMono-Regular,monospace;
+    letter-spacing:.08em;color:#bef264;text-shadow:0 2px 14px rgba(0,0,0,.7)}
+  .hud small{display:block;font-size:10px;letter-spacing:.14em;opacity:.55;color:#e8edf4;margin-top:3px}
+  .overlay{position:fixed;inset:0;display:grid;place-items:center;background:rgba(5,7,11,.82);
+    backdrop-filter:blur(6px);text-align:center;padding:24px;z-index:5}
+  .overlay[hidden]{display:none}
+  .card{max-width:360px}
+  .card h1{margin:0 0 6px;font-size:26px;letter-spacing:-.03em}
+  .card p{margin:0 0 16px;font-size:13.5px;line-height:1.6;color:#a9b4c4}
+  .card .stat{font:800 40px/1 ui-monospace,monospace;color:#bef264;margin:10px 0 4px}
+  .keys{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:14px 0 18px}
+  .keys span{font:800 10.5px/1 ui-monospace,monospace;letter-spacing:.06em;padding:6px 9px;border-radius:8px;
+    border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:#cbd5e1}
+  button{appearance:none;border:0;background:#bef264;color:#0b0d12;font:900 13px/1 inherit;
+    padding:12px 22px;border-radius:11px;cursor:pointer;letter-spacing:.02em}
+  button.ghost{background:transparent;color:#e8edf4;border:1px solid rgba(255,255,255,.18);margin-left:8px}
+  .foot{position:fixed;right:14px;bottom:12px;font:700 10px/1 ui-monospace,monospace;
+    letter-spacing:.14em;color:rgba(232,237,244,.32);pointer-events:none}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div class="hud" id="hud"></div>
+<div class="overlay" id="intro">
+  <div class="card">
+    <h1>Neon Runner</h1>
+    <p>Three lanes, one closing wall. Jump the low barriers, slide under the tall ones, and keep the speed up.</p>
+    <div class="keys"><span>← → OR A D</span>
+    <span>CHANGE LANE</span>
+    <span>↑ / SPACE</span>
+    <span>JUMP</span>
+    <span>↓</span>
+    <span>SLIDE</span></div>
+    <button id="go">Play</button>
+    <button class="ghost" id="mute" aria-pressed="false">Sound on</button>
+  </div>
+</div>
+<div class="overlay" id="over" hidden>
+  <div class="card">
+    <p id="overwhy">Run over.</p>
+    <div class="stat" id="score">0</div>
+    <p id="best" style="margin:0"></p>
+    <div style="margin-top:18px">
+      <button id="again">Again</button>
+    </div>
+  </div>
+</div>
+<div class="foot">GG-LOUNGE ORIGINALS</div>
+<script src="../_shared/gg-arcade.js"></script>
+<script>/* Neon Runner — an endless lane runner with a wall that never stops closing. */
+(function () {
+  'use strict';
+  var view = GGA.createCanvas(document.getElementById('stage'));
+  var ctx = view.ctx;
+  var input = GGA.input(view.canvas);
+  var hud = document.getElementById('hud');
+  var intro = document.getElementById('intro');
+  var over = document.getElementById('over');
+  var scoreEl = document.getElementById('score');
+  var bestEl = document.getElementById('best');
+  var whyEl = document.getElementById('overwhy');
+
+  var state = 'intro';
+  var player, lanes, obstacles, sparks, distance, speed, time, jump, slide, best, combo, spin;
+  best = GGA.store('best', 0) || 0;
+
+  function reset() {
+    player = { lane: 1, y: 0, vy: 0, jumping: false, sliding: 0 };
+    obstacles = [];
+    sparks = [];
+    distance = 0;
+    speed = 320;
+    time = 0;
+    jump = 0;
+    slide = 0;
+    combo = 0;
+    best = best || 0;
+    spin = 0;
+    input.reset();
+  }
+
+  function laneX(lane) {
+    var spread = Math.min(view.size.w * 0.42, 420);
+    return view.size.w * 0.5 + (lane - 1) * (spread / 2);
+  }
+
+  function spawn() {
+    var lane = GGA.randInt(0, 2);
+    var kind = Math.random() < 0.24 ? 'low' : 'block';
+    // Never block all three lanes at once; a wall you cannot pass is not a game.
+    obstacles.push({ lane: lane, kind: kind, z: 1.15, hit: false });
+    if (Math.random() < 0.3) {
+      var other = (lane + GGA.randInt(1, 2)) % 3;
+      obstacles.push({ lane: other, kind: kind, z: 1.15, hit: false });
+    }
+  }
+
+  function update(dt) {
+    spin += dt;
+    if (state !== 'play') return;
+    time += dt;
+    speed = 320 + Math.min(520, time * 17);
+    distance += speed * dt;
+
+    // Lane changes are instant and readable: 0.09s of visual snap, not a tween
+    // that lies about where you are while an obstacle arrives.
+    if (input.keys.left && player.lane > 0) { player.lane--; input.keys.left = false; }
+    if (input.keys.right && player.lane < 2) { player.lane++; input.keys.right = false; }
+
+    if (input.keys.up && !player.jumping && player.sliding <= 0) {
+      player.jumping = true;
+      player.vy = -7.2;
+    }
+    if (input.keys.down && !player.jumping) player.sliding = 0.42;
+
+    if (player.jumping) {
+      player.vy += 22 * dt;
+      player.y += player.vy;
+      if (player.y >= 0) { player.y = 0; player.jumping = false; player.vy = 0; }
+    }
+    if (player.sliding > 0) player.sliding -= dt;
+
+    if (time > 0.9 && Math.random() < dt * (1.1 + speed / 620)) spawn();
+
+    for (var i = obstacles.length - 1; i >= 0; i--) {
+      var o = obstacles[i];
+      o.z -= (speed / 900) * dt;
+      if (o.z < -0.15) { obstacles.splice(i, 1); continue; }
+      // Collision window: same lane, and the obstacle is passing the player.
+      if (!o.hit && Math.abs(o.z - 0.42) < 0.09 && o.lane === player.lane) {
+        var cleared = (o.kind === 'low' && player.jumping) || (o.kind === 'block' && player.sliding > 0);
+        if (!cleared) { die('You ran into a wall.'); return; }
+        o.hit = true;
+        combo++;
+        distance += 40 + combo * 8;
+        for (var s = 0; s < 10; s++) {
+          sparks.push({ x: laneX(o.lane), y: view.size.h * 0.74, vx: GGA.rand(-2, 2), vy: GGA.rand(-3.4, -0.6), a: 1 });
+        }
+      }
+    }
+
+    for (var k = sparks.length - 1; k >= 0; k--) {
+      var spark = sparks[k];
+      spark.x += spark.vx;
+      spark.y += spark.vy;
+      spark.vy += 0.16;
+      spark.a -= dt * 1.6;
+      if (spark.a <= 0) sparks.splice(k, 1);
+    }
+
+    var points = Math.floor(distance / 10);
+    hud.innerHTML = points + ' pts<small>' + Math.floor(speed / 10) + ' KM/H · x' + (1 + Math.floor(combo / 5)) + '</small>';
+  }
+
+  function die(reason) {
+    state = 'dead';
+    whyEl.textContent = reason;
+    var points = Math.floor(distance / 10);
+    scoreEl.textContent = points;
+    if (points > best) { best = points; GGA.store('best', best); }
+    bestEl.textContent = 'Best ' + best;
+    over.hidden = false;
+  }
+
+  /** Project a lane/z coordinate into screen space. z=0 is the horizon. */
+  function project(lane, z) {
+    var w = view.size.w, h = view.size.h;
+    var horizon = h * 0.34;
+    var t = 1 - GGA.clamp(z, 0, 1.2);
+    var perspective = Math.pow(t, 2.2);
+    var y = horizon + (h * 0.92 - horizon) * perspective;
+    var spread = Math.min(w * 0.42, 420) * (0.16 + perspective * 1.05);
+    return { x: w * 0.5 + (lane - 1) * (spread / 2), y: y, scale: 0.22 + perspective * 1.05 };
+  }
+
+  function draw() {
+    var w = view.size.w, h = view.size.h;
+    var sky = ctx.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0, '#0a1020');
+    sky.addColorStop(0.34, '#111a2e');
+    sky.addColorStop(1, '#1b1030');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, w, h);
+
+    // Sun on the horizon.
+    GGA.glow(ctx, w * 0.5, h * 0.34, Math.min(w, h) * 0.42, 'rgba(240,171,252,.30)', 1);
+    ctx.beginPath();
+    ctx.arc(w * 0.5, h * 0.34, Math.min(w, h) * 0.13, 0, Math.PI * 2);
+    ctx.fillStyle = '#f0abfc';
+    ctx.fill();
+    // Scanline bands across the sun: the shorthand everyone reads as retro.
+    ctx.fillStyle = 'rgba(17,26,46,.85)';
+    for (var b = 0; b < 7; b++) {
+      var by = h * 0.34 - Math.min(w, h) * 0.13 + b * (Math.min(w, h) * 0.13 / 6);
+      ctx.fillRect(w * 0.5 - Math.min(w, h) * 0.14, by, Math.min(w, h) * 0.28, 3 + b * 1.1);
+    }
+
+    // Road: three lanes converging.
+    var horizon = h * 0.34;
+    var near = { left: laneX(0) - 60, right: laneX(2) + 60 };
+    ctx.beginPath();
+    ctx.moveTo(w * 0.5 - 26, horizon);
+    ctx.lineTo(w * 0.5 + 26, horizon);
+    ctx.lineTo(near.right, h);
+    ctx.lineTo(near.left, h);
+    ctx.closePath();
+    ctx.fillStyle = '#0d1220';
+    ctx.fill();
+
+    // Rungs: scrolling chevrons sell the speed far better than moving dots.
+    for (var r = 0; r < 14; r++) {
+      var z = ((r / 14) + (distance * 0.0016) % (1 / 14)) % 1;
+      var a = project(0, z), c = project(2, z);
+      ctx.globalAlpha = 0.10 + z * 0.35;
+      ctx.strokeStyle = '#7dd3ff';
+      ctx.lineWidth = 1 + z * 2;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(c.x, c.y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // Lane rails.
+    for (var lane = 0; lane < 3; lane++) {
+      var top = project(lane, 0), bottom = project(lane, 1);
+      ctx.strokeStyle = 'rgba(190,242,100,.22)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(top.x, top.y);
+      ctx.lineTo(bottom.x, bottom.y);
+      ctx.stroke();
+    }
+
+    obstacles.slice().sort(function (a, b) { return b.z - a.z; }).forEach(function (o) {
+      var p = project(o.lane, o.z);
+      var height = (o.kind === 'low' ? 34 : 66) * p.scale;
+      var width = 74 * p.scale;
+      ctx.fillStyle = o.kind === 'low' ? '#fca5a5' : '#ff5c8a';
+      ctx.globalAlpha = GGA.clamp(o.z * 2.4, 0, 1);
+      ctx.fillRect(p.x - width / 2, p.y - height, width, height);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = 'rgba(255,255,255,.5)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(p.x - width / 2, p.y - height, width, height);
+    });
+
+    var me = project(player.lane, 0.42);
+    var meY = me.y - 52 * me.scale - player.y * 26;
+    var meH = player.sliding > 0 ? 26 * me.scale : 52 * me.scale;
+    GGA.glow(ctx, me.x, meY - meH / 2, 46 * me.scale + 14, 'rgba(190,242,100,.55)', 0.9);
+    ctx.fillStyle = '#bef264';
+    ctx.fillRect(me.x - 11 * me.scale, meY - meH, 22 * me.scale, meH);
+
+    for (var i = 0; i < sparks.length; i++) {
+      var spark = sparks[i];
+      ctx.globalAlpha = Math.max(0, spark.a);
+      ctx.fillStyle = '#fde68a';
+      ctx.fillRect(spark.x, spark.y, 2.4, 2.4);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  var runner = GGA.loop(update, draw);
+
+  function begin() {
+    reset();
+    state = 'play';
+    intro.hidden = true;
+    over.hidden = true;
+    hud.innerHTML = '0 pts<small>0 KM/H</small>';
+    runner.start();
+  }
+  document.getElementById('go').addEventListener('click', begin);
+  document.getElementById('again').addEventListener('click', begin);
+  // Space and arrows drive the lanes; the shared input already maps them, but
+  // the press events give the jump a crisp edge instead of polling.
+  input.onPress(function (name) { if (name === 'up') { if (!player.jumping && state === 'play') { player.jumping = true; player.vy = -7.2; } } });
+  reset();
+  draw();
+  runner.start();
+})();
+</script>
+</body>
+</html>
