@@ -3541,12 +3541,15 @@ h4,
   .gg-split-area.is-split .gg-split-right { grid-column: 1; grid-row: 2; }
   .gg-split-handle, .gg-split-divider { display: none; }
 }
+/* `display: contents` lets the right pane and the divider become grid items of
+   .gg-split-area directly, so the pane occupies a real track instead of a
+   floating box. The divider and handle inside it are absolutely positioned, and
+   they resolve against that same area because it is the nearest positioned
+   ancestor — the pane itself is a separate grid item, not their container. */
 .gg-split {
   display: contents;
 }
-/* The right pane is a grid track, not a floating box. It keeps `pointer-events`
-   on so its own bar and frame are interactive while the overlay above it
-   (`.gg-split`) stays transparent to clicks for the left pane. */
+/* The right pane is a grid track, not a floating box. */
 .gg-split-right {
   grid-column: 2;
   grid-row: 1;
@@ -3555,6 +3558,7 @@ h4,
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   background: #07090e;
   border-left: 1px solid var(--line);
 }

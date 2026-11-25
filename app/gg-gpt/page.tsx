@@ -662,7 +662,7 @@ export default function GgGptPage() {
               <button
                 type="button"
                 className="gg-icon-btn"
-                title={`Task: ${task} — GG-GPT routes to the model best at it`}
+                title={`Task: ${task} — GG-GPT routes to the model best at it (Code sends it to Z.ai's GLM first)`}
                 onClick={() => { const order = ['auto', 'code', 'vision', 'chat', 'long'] as const; setTask(current => order[(order.indexOf(current) + 1) % order.length]); }}
               >
                 <Search size={15} />

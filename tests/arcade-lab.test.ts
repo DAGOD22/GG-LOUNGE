@@ -15,6 +15,8 @@ import { generateGame, mulberry32 } from '../lib/micro-game';
 import { SANDBOX_CSP, buildSandboxDocument, extractCode, isSafeSandboxSource, stripTypes } from '../lib/gg-gpt/sandbox';
 import { MIRRORS, bestMirror, isRetired, recordFailure, recordSuccess } from '../lib/mirror-mesh';
 import { formatDuration } from '../components/ArcadeExtras';
+import { zaiEndpoint } from '../lib/gg-gpt/engine';
+import { readFileSync } from 'node:fs';
 
 /** A tiny ImageData lookalike — node has no DOM, and the algorithm only reads
  *  .data/.width/.height, so a plain object is the honest fixture. */
@@ -197,6 +199,60 @@ test('mirror mesh: the fastest healthy mirror wins, canonical preferred when clo
   assert.equal(farCanonical, MIRRORS[2]);
 
   assert.equal(bestMirror([{ host: MIRRORS[0], ms: null }]), null);
+});
+
+test('GG-GPT: the Z.ai endpoint is the documented one, whichever base is set', () => {
+  // The two failure modes this pins: a bare `z.ai` host (404) and a doubled
+  // `/api/paas/v4` (also 404). Both look like a rejected key to a caller.
+  assert.equal(zaiEndpoint('https://api.z.ai'), 'https://api.z.ai/api/paas/v4/chat/completions');
+  assert.equal(zaiEndpoint('https://api.z.ai/'), 'https://api.z.ai/api/paas/v4/chat/completions');
+  assert.equal(zaiEndpoint('https://api.z.ai/api/paas/v4'), 'https://api.z.ai/api/paas/v4/chat/completions');
+  assert.equal(zaiEndpoint('https://api.z.ai/api/paas/v4/'), 'https://api.z.ai/api/paas/v4/chat/completions');
+  assert.equal(zaiEndpoint('https://open.bigmodel.cn'), 'https://open.bigmodel.cn/api/paas/v4/chat/completions');
+});
+
+test('GG-GPT: glm-4.7-flash stays lowercase and its vision sibling is separate', () => {
+  const source = readFileSync(new URL('../lib/gg-gpt/engine.ts', import.meta.url), 'utf8');
+  assert.match(source, /zai: "glm-4\.7-flash"/);
+  assert.doesNotMatch(source, /"GLM-4\.7-Flash"/, 'the paid uppercase id must not appear');
+  // A vision model id has a `v` before `-flash`; the text model does not.
+  assert.match(source, /zaiVision: "glm-4\.6v-flash"/);
+});
+
+test('split screen: both panes are grid tracks, not floating boxes', () => {
+  // The original bug: the right pane was `position:absolute; left:var(--gg-split)`,
+  // so it only lined up with the left pane at exactly 50%, and games that size
+  // themselves to their viewport got a pane the wrong size at every other value.
+  const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
+  // Anchor on the selector at the start of a line so `.gg-split-right` does not
+  // match `.gg-split-area.is-split .gg-split-right`.
+  const block = (selector: string) => {
+    const pattern = new RegExp(`^${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{`, 'm');
+    const match = pattern.exec(css);
+    assert.ok(match, `${selector} must exist`);
+    return css.slice(match.index, css.indexOf('}', match.index));
+  };
+
+  assert.match(block('.gg-split-area'), /display:\s*grid/);
+  const split = block('.gg-split-area.is-split');
+  assert.match(split, /grid-template-columns:\s*minmax\(0,\s*var\(--gg-split/);
+  // minmax(0, …) is what stops a wide game from forcing the grid to overflow.
+  assert.equal((split.match(/minmax\(0,/g) ?? []).length, 2);
+
+  const right = block('.gg-split-right');
+  assert.match(right, /grid-column:\s*2/);
+  assert.doesNotMatch(right, /position:\s*absolute/);
+  assert.doesNotMatch(right, /left:\s*var\(--gg-split/);
+
+  // The pane's own touch pad must exist for the phone layout, where the second
+  // game was previously visible but unplayable. Its `touch-action` lives on the
+  // buttons, not the container.
+  const touch = block('.gg-split-touch');
+  assert.match(touch, /display:\s*none/, 'the pad is hidden on a mouse device');
+  const touchButton = block('.gg-split-touch button');
+  assert.match(touchButton, /touch-action:\s*none/);
+  assert.match(css, /\.gg-split-touch \{ display: grid; \}/);
+  assert.match(css, /@media \(pointer: coarse\)/);
 });
 
 test('play time formats as a person would say it', () => {

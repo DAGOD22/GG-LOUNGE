@@ -86,8 +86,14 @@ const MODELS = {
   /**
    * Z.ai's GLM. The id MUST stay lowercase: the free tier is selected by the
    * lowercase alias, and `GLM-4.7-Flash` is a paid model id that answers 402.
+   *
+   * `glm-4.7-flash` is a *text* model. Z.ai's vision models carry a `v` in the
+   * id (`glm-4.6v-flash`), so the two are configured separately — claiming
+   * vision on the text model would fail at request time with a 400 instead of
+   * falling through to another provider.
    */
   zai: "glm-4.7-flash",
+  zaiVision: "glm-4.6v-flash",
 };
 
 /**
@@ -159,6 +165,19 @@ function isSseFrame(chunk: string): boolean {
 }
 
 /**
+ * The Z.ai chat endpoint, from a base that may or may not include the path.
+ *
+ * Exported because this is the single most error-prone string in the provider
+ * chain: the documented host is `api.z.ai` (bare `z.ai` answers 404) and the
+ * documented path is `/api/paas/v4/chat/completions`. Both mistakes look like
+ * an invalid API key from the caller's point of view, so a unit test pins it.
+ */
+export function zaiEndpoint(base: string | undefined = process.env.ZAI_BASE_URL): string {
+  const trimmed = (base || "https://api.z.ai").replace(/\/+$/, "");
+  return /\/paas\/v4$/.test(trimmed) ? `${trimmed}/chat/completions` : `${trimmed}/api/paas/v4/chat/completions`;
+}
+
+/**
  * Turn a turn's text + images into the OpenAI-compatible content shape.
  *
  * OpenAI-compatible gateways accept either a string or an array of parts. When
@@ -196,197 +215,55 @@ function providers(): Provider[] {
    */
   const zaiKey = process.env.ZAI_API_KEY || process.env.Z_AI_API_KEY || process.env.GG_GPT_KEY;
   if (zaiKey) {
-    const base = (process.env.ZAI_BASE_URL || "https://z.ai").replace(/\/+$/, "");
-    const model = process.env.ZAI_MODEL || MODELS.zai;
+    /**
+     * The base URL has a host and a path component that are easy to get wrong.
+     *
+     * The documented OpenAI-compatible base is `https://api.z.ai/api/paas/v4`
+     * — note `api.` in the host, which `https://z.ai` does not have. Requests
+     * to `https://z.ai/api/...` answer 404, and that failure looks exactly like
+     * a bad key. `ZAI_BASE_URL` is honoured when set, and a base that already
+     * ends in `/paas/v4` is not appended to twice.
+     */
+    const endpoint = zaiEndpoint();
+    const textModel = process.env.ZAI_MODEL || MODELS.zai;
+    const visionModel = process.env.ZAI_VISION_MODEL || MODELS.zaiVision;
+
+    const call = (turns: ChatTurn[], o: CallOptions, stream: boolean, withImages: boolean) => {
+      const model = withImages ? visionModel : textModel;
+      return {
+        url: endpoint,
+        init: {
+          method: "POST",
+          headers: { ...json, authorization: `Bearer ${zaiKey}` },
+          body: JSON.stringify({
+            model,
+            messages: withImages ? visionMessages(turns) : turns.map(turn => ({ role: turn.role, content: turn.content })),
+            temperature: o.temperature ?? 0.7,
+            max_tokens: o.maxTokens ?? 4096,
+            ...(stream ? { stream: true } : {}),
+          }),
+        } as RequestInit,
+      };
+    };
+
     list.push({
       name: "zai",
       tier: 96,
-      model,
-      // GLM-4.7-Flash accepts image parts on the same endpoint.
+      model: textModel,
+      // Only true because there is a real vision model id behind it.
       vision: true,
       // Its strength is code and long single-shot rewrites.
       affinity: { code: 8, long: 6, vision: 2 },
-      request: (turns, o) => ({
-        url: `${base}/api/paas/v4/chat/completions`,
-        init: {
-          method: "POST",
-          headers: { ...json, authorization: `Bearer ${zaiKey}` },
-          body: JSON.stringify({
-            model,
-            messages: visionMessages(turns),
-            temperature: o.temperature ?? 0.7,
-            max_tokens: o.maxTokens ?? 4096,
-          }),
-        },
-      }),
+      request: (turns, o) => {
+        // A turn with images must go to the vision model; the text model rejects
+        // the content-parts shape outright.
+        const withImages = turns.some(turn => turn.images?.length);
+        return call(turns, o, false, withImages);
+      },
       parse: (_p, raw) => {
         try { return openAiShape(JSON.parse(raw)); } catch { return ""; }
       },
-      stream: (turns, o) => ({
-        url: `${base}/api/paas/v4/chat/completions`,
-        init: {
-          method: "POST",
-          headers: { ...json, authorization: `Bearer ${zaiKey}` },
-          body: JSON.stringify({
-            model,
-            messages: visionMessages(turns),
-            temperature: o.temperature ?? 0.7,
-            max_tokens: o.maxTokens ?? 4096,
-            stream: true,
-          }),
-        },
-      }),
-      parseStream: sseDeltas,
-    });
-  }
-
-  // ---- keyed, highest quality ----
-  const openrouter = process.env.GG_GPT_KEY || process.env.OPENROUTER_API_KEY;
-  if (openrouter) {
-    list.push({
-      name: "openrouter",
-      tier: 100,
-      model: process.env.GG_GPT_MODEL || MODELS.openrouter,
-      request: (turns, o) => ({
-        url: "https://openrouter.ai/api/v1/chat/completions",
-        init: {
-          method: "POST",
-          headers: {
-            ...json,
-            authorization: `Bearer ${openrouter}`,
-            "HTTP-Referer": "https://gg-lounge.vercel.app",
-            "X-Title": "GG-GPT",
-          },
-          body: JSON.stringify({
-            model: process.env.GG_GPT_MODEL || MODELS.openrouter,
-            messages: turns,
-            temperature: o.temperature ?? 0.7,
-            max_tokens: o.maxTokens ?? 2048,
-          }),
-        },
-      }),
-      parse: (_p, raw) => {
-        try { return openAiShape(JSON.parse(raw)); } catch { return ""; }
-      },
-      stream: (turns, o) => ({
-        url: "https://openrouter.ai/api/v1/chat/completions",
-        init: {
-          method: "POST",
-          headers: {
-            ...json,
-            authorization: `Bearer ${openrouter}`,
-            "HTTP-Referer": "https://gg-lounge.vercel.app",
-            "X-Title": "GG-GPT",
-          },
-          body: JSON.stringify({
-            model: process.env.GG_GPT_MODEL || MODELS.openrouter,
-            messages: turns,
-            temperature: o.temperature ?? 0.7,
-            max_tokens: o.maxTokens ?? 2048,
-            stream: true,
-          }),
-        },
-      }),
-      parseStream: sseDeltas,
-    });
-  }
-  const groq = process.env.GROQ_API_KEY;
-  if (groq) {
-    list.push({
-      name: "groq",
-      tier: 95,
-      model: process.env.GG_GPT_MODEL || MODELS.groq,
-      request: (turns, o) => ({
-        url: "https://api.groq.com/openai/v1/chat/completions",
-        init: {
-          method: "POST",
-          headers: { ...json, authorization: `Bearer ${groq}` },
-          body: JSON.stringify({
-            model: process.env.GG_GPT_MODEL || MODELS.groq,
-            messages: turns,
-            temperature: o.temperature ?? 0.7,
-            max_tokens: o.maxTokens ?? 2048,
-          }),
-        },
-      }),
-      parse: (_p, raw) => {
-        try { return openAiShape(JSON.parse(raw)); } catch { return ""; }
-      },
-    });
-  }
-  const hf = process.env.HUGGINGFACE_API_KEY;
-  if (hf) {
-    list.push({
-      name: "huggingface",
-      tier: 90,
-      model: process.env.GG_GPT_MODEL || MODELS.hf,
-      request: (turns, o) => ({
-        url: "https://router.huggingface.co/v1/chat/completions",
-        init: {
-          method: "POST",
-          headers: { ...json, authorization: `Bearer ${hf}` },
-          body: JSON.stringify({
-            model: process.env.GG_GPT_MODEL || MODELS.hf,
-            messages: turns,
-            temperature: o.temperature ?? 0.7,
-            max_tokens: o.maxTokens ?? 1024,
-          }),
-        },
-      }),
-      parse: (_p, raw) => {
-        try { return openAiShape(JSON.parse(raw)); } catch { return ""; }
-      },
-    });
-  }
-
-  // ---- keyless, always available ----
-  // Pollinations with the (usually) strongest free alias, then the lighter ones.
-  // Measured from production (see /api/gg-gpt/diag): every POST alias answers
-  // 402 FREE_LIMIT from a datacenter IP, and qwen-coder does not exist at all.
-  // They stay as cheap secondary hopes — a shared quota sometimes frees up —
-  // but nothing important may depend on them.
-  for (const [alias, tier] of [
-    ["openai", 55],
-    ["openai-fast", 50],
-    ["mistral", 45],
-  ] as const) {
-    list.push({
-      name: `pollinations:${alias}`,
-      tier,
-      model: alias,
-      request: (turns, o) => ({
-        url: "https://text.pollinations.ai/openai",
-        init: {
-          method: "POST",
-          headers: json,
-          body: JSON.stringify({
-            model: alias,
-            messages: turns,
-            stream: false,
-            temperature: o.temperature ?? 0.7,
-            max_tokens: o.maxTokens ?? 2048,
-            referrer: "gg-lounge",
-          }),
-        },
-      }),
-      parse: (_p, raw) => {
-        try { return openAiShape(JSON.parse(raw)); } catch { return raw.slice(0, 4000); }
-      },
-      stream: (turns, o) => ({
-        url: "https://text.pollinations.ai/openai",
-        init: {
-          method: "POST",
-          headers: json,
-          body: JSON.stringify({
-            model: alias,
-            messages: turns,
-            stream: true,
-            temperature: o.temperature ?? 0.7,
-            max_tokens: o.maxTokens ?? 2048,
-            referrer: "gg-lounge",
-          }),
-        },
-      }),
+      stream: (turns, o) => call(turns, o, true, turns.some(turn => turn.images?.length)),
       parseStream: sseDeltas,
     });
   }
