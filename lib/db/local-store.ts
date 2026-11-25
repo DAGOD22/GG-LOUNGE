@@ -57,6 +57,13 @@ interface LocalStore {
   presence?: unknown;
   events?: unknown;
   coopRooms?: unknown;
+  /**
+   * The co-op relay queue. Declared here like every other slice: a store object
+   * rebuilt without this key erases the queue on the next unrelated write,
+   * which is exactly what made the relay look like it accepted messages and
+   * then silently forget them.
+   */
+  coopRelay?: unknown;
   /** CHATVERSE: rooms, messages, presence and uploaded images. Same reason as
    *  above — kept as `unknown` slices so this module stays dependency-free. */
   chatRooms?: unknown;
@@ -118,6 +125,7 @@ export async function readLocal(): Promise<LocalStore> {
       presence: (parsed as any).presence,
       events: (parsed as any).events,
       coopRooms: (parsed as any).coopRooms,
+      coopRelay: (parsed as any).coopRelay,
       chatRooms: (parsed as any).chatRooms,
       chatMessages: (parsed as any).chatMessages,
       chatPresence: (parsed as any).chatPresence,

@@ -80,6 +80,16 @@ export function CoopRoom() {
    * and both need to arrive at the same one.
    */
   const [roomGame, setRoomGame] = useState<string | null>(null);
+  /**
+   * Which transport this room is actually using.
+   *
+   * `p2p` is the default and the whole point: nothing leaves the two browsers.
+   * `relay` means the direct connection could not be established (strict NAT,
+   * blocked UDP, a school firewall) and messages are being carried through our
+   * own queue instead. The panel says which one is live, because a player has a
+   * right to know when their chat is going through a server.
+   */
+  const [transport, setTransport] = useState<'p2p' | 'relay'>('p2p');
 
   const connection = useRef<RTCPeerConnection | null>(null);
   const channel = useRef<RTCDataChannel | null>(null);
@@ -107,6 +117,18 @@ export function CoopRoom() {
    * room must keep forwarding input frames at 60 Hz while it happens.
    */
   const videoListeners = useRef(new Set<(message: { sdp: string; kind: 'offer' | 'answer' }) => void>());
+  /** The relay poll timer, its read cursor, and the side we identify as. */
+  const relayTimer = useRef<number | null>(null);
+  const relayCursor = useRef(0);
+  const [relayActive, setRelayActive] = useState(false);
+  const relayActiveRef = useRef(false);
+  useEffect(() => { relayActiveRef.current = relayActive; }, [relayActive]);
+  /** The room code, readable from transport callbacks without a stale closure. */
+  const codeRef = useRef('');
+  /** Our display name, for the relay's hello. */
+  const nameRef = useRef('');
+  /** `handleMessage` is declared after the transport callbacks that need it. */
+  const handleMessageRef = useRef<(message: unknown) => void>(() => {});
 
   useEffect(() => {
     forwardRef.current = forwardKeys;
@@ -115,6 +137,9 @@ export function CoopRoom() {
     peerNameRef.current = peerName;
   }, [peerName]);
   useEffect(() => {
+    codeRef.current = code;
+  }, [code]);
+  useEffect(() => {
     bridgeRef.current = bridge;
   }, [bridge]);
 
@@ -122,6 +147,9 @@ export function CoopRoom() {
     () => settings.cloak.title?.trim() || 'You',
     [settings.cloak.title],
   );
+  useEffect(() => {
+    nameRef.current = myName;
+  }, [myName]);
 
   const push = useCallback((who: ChatLine['who'], text: string) => {
     setChat(current => [...current.slice(-40), { id: lineId.current++, who, text }]);
@@ -129,15 +157,37 @@ export function CoopRoom() {
 
   /* ---- transport ------------------------------------------------------ */
 
+  /**
+   * Send a room message over whichever transport is live.
+   *
+   * Returns false only when *neither* path could take it, so the callers that
+   * surface "no connection" keep working. Falling back here rather than at each
+   * call site is what makes the relay invisible to the rest of the component:
+   * chat, keys, presence and reactions all go through this one function.
+   */
   const sendRaw = useCallback((message: RoomMessage): boolean => {
+    const payload = JSON.stringify(message);
     const channelNow = channel.current;
-    if (!channelNow || channelNow.readyState !== 'open') return false;
-    try {
-      channelNow.send(JSON.stringify(message));
-      return true;
-    } catch {
-      return false;
+    if (channelNow?.readyState === 'open') {
+      try {
+        channelNow.send(payload);
+        return true;
+      } catch {
+        /* fall through to the relay */
+      }
     }
+    const code = codeRef.current;
+    const side = role.current;
+    if (!code || !side) return false;
+    // Fire and forget: a relayed message that loses a race is retried by the
+    // next identical event (a key held down repeats, chat has a send button).
+    void fetch('/api/coop/relay', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'post', code, side, body: payload }),
+      keepalive: true,
+    }).catch(() => {});
+    return true;
   }, []);
 
   const stopPolling = useCallback(() => {
@@ -145,9 +195,68 @@ export function CoopRoom() {
     poll.current = null;
   }, []);
 
+  /* ---- relay fallback ------------------------------------------------- */
+
+  const stopRelay = useCallback(() => {
+    if (relayTimer.current) window.clearInterval(relayTimer.current);
+    relayTimer.current = null;
+    setRelayActive(false);
+    relayCursor.current = 0;
+  }, []);
+
+  /**
+   * Start draining the relay queue.
+   *
+   * Called when the direct channel fails or never opens. From this point every
+   * message goes both ways through `/api/coop/relay`, which is the same
+   * `handleMessage` path the data channel feeds — so the room behaves
+   * identically, just with a server in the middle.
+   */
+  const startRelay = useCallback(
+    (roomCode: string) => {
+      if (relayTimer.current) return;
+      setRelayActive(true);
+      setTransport('relay');
+      setStatus('connected');
+      const side = role.current ?? 'host';
+      // Announce ourselves immediately so the peer learns a name even though no
+      // data channel ever opened.
+      void fetch('/api/coop/relay', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'post', code: roomCode, side, body: JSON.stringify({ t: 'hello', name: nameRef.current }) }),
+      }).catch(() => {});
+
+      relayTimer.current = window.setInterval(async () => {
+        try {
+          const response = await fetch('/api/coop/relay', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ action: 'poll', code: roomCode, side, since: relayCursor.current }),
+          });
+          if (!response.ok) return;
+          const data = await response.json();
+          if (typeof data?.cursor === 'number') relayCursor.current = data.cursor;
+          for (const body of (data?.messages ?? []) as string[]) {
+            try {
+              handleMessageRef.current(JSON.parse(body));
+            } catch {
+              /* a bad body is dropped, not rethrown */
+            }
+          }
+        } catch {
+          /* a missed poll is not a failed room: the next tick retries */
+        }
+      }, 700);
+    },
+    [],
+  );
+
   const teardown = useCallback(
     (announce = true) => {
       stopPolling();
+      stopRelay();
+      setTransport('p2p');
       if (forwardRef.current) {
         try {
           channel.current?.send(JSON.stringify({ t: 'input', frame: { t: 'release-all' } }));
@@ -179,7 +288,7 @@ export function CoopRoom() {
       setReactions([]);
       if (announce) push('system', 'Left the room.');
     },
-    [push, stopPolling],
+    [push, stopPolling, stopRelay],
   );
 
   const handleMessage = useCallback(
@@ -225,12 +334,18 @@ export function CoopRoom() {
     [push],
   );
 
+  useEffect(() => {
+    handleMessageRef.current = handleMessage;
+  }, [handleMessage]);
+
   const wireChannel = useCallback(
     (dataChannel: RTCDataChannel, name: string) => {
       channel.current = dataChannel;
       dataChannel.onopen = () => {
         setStatus('connected');
         setError('');
+        setTransport('p2p');
+        stopRelay();
         dataChannel.send(JSON.stringify({ t: 'hello', name }));
       };
       dataChannel.onclose = () => {
@@ -249,7 +364,7 @@ export function CoopRoom() {
         handleMessage(parsed);
       };
     },
-    [handleMessage, push],
+    [handleMessage, push, stopRelay],
   );
 
   const buildConnection = useCallback(
@@ -257,12 +372,24 @@ export function CoopRoom() {
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       connection.current = pc;
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'failed') {
-          setError('The direct connection failed — a school network may block peer-to-peer traffic.');
-          setStatus('error');
+        if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+          // Do not give up. A failed ICE negotiation is common on school and
+          // mobile networks, and telling the player "the connection failed" is
+          // a dead end for them: there is nothing to retry. Switch to the
+          // relay, which always works, and say so.
           stopPolling();
+          if (codeRef.current) {
+            startRelay(codeRef.current);
+            push('system', 'Direct connection blocked — using the relay. Chat and keys still work.');
+          } else {
+            setError('The direct connection failed. Try again — or use a different network.');
+            setStatus('error');
+          }
         }
-        if (pc.connectionState === 'connected') setStatus('connected');
+        if (pc.connectionState === 'connected') {
+          setTransport('p2p');
+          setStatus('connected');
+        }
       };
       pc.ondatachannel = event => wireChannel(event.channel, name);
       if (isHost) {
@@ -278,7 +405,7 @@ export function CoopRoom() {
       }
       return pc;
     },
-    [stopPolling, wireChannel],
+    [stopPolling, wireChannel, startRelay, push],
   );
 
   /** Host: create the offer, park it, show the code. */
@@ -347,6 +474,7 @@ export function CoopRoom() {
       if (data?.needsDatabase) setNeedsDatabase(true);
       if (!response.ok || !data?.code) throw new Error(data?.error || 'Could not open a room');
       setCode(data.code);
+      codeRef.current = data.code;
       setStatus('waiting');
       push('system', 'Room open. Read the code to your friend.');
       startHostPolling(data.code);
@@ -469,6 +597,30 @@ export function CoopRoom() {
     [push, sendRaw, status],
   );
 
+  /**
+   * The watchdog.
+   *
+   * A peer connection can sit in `connecting` indefinitely without ever firing
+   * `failed` — some networks silently drop the STUN replies and the state never
+   * changes again. That is the "it just says waiting forever" case. If neither
+   * transport has become live a few seconds after the room exists, the relay
+   * takes over, because a room that never connects is worse than a room with a
+   * server in the middle.
+   */
+  useEffect(() => {
+    if (status !== 'waiting' && status !== 'connecting') return;
+    const id = window.setTimeout(() => {
+      if (relayActiveRef.current) return;
+      const open = channel.current?.readyState === 'open';
+      if (open) return;
+      if (codeRef.current) {
+        startRelay(codeRef.current);
+        push('system', 'No direct route between you — using the relay instead.');
+      }
+    }, 7000);
+    return () => window.clearTimeout(id);
+  }, [status, startRelay, push]);
+
   /* An installed-app shortcut (or any link) can ask for the panel directly. */
   useEffect(() => {
     const openPanel = () => setOpen(true);
@@ -569,7 +721,7 @@ export function CoopRoom() {
         title="Play with a friend"
       >
         <Users size={16} />
-        <span>{connected ? 'In a room' : 'Play with a friend'}</span>
+        <span>{connected ? (transport === 'relay' ? 'In a room (relay)' : 'In a room') : 'Play with a friend'}</span>
         {connected && <span className="gg-coop-dot" aria-hidden="true" />}
       </button>
 
@@ -604,7 +756,12 @@ export function CoopRoom() {
             {status === 'creating' && 'Opening a room…'}
             {status === 'waiting' && 'Waiting for your friend to join with the code…'}
             {status === 'connecting' && 'Connecting directly…'}
-            {status === 'connected' && (peerName ? `Connected to ${peerName}.` : 'Connected.')}
+            {status === 'connected' &&
+              (transport === 'relay'
+                ? `Connected${peerName ? ` to ${peerName}` : ''} through the relay — direct video is off, chat and keys work.`
+                : peerName
+                  ? `Connected to ${peerName} directly, peer to peer.`
+                  : 'Connected directly, peer to peer.')}
             {status === 'error' && (error || 'Something went wrong.')}
           </p>
 

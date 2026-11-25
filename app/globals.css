@@ -132,7 +132,6 @@ footer {
   padding-inline: 38px;
 }
 .site-header {
-  height: 88px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -142,6 +141,12 @@ footer {
   gap: 18px;
   border-bottom: 1px solid var(--line);
   position: relative;
+  /* A wrapped second nav line used to be clipped by the fixed 88px height. */
+  min-height: 88px;
+  height: auto;
+  flex-wrap: wrap;
+  padding-block: 12px;
+  row-gap: 8px;
 }
 .brand,
 .footer-brand {
@@ -176,18 +181,42 @@ footer {
   /* The gap tracks the viewport so the row tightens before anything wraps —
      "GG-GPT" was breaking across two lines at 1440px because the nav had a
      fixed 34px gap, eight items and nowhere to put them. */
-  gap: clamp(10px, 1.4vw, 30px);
+  gap: clamp(6px, 1.1vw, 26px);
   color: var(--muted);
   font-size: 12px;
-  /* If space does run out, scrolling beats wrapping: a nav item split across
-     two lines makes the header taller and reads as a layout bug. */
-  flex-wrap: nowrap;
+  /* There are ten items in this row. `overflow: hidden` with `nowrap` made the
+     ones that did not fit disappear completely — no scrollbar, no ellipsis, no
+     drawer: Studio, Request a game and Admin were simply deleted from the page
+     at anything narrower than ~1500px, and "GG-GPT" was cut in half. A nav that
+     silently eats its own items is worse than a nav that wraps, so the row is
+     allowed to wrap onto a second line and the header grows instead. */
+  flex-wrap: wrap;
+  justify-content: center;
+  row-gap: 6px;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
+  /* Between 1020px and ~1180px the three groups genuinely cannot share a row.
+     Before this, the nav was the flex item that gave way — it had `min-width: 0`
+     and no shrink limit, so it collapsed and *clipped* its own items. It now
+     refuses to shrink below its content and wraps to its own line instead, which
+     is what a header should do: get taller, never lose links. */
+  flex: 1 1 auto;
+  order: 3;
+  width: 100%;
 }
 .header-nav > * {
   white-space: nowrap;
   flex: 0 0 auto;
+}
+/* Wide enough for one row: put the nav back between the wordmark and the
+   actions. The breakpoint is where the measured content stops fitting (brand
+   125 + nav 507 + actions 126 + gutters ≈ 800px of a 1180px inner width). */
+@media (min-width: 1180px) {
+  .header-nav {
+    flex: 0 1 auto;
+    order: 0;
+    width: auto;
+  }
 }
 .header-nav a:hover {
   color: var(--foreground);
@@ -2628,7 +2657,8 @@ a:focus-visible {
     position: absolute;
     left: 12px;
     right: 12px;
-    top: 88px;
+    /* Sit under the header whatever height it ended up being. */
+    top: 100%;
     z-index: 30;
     flex-direction: column;
     gap: 0;
@@ -2775,7 +2805,10 @@ a:focus-visible {
 /* Phones: drop the low-value chips so the wordmark and Sign in stay on one row. */
 @media (max-width: 640px) {
   .site-header {
-    height: 64px;
+    /* min-height so nothing is clipped; a wrapped row can still breathe. */
+    min-height: 64px;
+    height: auto;
+    flex-wrap: nowrap;
     gap: 8px;
     padding-inline: 14px;
   }
@@ -2806,7 +2839,7 @@ a:focus-visible {
     padding: 0;
   }
   .header-nav.mobile-open {
-    top: 64px;
+    top: 100%;
   }
 }
 @media (max-width: 560px) {
@@ -2819,7 +2852,8 @@ a:focus-visible {
     font-size: clamp(3rem, 12vw, 4.4rem);
   }
   .site-header {
-    height: 72px;
+    min-height: 72px;
+    height: auto;
   }
 }
 /* Hero stats settle into place on load. The digits are the real digits at
@@ -5601,5 +5635,457 @@ summary:focus-visible,
 @media (max-width: 900px) {
   .grid-key-hint {
     display: none;
+  }
+}
+
+/* ==================================================================== */
+/* Arcade Lab                                                            */
+/* ==================================================================== */
+/*
+ * This panel shipped with 110 class names and no stylesheet at all, so it
+ * rendered as unstyled browser default chrome — a column of 13px serif text,
+ * grey buttons and a canvas with no box, sitting on top of the game. That is
+ * what "ugly" was: not a design that needed adjusting, but the total absence
+ * of one.
+ *
+ * Design rules, so additions stay coherent:
+ *   - it floats over the game, so it needs its own surface, border and shadow;
+ *   - controls are pills, like every other control on the site;
+ *   - one accent (lime) marks the active state and nothing else does;
+ *   - 11px labels, 12px controls — the panel is a tool, not content.
+ */
+.gglab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ---- the trigger that lives in the launcher's control cluster ---- */
+.gglab-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.gglab-trigger:hover {
+  border-color: rgba(215, 243, 74, 0.5);
+  background: rgba(215, 243, 74, 0.1);
+}
+.gglab-trigger.on {
+  border-color: var(--lime);
+  background: var(--lime);
+  color: var(--ink);
+}
+.gglab-trigger:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
+/* ---- the popover ---- */
+.gglab-panel-box {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 70;
+  width: min(380px, calc(100vw - 28px));
+  max-height: min(70vh, 560px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+  color: var(--foreground);
+  font-size: 12px;
+}
+.gglab-panel-box > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.gglab-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--lime);
+}
+.gglab-panel-box > header button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.gglab-panel-box > header button:hover {
+  color: var(--foreground);
+  background: var(--surface-hover);
+}
+
+/* ---- tabs: one scrollable row, never a wrapped block of text ---- */
+.gglab-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--line);
+}
+.gglab-tabs::-webkit-scrollbar {
+  display: none;
+}
+.gglab-tabs button {
+  flex: 0 0 auto;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.gglab-tabs button:hover {
+  color: var(--foreground);
+  background: var(--surface-hover);
+}
+.gglab-tabs button.on {
+  border-color: var(--lime);
+  background: rgba(215, 243, 74, 0.14);
+  color: var(--foreground);
+}
+
+/* ---- body ---- */
+.gglab-body {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.gglab-body > * {
+  min-width: 0;
+}
+.gglab-panel {
+  display: grid;
+  gap: 10px;
+}
+.gglab-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.gglab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 62px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.gglab-note {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.gglab-note.error {
+  color: var(--coral);
+}
+.gglab-note.ok {
+  color: var(--lime);
+}
+.gglab-count {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+
+/* ---- every control in the panel is the same pill ---- */
+.gglab-body button,
+.gglab-panel button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+.gglab-body button:hover,
+.gglab-panel button:hover {
+  background: var(--surface-hover);
+  border-color: rgba(215, 243, 74, 0.4);
+}
+.gglab-body button.on,
+.gglab-panel button.on {
+  border-color: var(--lime);
+  background: var(--lime);
+  color: var(--ink);
+}
+.gglab-body button:disabled,
+.gglab-panel button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.gglab-body button:focus-visible,
+.gglab-panel button:focus-visible,
+.gglab-vault-input button:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+.gglab-primary {
+  border-color: var(--lime) !important;
+  background: var(--lime) !important;
+  color: var(--ink) !important;
+}
+
+/* ---- speed + filter groups ---- */
+.gglab-scales,
+.gglab-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+.gglab-scales button,
+.gglab-filters button {
+  min-height: 26px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+
+/* ---- rewind ---- */
+.gglab-rewind-wrap {
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+.gglab-rewind {
+  width: 100%;
+  height: 96px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #07080c;
+  display: block;
+}
+
+/* ---- voice ---- */
+.gglab-toggle {
+  position: relative;
+  overflow: hidden;
+  min-height: 30px !important;
+  padding: 0 14px !important;
+}
+/* The level meter is a fill behind the label, so the button never changes size
+   while you talk — a control that reflows mid-sentence is unreadable. */
+.gglab-meter {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(var(--v, 0));
+  background: rgba(215, 243, 74, 0.3);
+  pointer-events: none;
+}
+.gglab-heard {
+  flex: 1 1 120px;
+  min-width: 0;
+  font-size: 10.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- vault ---- */
+.gglab-vault {
+  display: grid;
+  gap: 8px;
+}
+.gglab-vault-field {
+  display: grid;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.gglab-vault-input {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.gglab-vault-input input,
+.gglab-vault-input textarea,
+.gglab-body input[type='text'],
+.gglab-body textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 30px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 11.5px;
+  resize: vertical;
+}
+.gglab-body input[type='text']:focus,
+.gglab-body textarea:focus {
+  outline: none;
+  border-color: var(--lime);
+}
+
+/* ---- generated micro-game ---- */
+.gglab-idea {
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: linear-gradient(135deg, rgba(125, 107, 255, 0.14), rgba(215, 243, 74, 0.08));
+}
+.gglab-idea strong {
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+.gglab-idea span {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ---- mesh ---- */
+.gglab-mesh {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+}
+.gglab-mesh-host {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.gglab-mesh-ms {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+/* ---- gameplay bubble ---- */
+.gglab-bubble {
+  position: fixed;
+  z-index: 75;
+  width: 176px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+.gglab-bubble video {
+  display: block;
+  width: 100%;
+  height: 132px;
+  object-fit: cover;
+  background: #07080c;
+}
+.gglab-bubble-toggle {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border-radius: 999px;
+  background: rgba(11, 13, 18, 0.7) !important;
+  border: 1px solid var(--line) !important;
+}
+.gglab-bubble-actions {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+}
+.gglab-bubble-actions button {
+  flex: 1;
+  min-height: 24px;
+  font-size: 10px;
+}
+.gglab-bubble-wait {
+  display: grid;
+  place-items: center;
+  height: 132px;
+  font-size: 10.5px;
+  color: var(--muted);
+  text-align: center;
+  padding: 0 14px;
+}
+
+/* Phones: the popover becomes a sheet pinned to the viewport, because a
+   380px popover anchored to a button near the edge always overflows. */
+@media (max-width: 560px) {
+  .gglab-panel-box {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    top: auto;
+    width: auto;
+    max-height: 72vh;
+  }
+  .gglab-label {
+    min-width: 52px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gglab-trigger,
+  .gglab-body button,
+  .gglab-panel button {
+    transition: none;
   }
 }
