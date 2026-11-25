@@ -295,6 +295,21 @@ test('the first-party originals sort ahead of the imported catalogue', async () 
   }
 });
 
+test('GG-GPT: a vision request never reaches a text-only provider', async () => {
+  const { orderProviders } = await import('../lib/gg-gpt/engine');
+  const stub = (name: string, tier: number) => ({
+    name, tier, model: name,
+    request: () => ({ url: '', init: {} }),
+    parse: () => '',
+  });
+  const list = [stub('text-only', 100), { ...stub('seer', 50), vision: true }];
+
+  assert.deepEqual(orderProviders(list, 'vision').map(p => p.name), ['seer']);
+  // For a normal chat the text provider still wins on tier; the filter is
+  // scoped to vision and must not reorder everything else.
+  assert.deepEqual(orderProviders(list, 'chat').map(p => p.name), ['text-only', 'seer']);
+});
+
 test('play time formats as a person would say it', () => {
   assert.equal(formatDuration(20_000), 'under a minute');
   assert.equal(formatDuration(9 * 60_000), '9m');
