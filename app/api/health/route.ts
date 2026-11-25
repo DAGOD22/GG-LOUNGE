@@ -56,6 +56,18 @@ export async function GET() {
     .then(m => m.uploadStats())
     .catch(() => ({ open: -1, bytes: -1, quota: 0, maxBytes: 0, ttlMs: 0 }));
 
+  // 4) Is the database actually upgraded? A schema from an older build is the
+  //    failure mode that looks like "the server is unavailable" from outside.
+  const schema = await import('@/lib/db/schema-check')
+    .then(m => m.schemaStatus())
+    .catch((e: any) => ({ mode: 'postgres' as const, ok: false, missing: [], error: e?.message }));
+  checks['db:schema'] = {
+    ok: schema.ok,
+    ms: 0,
+    ...(schema.error ? { error: schema.error } : {}),
+    ...(schema.missing?.length ? { error: `missing tables: ${schema.missing.join(', ')}` } : {}),
+  };
+
   const allOk = Object.values(checks).every(c => c.ok || c.error === 'fetch blocked/skipped (sandbox)')
   const ms = Date.now() - started
 
@@ -73,6 +85,7 @@ export async function GET() {
         canonicalHost: CANONICAL_HOST,
         addresses: SITE_DOMAINS.length,
       },
+      schema: { mode: schema.mode, ok: schema.ok, missing: schema.missing ?? [] },
       uploads,
     },
     { headers: { 'cache-control': 'no-store', 'x-health-ms': String(ms) } }
