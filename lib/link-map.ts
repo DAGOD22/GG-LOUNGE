@@ -131,6 +131,9 @@ export function sitePages(): DocSection {
       { label: 'Terms', href: '/terms' },
       { label: 'Health', href: '/api/health', note: 'JSON: database, proxy and build status' },
       { label: 'Link directory (this page)', href: '/secret-link-doc', note: 'Unlisted — no nav entry' },
+      // The URL is the door; the password is the key. Listing the address here
+      // is deliberate (this page is itself unlisted), but the password never is.
+      { label: 'CHATVERSE', href: '/chatverse', note: 'Private chat — password required' },
     ],
   };
 }

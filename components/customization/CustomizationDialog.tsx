@@ -35,7 +35,31 @@ export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onC
   };
   useEffect(()=>setIconDraft(settings.cloak.icon.startsWith('data:')?'':settings.cloak.icon),[settings.cloak.icon]);
   useEffect(()=>setDestination(settings.panic.destination),[settings.panic.destination]);
-  useEffect(()=>{const el=dialog.current;if(!el)return;if(open&&!el.open)el.showModal();if(!open&&el.open)el.close();if(open){const old=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=old;};}},[open]);
+  /**
+   * A modal <dialog> is promoted to the browser's **top layer**, which paints
+   * above every z-index in the document — including the animated cursor canvas
+   * at 2147483000. Combined with `html.ggl-cursor-on * { cursor: none }` that
+   * meant the Customize panel showed *no pointer at all*: the native cursor was
+   * hidden globally and the replacement canvas was painted underneath the
+   * dialog. Moving a slider was guesswork.
+   *
+   * The fix is to stop hiding the native pointer while the dialog is open and
+   * to park the custom cursor canvas *inside* the top layer alongside it. The
+   * canvas is a direct child of <body>, so re-parenting it into the dialog keeps
+   * it above the panel's background while the panel's own controls still
+   * receive clicks (both are top-layer siblings; the canvas is inert).
+   */
+  useEffect(()=>{
+    const el=dialog.current;if(!el)return;
+    const root=document.documentElement;
+    if(open&&!el.open)el.showModal();
+    if(!open&&el.open)el.close();
+    if(!open)return;
+    root.classList.add('ggl-dialog-open');
+    const old=document.body.style.overflow;
+    document.body.style.overflow='hidden';
+    return ()=>{document.body.style.overflow=old;root.classList.remove('ggl-dialog-open');};
+  },[open]);
   useEffect(()=>{setError('');setResetConfirm(false);setCapturing(false);},[tab,setCapturing]);
   useEffect(()=>{
     if(!capturing)return;let pending:KeyBinding|null=null;

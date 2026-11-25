@@ -220,7 +220,7 @@ export function CoopRoom() {
   );
 
   const buildConnection = useCallback(
-    (name: string, onOffer?: (offer: string) => void) => {
+    (name: string, isHost: boolean) => {
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       connection.current = pc;
       pc.onconnectionstatechange = () => {
@@ -232,11 +232,17 @@ export function CoopRoom() {
         if (pc.connectionState === 'connected') setStatus('connected');
       };
       pc.ondatachannel = event => wireChannel(event.channel, name);
-      if (onOffer) {
+      if (isHost) {
+        // The host always opens the channel, and it has to be created *before*
+        // the offer is made so the channel is negotiated in the SDP. It used to
+        // be created only when an `onOffer` callback was passed — and no caller
+        // ever passed one, so a host and guest could connect at the ICE level
+        // and then have nothing to talk over: the room said "connected" and no
+        // message, cursor or game ever arrived. That is the whole of "the room
+        // maker doesn't work".
         const dataChannel = pc.createDataChannel('ggl-coop', { ordered: true });
         wireChannel(dataChannel, name);
       }
-      void onOffer;
       return pc;
     },
     [stopPolling, wireChannel],
@@ -292,7 +298,7 @@ export function CoopRoom() {
     role.current = 'host';
     setRoleState('host');
     try {
-      const pc = buildConnection(myName);
+      const pc = buildConnection(myName, true);
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       // Wait for ICE so the offer in the code already carries candidates; a
@@ -341,7 +347,7 @@ export function CoopRoom() {
       const signal = decodeSignal(data.offer);
       if (!signal) throw new Error('That room code is not valid.');
 
-      const pc = buildConnection(myName);
+      const pc = buildConnection(myName, false);
       await pc.setRemoteDescription({ type: 'offer', sdp: signal.sdp });
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);

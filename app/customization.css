@@ -88,6 +88,24 @@ html[data-gg-background=true] .site-header,html[data-gg-background=true] .catalo
 
 /* ---- animated cursor gallery + sliders ---- */
 html.ggl-cursor-on, html.ggl-cursor-on *, html.ggl-cursor-on input, html.ggl-cursor-on textarea { cursor: none !important; }
+/*
+ * …except while a modal dialog is open.
+ *
+ * A modal <dialog> lives in the browser's top layer, above every z-index, so the
+ * custom cursor canvas (which is an ordinary body child at z-index 2147483000)
+ * is painted *under* it. Hiding the native pointer there left the Customize
+ * panel with no pointer at all. The panel is the one place a person is aiming at
+ * 12px sliders and colour swatches, so it gets the real pointer back and the
+ * animated one is simply hidden.
+ */
+html.ggl-cursor-on.ggl-dialog-open,
+html.ggl-cursor-on.ggl-dialog-open *:not(input[type='range']) { cursor: auto !important; }
+html.ggl-cursor-on.ggl-dialog-open a[href],
+html.ggl-cursor-on.ggl-dialog-open button:not([disabled]),
+html.ggl-cursor-on.ggl-dialog-open [role='button'],
+html.ggl-cursor-on.ggl-dialog-open select,
+html.ggl-cursor-on.ggl-dialog-open summary { cursor: pointer !important; }
+html.ggl-cursor-on.ggl-dialog-open input[type='range'] { cursor: ew-resize !important; }
 .gg-cursor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 12px; }
 .gg-cursor-card { position: relative; display: grid; justify-items: center; gap: 6px; padding: 7px; border: 1px solid var(--gg-line, rgba(244,242,236,.14)); border-radius: 12px; background: rgba(255,255,255,.03); color: var(--gg-muted, #9699a8); cursor: pointer; transition: border-color .15s, background .15s; }
 .gg-cursor-card:hover { border-color: rgba(244,242,236,.32); }

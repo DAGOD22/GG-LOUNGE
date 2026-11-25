@@ -57,6 +57,12 @@ interface LocalStore {
   presence?: unknown;
   events?: unknown;
   coopRooms?: unknown;
+  /** CHATVERSE: rooms, messages, presence and uploaded images. Same reason as
+   *  above — kept as `unknown` slices so this module stays dependency-free. */
+  chatRooms?: unknown;
+  chatMessages?: unknown;
+  chatPresence?: unknown;
+  chatMedia?: unknown;
 }
 
 let localDir: string | null = null;
@@ -112,6 +118,10 @@ export async function readLocal(): Promise<LocalStore> {
       presence: (parsed as any).presence,
       events: (parsed as any).events,
       coopRooms: (parsed as any).coopRooms,
+      chatRooms: (parsed as any).chatRooms,
+      chatMessages: (parsed as any).chatMessages,
+      chatPresence: (parsed as any).chatPresence,
+      chatMedia: (parsed as any).chatMedia,
     };
   } catch {
     return { bans: [], visits: [], requests: [], games: [], reports: [], userStates: {}, users: [], sessions: [], saves: [], achievements: [], gameStats: [], gateStates: {}, ggChats: [], ggMessages: [], ggMemory: [], notifications: [] };

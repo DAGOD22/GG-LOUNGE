@@ -236,6 +236,51 @@ export function migrate(): Promise<void> {
           "touched_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
         CREATE INDEX IF NOT EXISTS "coop_room_touched_idx" ON "coop_room" ("touched_at" DESC);
+
+        /* ---- CHATVERSE --------------------------------------------------
+           The private chat behind the admin door. Rooms and messages are
+           separate tables so listing rooms stays one cheap query, and the
+           message id is a BIGSERIAL because ordering is by id, not by time:
+           two messages in the same millisecond must not be lost or doubled.
+           Nothing seeds these tables — an empty room is an empty room. */
+        CREATE TABLE IF NOT EXISTS "chat_room" (
+          "id" TEXT PRIMARY KEY,
+          "name" TEXT NOT NULL,
+          "topic" TEXT NOT NULL DEFAULT '',
+          "created_by" TEXT NOT NULL DEFAULT '',
+          "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "last_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS "chat_room_last_idx" ON "chat_room" ("last_at" DESC);
+        CREATE TABLE IF NOT EXISTS "chat_message" (
+          "id" BIGSERIAL PRIMARY KEY,
+          "room" TEXT NOT NULL,
+          "author" TEXT NOT NULL,
+          "body" TEXT NOT NULL DEFAULT '',
+          "media" TEXT NOT NULL DEFAULT '',
+          "media_name" TEXT NOT NULL DEFAULT '',
+          "at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS "chat_message_room_idx" ON "chat_message" ("room", "id");
+        CREATE TABLE IF NOT EXISTS "chat_presence" (
+          "room" TEXT NOT NULL,
+          "who" TEXT NOT NULL,
+          "seen_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY ("room", "who")
+        );
+        /* Uploaded screenshots. The bytes live in their own row so listing a
+           room never drags image data along with it. */
+        CREATE TABLE IF NOT EXISTS "chat_media" (
+          "id" TEXT PRIMARY KEY,
+          "room" TEXT NOT NULL DEFAULT '',
+          "kind" TEXT NOT NULL DEFAULT 'image',
+          "mime" TEXT NOT NULL,
+          "bytes" BYTEA NOT NULL,
+          "size" INTEGER NOT NULL,
+          "name" TEXT NOT NULL DEFAULT '',
+          "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS "chat_media_created_idx" ON "chat_media" ("created_at" DESC);
       `);
       // Tolerate tables created by older schemas.
       await p.query(`ALTER TABLE "banned_user" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMPTZ`);
