@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isValidRoomCode, normalizeRoomCode, shouldForwardKey, parseRoomMessage } from '@/lib/coop';
 import { relayStore } from '@/lib/db/relay';
+import { describeDbError } from '@/lib/db/errors';
 import { callerKey, consumeSharedBudget } from '@/lib/live-budget';
 import { getMode, isEphemeralHost } from '@/lib/db/connection';
 
@@ -79,10 +80,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ relay: true, messages: items.map(item => item.body), cursor });
     }
   } catch (cause) {
-    return NextResponse.json(
-      { error: `Relay unavailable: ${(cause as Error).message || 'unknown error'}` },
-      { status: 503 },
-    );
+    const info = describeDbError(cause);
+    console.error('[coop/relay]', info.detail);
+    return NextResponse.json({ error: info.message, schema: info.schema }, { status: 503 });
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

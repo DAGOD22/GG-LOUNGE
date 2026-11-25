@@ -66,6 +66,14 @@ export function CoopRoom() {
    * the handshake. The panel shows the fix instead of inviting another try.
    */
   const [needsDatabase, setNeedsDatabase] = useState(false);
+  /**
+   * The database answered, but its schema is older than this build.
+   *
+   * This is our bug, not the player's: retrying does the same thing every time
+   * until the migration catches up. Distinguished from a network failure so the
+   * panel does not invite a retry that cannot work.
+   */
+  const [needsRepair, setNeedsRepair] = useState(false);
   const [copied, setCopied] = useState(false);
   const [chat, setChat] = useState<ChatLine[]>([]);
   const [draft, setDraft] = useState('');
@@ -472,7 +480,11 @@ export function CoopRoom() {
       });
       const data = await response.json();
       if (data?.needsDatabase) setNeedsDatabase(true);
-      if (!response.ok || !data?.code) throw new Error(data?.error || 'Could not open a room');
+      if (data?.schema) setNeedsRepair(true);
+      if (!response.ok || !data?.code) {
+        // The response body is ours; the raw Postgres text stays on the server.
+        throw new Error(data?.error || 'Could not open a room');
+      }
       setCode(data.code);
       codeRef.current = data.code;
       setStatus('waiting');
@@ -765,6 +777,12 @@ export function CoopRoom() {
             {status === 'error' && (error || 'Something went wrong.')}
           </p>
 
+          {needsRepair && (
+            <p className="gg-live-error" role="alert">
+              The room database is a version behind this build. It upgrades itself on the next
+              request — reload in a minute and it will work.
+            </p>
+          )}
           {needsDatabase && (
             <p className="gg-live-error" role="alert">
               Rooms need a database on this deployment. Connect Postgres and set DATABASE_URL, then

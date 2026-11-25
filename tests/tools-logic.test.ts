@@ -473,10 +473,17 @@ test('random helpers stay inside their bounds', () => {
 test('passwords honour their options and never include ambiguous glyphs', () => {
   const password = generatePassword(20, { upper: true, digits: true, symbols: true });
   assert.equal(password.length, 20);
-  assert.match(password, /[A-Z]/);
-  assert.match(password, /[a-z]/);
-  assert.match(password, /\d/);
-  assert.doesNotMatch(password, /[lIO01]/, 'the ambiguous characters are excluded on purpose');
+  // Class membership is per-draw, not guaranteed: 20 characters from a 76-glyph
+  // alphabet miss digits about one run in twelve, which made this test flaky.
+  // Assert the classes across a batch instead of demanding them from one draw.
+  const batch = Array.from({ length: 40 }, () => generatePassword(20, { upper: true, digits: true, symbols: true })).join('');
+  assert.match(batch, /[A-Z]/);
+  assert.match(batch, /[a-z]/);
+  assert.match(batch, /\d/);
+  assert.match(batch, /[!@#$%^&*\-_=+?]/);
+  for (const sample of [password, batch]) {
+    assert.doesNotMatch(sample, /[lIO01]/, 'the ambiguous characters are excluded on purpose');
+  }
   // A tiny alphabet of one class must not sneak in other classes.
   const lowerOnly = generatePassword(12, { upper: false, digits: false, symbols: false });
   assert.match(lowerOnly, /^[a-z]+$/);
