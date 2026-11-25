@@ -9,6 +9,12 @@ html[data-gg-background=true] .lounge-shell{background:transparent!important}
 html[data-gg-background=true] .hero{background:linear-gradient(135deg,color-mix(in srgb,var(--background) 55%,transparent),color-mix(in srgb,var(--background) 25%,transparent))!important;border-radius:0 0 28px 28px}
 html[data-gg-background=true] .site-header,html[data-gg-background=true] .catalog,html[data-gg-background=true] .lounge-shell>footer{background:color-mix(in srgb,var(--background) 65%,transparent);backdrop-filter:blur(5px)}
 .brand-mark,.spotlight-tag,.circle-play{color:var(--accent-ink)}
+/* The bottom-left corner is shared by two floating triggers, so neither one
+   may claim it alone. Customize sits at the left edge; "Play with a friend"
+   sits to its right on the same baseline (see --gg-corner-y in globals.css).
+   They used to be at left:20/bottom:20 and left:18/bottom:18 with z-index 60
+   and 62, i.e. stacked almost pixel-for-pixel, which is why the co-op button
+   could not be reached. */
 .gg-customize-trigger{position:fixed;z-index:60;left:20px;bottom:20px;display:flex;gap:9px;align-items:center;padding:11px 16px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--foreground);font-size:12px;font-weight:800;box-shadow:0 6px 28px #0004;cursor:pointer}
 .gg-customize-trigger:hover{border-color:var(--lime);color:var(--lime)}
 .gg-customization{border:1px solid var(--line);border-radius:22px;background:var(--background);color:var(--foreground);padding:0;width:min(890px,calc(100vw - 28px));max-width:none;height:min(740px,calc(100dvh - 32px));max-height:calc(100dvh - 32px);box-shadow:0 36px 130px #0009;overflow:hidden;margin:auto}
@@ -48,6 +54,14 @@ html[data-gg-background=true] .site-header,html[data-gg-background=true] .catalo
 .gg-tab-preview img{width:18px;height:18px;object-fit:contain}
 .gg-tab-preview span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gg-chip-row{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+/* Favicon presets: a real picker, not a row of emoji. Each tile shows the icon
+   exactly as the browser will render it at tab size. */
+.gg-favicon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:12px}
+.gg-favicon-tile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);cursor:pointer;color:var(--text);font:inherit;font-size:11px;font-weight:700}
+.gg-favicon-tile:hover{background:rgba(255,255,255,.07)}
+.gg-favicon-tile.active{border-color:var(--accent);background:rgba(215,243,74,.12)}
+.gg-favicon-tile img{width:28px;height:28px;display:block;border-radius:6px}
+.gg-favicon-tile span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .gg-chip[aria-pressed=true]{border-color:var(--lime);background:color-mix(in srgb,var(--lime) 12%,var(--panel));color:var(--lime)}
 .gg-key-recorder{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:10px;font-size:11px;margin:16px 0}
 .gg-key-recorder kbd{padding:7px 12px;border:1px solid var(--line);border-bottom-width:3px;border-radius:7px;font:700 12px ui-monospace,monospace;margin-left:auto}
@@ -74,6 +88,24 @@ html[data-gg-background=true] .site-header,html[data-gg-background=true] .catalo
 
 /* ---- animated cursor gallery + sliders ---- */
 html.ggl-cursor-on, html.ggl-cursor-on *, html.ggl-cursor-on input, html.ggl-cursor-on textarea { cursor: none !important; }
+/*
+ * …except while a modal dialog is open.
+ *
+ * A modal <dialog> lives in the browser's top layer, above every z-index, so the
+ * custom cursor canvas (which is an ordinary body child at z-index 2147483000)
+ * is painted *under* it. Hiding the native pointer there left the Customize
+ * panel with no pointer at all. The panel is the one place a person is aiming at
+ * 12px sliders and colour swatches, so it gets the real pointer back and the
+ * animated one is simply hidden.
+ */
+html.ggl-cursor-on.ggl-dialog-open,
+html.ggl-cursor-on.ggl-dialog-open *:not(input[type='range']) { cursor: auto !important; }
+html.ggl-cursor-on.ggl-dialog-open a[href],
+html.ggl-cursor-on.ggl-dialog-open button:not([disabled]),
+html.ggl-cursor-on.ggl-dialog-open [role='button'],
+html.ggl-cursor-on.ggl-dialog-open select,
+html.ggl-cursor-on.ggl-dialog-open summary { cursor: pointer !important; }
+html.ggl-cursor-on.ggl-dialog-open input[type='range'] { cursor: ew-resize !important; }
 .gg-cursor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 12px; }
 .gg-cursor-card { position: relative; display: grid; justify-items: center; gap: 6px; padding: 7px; border: 1px solid var(--gg-line, rgba(244,242,236,.14)); border-radius: 12px; background: rgba(255,255,255,.03); color: var(--gg-muted, #9699a8); cursor: pointer; transition: border-color .15s, background .15s; }
 .gg-cursor-card:hover { border-color: rgba(244,242,236,.32); }

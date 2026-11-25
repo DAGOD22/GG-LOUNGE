@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react';
 import { Send, Upload, Sparkles, Gamepad2, ShieldCheck, Clock, CheckCircle2, AlertCircle, Image as ImageIcon, FileCode, ArrowRight, Trophy, MessageSquare, ThumbsUp, Star, Zap, Users } from 'lucide-react';
 import { readFileAsDataUrl, uploadGameHtml } from '@/lib/upload-client';
@@ -75,12 +76,12 @@ export default function RequestGame() {
   const shown = recent.filter(r=> filter==='all' || r.status===filter)
 
   return (
-    <main className="lounge-shell">
+    <main className="lounge-shell" id="main-content">
       <div className="noise" aria-hidden="true" />
       <header className="site-header">
-        <a href="/" className="brand"><span className="brand-mark"><Gamepad2 size={19}/></span><span>GG-LOUNGE<span className="tm">™</span></span></a>
+        <Link href="/" className="brand"><span className="brand-mark"><Gamepad2 size={19}/></span><span>GG-LOUNGE<span className="tm">™</span></span></Link>
         <nav className="header-nav">
-          <a href="/">Library</a>
+          <Link href="/">Library</Link>
           <a href="/apps">Apps</a>
           <a href="/proxy">Proxy</a>
           <a href="/request-game" style={{color:'var(--lime)',textDecoration:'underline',textUnderlineOffset:6}}>Request</a>
@@ -200,7 +201,7 @@ export default function RequestGame() {
                   </div>
                 ))}
               </div>
-              <a href="/" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6, marginTop:12, padding:'10px 12px', borderRadius:999, border:'1px solid rgba(255,255,255,.12)', background:'rgba(255,255,255,.04)', fontSize:12, fontWeight:700, textDecoration:'none'}}>Back to lounge <ArrowRight size={12}/></a>
+              <Link href="/" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6, marginTop:12, padding:'10px 12px', borderRadius:999, border:'1px solid rgba(255,255,255,.12)', background:'rgba(255,255,255,.04)', fontSize:12, fontWeight:700, textDecoration:'none'}}>Back to lounge <ArrowRight size={12}/></Link>
             </div>
 
             <div style={{padding:'14px 16px', borderRadius:16, background:'linear-gradient(135deg, rgba(215,243,74,.14), rgba(125,107,255,.14))', border:'1px solid rgba(255,255,255,.08)'}}>

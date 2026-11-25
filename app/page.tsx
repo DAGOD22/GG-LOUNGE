@@ -1,22 +1,51 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useGameUrl } from '@/lib/use-game-url'
+import { mergeGuestPlays } from '@/lib/guest-progress'
 import { useCustomization } from '@/components/customization/CustomizationProvider'
+import { WelcomeTour } from '@/components/live/WelcomeTour'
 import { THEMES } from '@/lib/customization/settings'
 import { dedupeGames } from '@/lib/game-identity'
 import { unavailableGames, getGameAssetIssues } from '@/lib/games'
 import Fuse from 'fuse.js'
-import { ArrowUpRight, Gamepad2, Heart, Maximize2, Play, Search, ShieldCheck, Sparkles, Trophy, X, Zap, LayoutGrid, Rows3, Shuffle, ExternalLink, Copy, AlertCircle, Loader2, ChevronLeft, ChevronRight, Sun, Moon, Download, Flag, Flame, Crown, Gift, Monitor, Keyboard, Bug, ThumbsUp, Globe, MessageSquare, Star, Timer, WifiOff, Wifi, Filter, ArrowUpDown, Eye, EyeOff, ShieldAlert, ListFilter, Users, LogIn, LogOut, User, Cloud, CloudOff, Save, Menu } from 'lucide-react'
+import { Gamepad2, Heart, ShieldCheck, Trophy, X, AlertCircle, Download, Cloud, WifiOff } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, CONTROLS_LEGEND, hashDay, gameOfDayIndex, PROXY_TILES, isNearDuplicate, normalizeTitle } from '@/lib/games'
+import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, gameOfDayIndex, isNearDuplicate, curatedRank } from '@/lib/games'
 import type { Game } from '@/lib/games'
-import { GameCard, ShelfCard } from '@/components/GameCard'
+import {  } from '@/components/GameCard'
 import { LibraryToolbar } from '@/components/LibraryToolbar'
 import { CatalogGrid } from '@/components/CatalogGrid'
 import { RequestPanel } from '@/components/RequestPanel'
 const HomeDashboard = dynamic(() => import('@/components/HomeDashboard').then(m => m.HomeDashboard), { ssr: false, loading: () => null })
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { Reveal } from '@/components/Reveal'
 import { AuthDialog } from '@/components/AuthDialog'
+import { AnnouncementBanner } from '@/components/AnnouncementBanner'
+import { SiteHeader } from '@/components/SiteHeader'
+import { HeroSection } from '@/components/HeroSection'
+import { CommandPalette, ShortcutSheet, buildShortcuts, useShortcuts, type Command } from '@/components/CommandPalette'
+import { SiteExtras } from '@/components/SiteExtras'
+import { NextUpRail } from '@/components/NextUpRail'
+import { Scratchpad, StatusLine, relativeTime, useCopyLink, type SiteStatus } from '@/components/SiteTools'
+import { BackToTop, Greeting, StoragePanel } from '@/components/SiteKit'
+import { catalogSummary, newestIds } from '@/lib/site-kit'
+import { parseSearch } from '@/lib/site-extras'
+
+/**
+ * Navigation and randomness are side effects, so they live at module scope
+ * rather than inline in the component: the React compiler is right to refuse a
+ * `window.location` assignment or a `Math.random()` call written in the render
+ * body, even when the value is only ever read from an event handler.
+ */
+function navigateTo(path: string) {
+  window.location.assign(path)
+}
+
+function pickRandom<T>(pool: T[]): T | undefined {
+  if (!pool.length) return undefined
+  return pool[Math.floor(Math.random() * pool.length)]
+}
 const GameModal = dynamic(() => import('@/components/GameModal').then(m => m.GameModal), { ssr: false, loading: () => null })
 const AchievementsHub = dynamic(() => import('@/components/AchievementsHub').then(m => m.AchievementsHub), { ssr: false, loading: () => null })
 
@@ -24,6 +53,9 @@ type PublishedListing = { id: string; title: string; icon: string | null }
 type RequestItem = { id: string; title: string; votes: number; status: string }
 export default function Page() {
   const [query, setQuery] = useState('')
+  // The first render must not rewrite the URL — it would erase a deep link
+  // before the launcher had a chance to read it.
+  const historyReady = useRef(false)
   const [filter, setFilter] = useState('All games')
   const [favorites, setFavorites] = useState<string[]>([])
   const [activeGame, setActiveGame] = useState<Game | null>(null)
@@ -43,21 +75,44 @@ export default function Page() {
   const [newReqTitle, setNewReqTitle] = useState('')
   const [leaderTab, setLeaderTab] = useState<'today'|'week'>('today')
   const [authUser, setAuthUser] = useState<{id:string; username:string}|null>(null)
+  const [guestMergeNote, setGuestMergeNote] = useState('')
   const [showAuth, setShowAuth] = useState<null|'login'|'register'|'reset'>(null)
   const [authForm, setAuthForm] = useState({ username:'', password:'', favoriteFood:'', newPassword:'' })
   const [authError, setAuthError] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
-  const [debouncedQuery, setDebouncedQuery] = useState('')
+  // Kept for the search input's debounce pipeline; the rendered list reads query.
+  const [, setDebouncedQuery] = useState('')
   const [sortBy, setSortBy] = useState<'featured'|'popular'|'newest'|'az'>('featured')
   const [visibleCount, setVisibleCount] = useState(36)
   const [hideLow, setHideLow] = useState(true)
   const [showStaffOnly, setShowStaffOnly] = useState(false)
   const [showAchievementsHub, setShowAchievementsHub] = useState(false)
+  const [showPalette, setShowPalette] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showScratch, setShowScratch] = useState(false)
+  const [showStorage, setShowStorage] = useState(false)
+  const [status, setStatus] = useState<{ state: SiteStatus; message: string }>({ state: 'idle', message: '' })
   const [achSummary, setAchSummary] = useState<{total:number, unlocked:number, points:number} | null>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [dbMode, setDbMode] = useState<'postgres'|'local'|null>(null)
   const [streak, setStreak] = useState(1)
-  const [showDashboard, setShowDashboard] = useState(false)
+  const [lastVisit, setLastVisit] = useState<string | null>(null)
+  // Open on first paint: the leaderboard, game of the day and Your Lounge are
+  // the reason to visit, and a collapsed panel nobody opens is a feature nobody
+  // has. The chevron closes it, and the choice is remembered.
+  const [showDashboard, setShowDashboardRaw] = useState(true)
+  // Remember a deliberate collapse across visits, but always start expanded for
+  // a first-time visitor — that is the whole point of surfacing the board.
+  const setShowDashboard = useCallback((next: boolean | ((v: boolean) => boolean)) => {
+    setShowDashboardRaw(prev => {
+      const value = typeof next === 'function' ? next(prev) : next
+      try { localStorage.setItem('ggl_dashboard_collapsed', value ? '0' : '1') } catch {}
+      return value
+    })
+  }, [])
+  useEffect(() => {
+    try { if (localStorage.getItem('ggl_dashboard_collapsed') === '1') setShowDashboardRaw(false) } catch {}
+  }, [])
 
   const featuredGames = useMemo(()=> games.filter(g=> FEATURED_IDS.includes(g.id)), [])
 
@@ -129,6 +184,7 @@ export default function Page() {
         localStorage.setItem('ggl_last_visit', today)
       }
       setStreak(s||1)
+      if (last) setLastVisit(last)
     }catch{}
   },[])
   useEffect(()=>{ try{localStorage.setItem('ggl_fav', JSON.stringify(favorites))}catch{} },[favorites])
@@ -165,14 +221,26 @@ export default function Page() {
   },[])
 
   // anonymous id for cloud sync + username-linked cloud (favorites sync across devices)
-  const anonIdRef = useRef<string>('')
+  const [guestToken, setGuestToken] = useState('')
   useEffect(()=>{
     try{
       let id = localStorage.getItem('ggl_anon_id')
       if(!id){ id='anon_'+Math.random().toString(36).slice(2,9)+Date.now().toString(36); localStorage.setItem('ggl_anon_id', id) }
-      anonIdRef.current=id
+      // A guest's row is reachable only with a token the server signed for that
+      // id; a bare id would let anyone read anyone else's history.
+      const cached = localStorage.getItem('ggl_guest_token')
+      if(cached && cached.startsWith(id + '.')) setGuestToken(cached)
+      else fetch('/api/user-state/token', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ anonId: id }) })
+        .then(r=> r.ok? r.json(): null)
+        .then((d:any)=>{ if(d?.token){ localStorage.setItem('ggl_guest_token', d.token); setGuestToken(d.token) } })
+        .catch(()=>{})
+    }catch{}
+  },[])
+  useEffect(()=>{
+    if(!guestToken) return
+    try{
       // load cloud state and merge (cloud wins if newer) — anon
-      fetch('/api/user-state?id='+encodeURIComponent(id)).then(r=> r.ok? r.json():null).then((d:any)=>{
+      fetch('/api/user-state', { headers:{ 'x-gg-guest': guestToken } }).then(r=> r.ok? r.json():null).then((d:any)=>{
         if(d?.state){
           const s=d.state
           if(Array.isArray(s.favorites) && s.favorites.length> favorites.length) setFavorites(s.favorites)
@@ -181,11 +249,11 @@ export default function Page() {
         }
       }).catch(()=>{})
     }catch{}
-  },[])
+  },[guestToken])
   // when signed in, also load/merge username cloud state (this is what saves progress across devices with username)
   useEffect(()=>{
     if(!authUser?.id) return
-    fetch('/api/user-state?id='+encodeURIComponent(authUser.id)).then(r=> r.ok? r.json():null).then((d:any)=>{
+    fetch('/api/user-state').then(r=> r.ok? r.json():null).then((d:any)=>{
       if(d?.state){
         const s=d.state
         // merge: union favorites, max playCounts, union recentlyPlayed
@@ -203,14 +271,19 @@ export default function Page() {
   },[authUser?.id])
   // sync to cloud debounced — anon + signed-in user (progress saves across devices via username)
   useEffect(()=>{
-    const anon = anonIdRef.current || (typeof localStorage!=='undefined' ? localStorage.getItem('ggl_anon_id') : '')
-    const ids = [anon, authUser?.id].filter(Boolean) as string[]
-    if(ids.length===0) return
+    // Signed in: the cookie identifies the row. Guest: the signed token does.
+    if(!authUser && !guestToken) return
+    const headers: Record<string,string> = { 'content-type':'application/json' }
+    if(!authUser) headers['x-gg-guest'] = guestToken
     const h = setTimeout(()=>{
-      for(const id of ids) fetch('/api/user-state', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ id, favorites, playCounts, recentlyPlayed })}).catch(()=>{})
+      fetch('/api/user-state', { method:'POST', headers, body: JSON.stringify({ favorites, playCounts, recentlyPlayed })}).catch(()=>{})
     }, 1200)
     return ()=> clearTimeout(h)
-  },[favorites, playCounts, recentlyPlayed, authUser])
+  },[favorites, playCounts, recentlyPlayed, authUser, guestToken])
+
+  // The Escape handler lives above the URL hook for historical reasons, so it
+  // reaches the push function through a ref rather than a stale closure.
+  const pushHomeRef = useRef<() => void>(() => {})
 
   // keyboard shortcut: '/' focuses search, Esc closes modal (a11y)
   useEffect(()=>{
@@ -218,7 +291,7 @@ export default function Page() {
       const tag = (e.target as HTMLElement)?.tagName
       if(tag==='INPUT' || tag==='TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
       if(e.key==='/' && !e.ctrlKey && !e.metaKey){ e.preventDefault(); const el=document.getElementById('main-search'); el?.focus() }
-      if(e.key==='Escape'){ setActiveGame(null); setShowAuth(null); setShowAchievementsHub(false); setMobileNavOpen(false) }
+      if(e.key==='Escape'){ setActiveGame(null); pushHomeRef.current(); setShowAuth(null); setShowAchievementsHub(false); setMobileNavOpen(false) }
     }
     window.addEventListener('keydown', onKey)
     return ()=> window.removeEventListener('keydown', onKey)
@@ -230,6 +303,37 @@ export default function Page() {
     return ()=> clearTimeout(id)
   },[query])
   useEffect(()=>{ setVisibleCount(36) },[query, filter, sortBy, hideLow, showStaffOnly])
+
+  /**
+   * `?q=<term>` is a real entry point, not decoration.
+   *
+   * The site's JSON-LD advertises `/?q={search_term_string}` as its SearchAction,
+   * which tells Google that a search box exists at that URL. It did not: the page
+   * never read `q`, so a visitor arriving from a search result landed on the
+   * unfiltered library. Read it on first paint so the promise is kept, and keep
+   * the address bar in step afterwards so a filtered view stays shareable.
+   */
+  useEffect(()=>{
+    const params = new URLSearchParams(window.location.search)
+    const wanted = params.get('q')
+    if(wanted && wanted.trim()) setQuery(wanted.trim().slice(0, 80))
+    // The installed app's jump-list shortcuts are real entry points too. They
+    // arrive as query params because a manifest shortcut cannot dispatch an
+    // event, so each one has to be honoured here or the shortcut is a lie.
+    if(params.get('customize') === '1'){ customization.openSettings(); }
+    if(params.get('coop') === '1'){ window.dispatchEvent(new CustomEvent('ggl:open-coop')); }
+  },[])
+  useEffect(()=>{
+    // Only touch history once the page is interactive, and only for the `q`
+    // param — the game launcher owns the rest of the query string.
+    if (!historyReady.current) { historyReady.current = true; return }
+    try{
+      const url = new URL(window.location.href)
+      if(query.trim()) url.searchParams.set('q', query.trim())
+      else url.searchParams.delete('q')
+      if(url.href !== window.location.href) window.history.replaceState(window.history.state, '', url)
+    }catch{}
+  },[query])
   // fetch requests for upvote list
   useEffect(()=>{
     fetch('/api/game-requests').then(r=> r.ok? r.json(): null).then((d:any)=>{
@@ -238,30 +342,61 @@ export default function Page() {
   },[])
 
   const allGames = useMemo(() => dedupeGames([...games, ...published]), [published])
-  // PROD: handle ?play= id from /g/[id] SEO landing (auto-open modal)
-  useEffect(()=>{
-    try{
-      const sp = new URLSearchParams(window.location.search)
-      const pid = sp.get('play')
-      if(pid){
-        const g = allGames.find(x=> x.id===pid)
-        if (g) {
-          launch(g)
-          const url = new URL(window.location.href); url.searchParams.delete('play'); history.replaceState(null,'', url.toString())
-        } // Keep the ID until asynchronously loaded community games are available.
-      }
-    }catch{}
+  // Open a game without any history side effects. Deep links, Back and the
+  // initial restore all replay through here so they never stack extra entries.
+  const openGameById = useCallback((id: string) => {
+    const g = allGames.find(x => x.id === id)
+    if (!g) return
+    setActiveGame(g)
+    setRecentlyPlayed(prev => [g.id, ...prev.filter(x => x !== g.id)].slice(0, 12))
   }, [allGames])
+
+  const closeGame = useCallback(() => setActiveGame(null), [])
+
+  /**
+   * The co-op room can open a game before any modal exists — a friend joining a
+   * room picks a two-player title and neither person is currently playing
+   * anything. The room owns no launcher, so it asks for one by event.
+   */
+  useEffect(() => {
+    const onLaunch = (event: Event) => {
+      const id = (event as CustomEvent<{ gameId?: string }>).detail?.gameId
+      if (id) openGameById(id)
+    }
+    window.addEventListener('ggl:launch-game', onLaunch as EventListener)
+    return () => window.removeEventListener('ggl:launch-game', onLaunch as EventListener)
+  }, [openGameById])
+
+  const isProxyGame = useCallback((id: string) => Boolean(allGames.find(g => g.id === id)?.proxy), [allGames])
+  const knowsGame = useCallback((id: string) => allGames.some(g => g.id === id), [allGames])
+
+  /* URL ⇄ game. A launch is a page view, so each one pushes its own history
+     entry: analytics sees N launches, Back closes the game, and the address
+     bar becomes a shareable link. */
+  const { pushGame, pushHome } = useGameUrl({
+    openGameId: activeGame?.id ?? null,
+    openGame: openGameById,
+    closeGame,
+    ready: allGames.length > 0,
+    known: knowsGame,
+    isProxy: isProxyGame,
+  })
+  useEffect(() => { pushHomeRef.current = pushHome }, [pushHome])
   // Fix 1: precomputed search index to avoid re-concatting strings on every keystroke
   const searchIndex = useMemo(() => new Map(allGames.map((g) => [g.id, `${g.title} ${g.genre} ${g.tone} ${g.description}`.toLowerCase()] as const)), [allGames])
   const fuse = useMemo(() => new Fuse(allGames, { keys: [{ name: 'title', weight: 0.5 }, { name: 'genre', weight: 0.2 }, { name: 'tone', weight: 0.15 }, { name: 'description', weight: 0.15 }], threshold: 0.3, distance: 100, ignoreLocation: true, minMatchCharLength: 2, includeScore: true }), [allGames])
+  // `genre:racing` and `tag:2 player` are real operators, parsed out before the
+  // text search runs. They are advertised in the palette and in the empty state
+  // rather than being a secret handshake.
+  const parsedQuery = useMemo(() => parseSearch(query), [query])
+  const genreOperator = parsedQuery.genre
   const visibleGames = useMemo(
     () => {
-      const q = query.trim().toLowerCase()
+      const q = parsedQuery.text.trim().toLowerCase()
       let base: Game[] = []
       if(q){
         // PROD honest: always use Fuse ranking (typo tolerant), not just fallback — users feel search is smart
-        const results = fuse.search(query.trim(), { limit: 80 })
+        const results = fuse.search(parsedQuery.text.trim(), { limit: 80 })
         const ranked = results.map(r=> r.item)
         // also include exact substring matches that Fuse might miss (boost them to top)
         const exact = allGames.filter(g=> (searchIndex.get(g.id)||'').includes(q))
@@ -289,19 +424,29 @@ export default function Page() {
         }
         base = kept
       }
+      if (genreOperator) {
+        // A genre operator narrows whatever the text search returned, rather
+        // than replacing it: "slope genre:arcade" means "slope, if it is arcade".
+        base = base.filter(g => g.genre.toLowerCase().includes(genreOperator))
+      }
       if (showStaffOnly) base = base.filter(g=> STAFF_PICKS.includes(g.id))
       // sorting
       if (sortBy==='popular') base = [...base].sort((a,b)=> (playCounts[b.id]||0) - (playCounts[a.id]||0))
       else if (sortBy==='az') base = [...base].sort((a,b)=> a.title.localeCompare(b.title))
       else if (sortBy==='newest') base = [...base].reverse()
-      // featured first when default
-      else base = [...base].sort((a,b)=> (b.featured?1:0) - (a.featured?1:0))
+      // default order is the hand-ranked best-of list, then featured tiles
+      else base = [...base].sort((a,b)=>
+        curatedRank(a.id) - curatedRank(b.id) || (b.featured?1:0) - (a.featured?1:0)
+      )
       return base
     },
-    [allGames, favorites, filter, query, playCounts, sortBy, hideLow, showStaffOnly, searchIndex, fuse],
+    [allGames, favorites, filter, query, playCounts, sortBy, hideLow, showStaffOnly, searchIndex, fuse, parsedQuery, genreOperator],
   )
   const loadMoreRef = useRef<HTMLDivElement>(null)
   const paginatedGames = useMemo(()=> visibleGames.slice(0, visibleCount), [visibleGames, visibleCount])
+  // The tail of the curated list is where new titles are appended, so that is
+  // what the "New" badge keys off. Memoised on the catalogue, not on the filter.
+  const newIds = useMemo(()=> newestIds(allGames.map(g => g.id), 8), [allGames])
   useEffect(()=>{
     if (!loadMoreRef.current) return
     const el = loadMoreRef.current
@@ -313,6 +458,9 @@ export default function Page() {
   }, [paginatedGames.length, visibleGames.length])
 
   // Fix 6: shelves grouping only when actually showing shelves (avoid wasted 192 scan in grid/search)
+  // Distinct genre count for the heading summary. Derived from what is on
+  // screen, so it matches the shelf list rather than the whole catalogue.
+  const genreCount = useMemo(()=> new Set(visibleGames.map(g => g.genre)).size, [visibleGames])
   const grouped = useMemo(()=>{
     if (view !== 'shelves' || filter !== 'All games' || query.trim()) return [] as [string, Game[]][]
     const map: Record<string, Game[]> = {}
@@ -323,7 +471,7 @@ export default function Page() {
     }
     return Object.entries(map).sort((a,b)=> b[1].length - a[1].length)
   }, [visibleGames, view, filter, query])
-  const staffGames = useMemo(()=> allGames.filter(g=> STAFF_PICKS.includes(g.id)), [allGames])
+  const staffGames = useMemo(()=> STAFF_PICKS.map(id=> allGames.find(g=> g.id===id)).filter((g): g is Game => Boolean(g)), [allGames])
 
   const spotlight = featuredGames[spotIdx] || games[0]
   const gameOfDay = useMemo(()=> {
@@ -359,34 +507,16 @@ export default function Page() {
       if(rows.length>0) return rows.slice(0,5)
     }
     // PROD honest global: never fake with local playCounts
-    if(serverLeaderboard.length===0) return featuredGames.slice(0,5).map((g,i)=> ({ game:g, count: 0}))
-    return featuredGames.slice(0,5).map((g,i)=> ({ game:g, count: 0}))
+    if(serverLeaderboard.length===0) return featuredGames.slice(0,5).map((g)=> ({ game:g, count: 0}))
+    return featuredGames.slice(0,5).map((g)=> ({ game:g, count: 0}))
   }, [allGames, playCounts, serverLeaderboard, authUser, featuredGames])
   // JSON-LD for SEO - top games as ItemList
-  function highlight(text:string, q:string){
-    if(!q) return text
-    const idx = text.toLowerCase().indexOf(q.toLowerCase())
-    if(idx===-1) return text
-    const before = text.slice(0, idx)
-    const match = text.slice(idx, idx+q.length)
-    const after = text.slice(idx+q.length)
-    // return JSX fragments via split render in caller — this helper returns parts
-    return ({ before, match, after } as any)
-  }
-  function Highlighted({ text, query }: { text:string; query:string }){
-    if(!query) return <>{text}</>
-    const lower=text.toLowerCase(), q=query.toLowerCase()
-    const i=lower.indexOf(q)
-    if(i===-1) return <>{text}</>
-    return <>{text.slice(0,i)}<mark className="hl">{text.slice(i,i+q.length)}</mark>{text.slice(i+q.length)}</>
-  }
-
   const jsonLd = useMemo(()=> ({
     '@context':'https://schema.org',
     '@type':'ItemList',
     name:'GG-Lounge Games',
     numberOfItems: allGames.length,
-    itemListElement: allGames.slice(0,24).map((g,i)=> ({
+    itemListElement: allGames.slice(0,24).map((g, i)=> ({
       '@type':'ListItem',
       position:i+1,
       item: {
@@ -406,6 +536,7 @@ export default function Page() {
 
   function launch(game: Game) {
     setActiveGame(game)
+    pushGame(game)
     setRecentlyPlayed(prev=> [game.id, ...prev.filter(x=> x!==game.id)].slice(0,12))
     setPlayCounts(prev=> ({ ...prev, [game.id]: (prev[game.id]||0)+1 }))
     try{ fetch('/api/visit', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ gameId: game.id }) }).catch(()=>{}) }catch{}
@@ -414,11 +545,110 @@ export default function Page() {
     setFavorites((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
   }
   function shufflePick(){
-    const pool = visibleGames.length? visibleGames: allGames
-    const pick = pool[Math.floor(Math.random()*pool.length)]
+    const pick = pickRandom(visibleGames.length? visibleGames: allGames)
     if(pick) launch(pick)
   }
   function toggleTheme(){ const id=theme==='dark'?'arctic':'lounge'; const preset=THEMES[id]; customization.update(s=>({...s,theme:{preset:id,mode:preset.mode,colors:{...preset.colors}}})) }
+
+  /**
+   * The shortcut table and the command palette share one set of actions, so a
+   * shortcut and the matching palette entry can never drift apart.
+   *
+   * Only things this page can actually do are here. Anything that would need a
+   * full navigation is a real link in the palette instead, so a command never
+   * pretends to be available when it is not.
+   */
+  function focusSearch(){
+    const el = document.getElementById('main-search') as HTMLInputElement | null
+    el?.focus(); el?.select()
+  }
+  function closeEverything(){
+    // `pushHome` directly, not the ref: this function is defined after the URL
+    // hook, so it can close over the real thing. Reading `pushHomeRef.current`
+    // here would be a ref read on a path the render body reaches.
+    setActiveGame(null); pushHome(); setShowAuth(null)
+    setShowAchievementsHub(false); setMobileNavOpen(false); setShowPalette(false); setShowShortcuts(false)
+  }
+  function goToGames(){
+    document.getElementById('games')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  function openTools(){ navigateTo('/tools') }
+  // The most recent game is the head of `recentlyPlayed`. `Date.now()` here
+  // would be an impure call in the render body, so the hint is worked out inside
+  // the command's own `run`-adjacent closure instead of at render time.
+  const recentGameTitle = recentlyPlayed[0]
+    ? allGames.find(g => g.id === recentlyPlayed[0])?.title ?? recentlyPlayed[0]
+    : null
+  // State, not Date.now(): the previous visit is already a stored string, so
+  // rendering it stays pure. The stored value is a calendar day, not a
+  // timestamp, so it is shown as a date rather than run through relativeTime.
+  const lastVisitHint = lastVisit ? `last seen ${lastVisit}` : 'first visit on this device'
+
+  const paletteCommands: Command[] = [
+    { id: 'go-library', label: 'Go to the library', hint: 'All 250 games', group: 'Go', run: () => { closeEverything(); scrollTo({ top: 0, behavior: 'smooth' }) } },
+    { id: 'go-games', label: 'Jump to the game list', hint: 'Skip the hero', group: 'Go', run: () => { closeEverything(); goToGames() } },
+    { id: 'go-apps', label: 'Open apps', hint: 'Ten proxied sites', group: 'Go', run: () => { navigateTo('/apps') } },
+    { id: 'go-proxy', label: 'Open the proxy', hint: 'Browse any address', group: 'Go', run: () => { navigateTo('/proxy') } },
+    { id: 'go-tools', label: 'Open the tools page', hint: '100 utilities', group: 'Tools', run: openTools },
+    { id: 'go-gpt', label: 'Ask GG-GPT', hint: 'Games assistant', group: 'Go', run: () => { navigateTo('/gg-gpt') } },
+    { id: 'go-requests', label: 'Request a game', hint: 'Or report a broken one', group: 'Go', run: () => { navigateTo('/request-game') } },
+    { id: 'go-youtube', label: 'Open the YouTube player', hint: 'Same-origin video', group: 'Go', run: () => { navigateTo('/youtube') } },
+    { id: 'go-doc', label: 'Open the link directory', hint: 'Every link on one page', group: 'Go', run: () => { navigateTo('/secret-link-doc') } },
+    { id: 'play-random', label: 'Play something random', hint: 'From what is on screen', group: 'Play', run: () => { closeEverything(); shufflePick() } },
+    { id: 'play-game-of-day', label: 'Play the game of the day', group: 'Play', run: () => { closeEverything(); if(gameOfDay) launch(gameOfDay) } },
+    { id: 'play-first', label: 'Play the first result', hint: visibleGames[0]?.title, group: 'Play', run: () => { closeEverything(); if(visibleGames[0]) launch(visibleGames[0]) } },
+    { id: 'play-recent', label: 'Play the last game you opened', hint: recentGameTitle ?? 'nothing opened yet', group: 'Play', run: () => { closeEverything(); const last = allGames.find(g => g.id === recentlyPlayed[0]); if (last) launch(last) } },
+    { id: 'view-theme', label: 'Switch light and dark', group: 'View', run: () => { toggleTheme() } },
+    { id: 'view-dashboard', label: showDashboard ? 'Collapse the dashboard' : 'Open the dashboard', group: 'View', run: () => { setShowDashboard(v => !v) } },
+    { id: 'view-achievements', label: 'Show achievements', hint: 'Your progress', group: 'View', run: () => { closeEverything(); setShowAchievementsHub(true) } },
+    { id: 'view-shortcuts', label: 'Show keyboard shortcuts', group: 'Help', run: () => { setShowPalette(false); setShowShortcuts(true) } },
+    { id: 'acct-signin', label: authUser ? `Signed in as ${authUser.username}` : 'Sign in', group: 'Account', run: () => { if(!authUser) { closeEverything(); setShowAuth('login') } } },
+    { id: 'acct-favourites', label: `Favourites (${favorites.length})`, hint: 'Filter the catalogue', group: 'Account', run: () => { closeEverything(); setFilter('Favorites'); goToGames() } },
+    { id: 'search-games', label: 'Search the catalogue', hint: 'Focus the search box', group: 'Go', run: () => { focusSearch() } },
+    { id: 'about-visit', label: 'When was I last here?', hint: lastVisitHint, group: 'Help', run: () => {
+      closeEverything()
+      // The stored value is a local calendar day. Parsing it happens inside the
+      // handler, not during render, so the clock is read at the right moment.
+      const when = lastVisit ? new Date(`${lastVisit}T12:00:00`).getTime() : Number.NaN
+      setStatus({
+        state: 'info',
+        message: Number.isFinite(when) ? `You were last here ${relativeTime(when)}.` : 'This is your first visit on this device.',
+      })
+    } },
+    { id: 'show-storage', label: 'See what this browser remembers', hint: 'Favourites, history, theme — and clear it', group: 'Help', run: () => { closeEverything(); setShowStorage(true) } },
+    { id: 'open-scratch', label: 'Open the scratchpad', hint: 'Notes that survive a reload', group: 'Tools', run: () => { closeEverything(); setShowScratch(true) } },
+    { id: 'copy-site-link', label: 'Copy a link to this page', hint: 'For sending to someone', group: 'Tools', run: () => { copySiteLink('the lounge', '/') } },
+    { id: 'random-game', label: 'Play a random game', hint: 'From the whole catalogue', group: 'Play', run: () => { closeEverything(); const pick = pickRandom(allGames); if (pick) launch(pick) } },
+  ]
+  const copySiteLink = useCopyLink((state, message) => setStatus({ state, message }))
+
+  const shortcuts = buildShortcuts({
+    focusSearch,
+    openPalette: () => setShowPalette(true),
+    openShortcuts: () => setShowShortcuts(true),
+    openTools,
+    openAchievements: () => setShowAchievementsHub(true),
+    openAuth: () => setShowAuth('login'),
+    toggleTheme,
+    toggleDashboard: () => setShowDashboard(v => !v),
+    shuffle: shufflePick,
+    // The panic screen has its own shortcut inside the panic document.
+    panic: () => window.dispatchEvent(new CustomEvent('ggl:panic')),
+    goHome: () => { closeEverything(); scrollTo({ top: 0, behavior: 'smooth' }) },
+    goLibrary: () => { closeEverything(); goToGames() },
+    goApps: () => { navigateTo('/apps') },
+    goProxy: () => { navigateTo('/proxy') },
+    goRequests: () => { navigateTo('/request-game') },
+    goGames: () => { closeEverything(); goToGames() },
+    closeAll: closeEverything,
+  })
+  // The shared table covers the page-wide actions; the scratchpad is local to
+  // this page, so it is appended rather than pushed into the shared builder.
+  useShortcuts([
+    ...shortcuts,
+    { combo: 'shift+alt+n', label: 'Open the scratchpad', group: 'Tools', run: () => setShowScratch(true) },
+    { combo: 'shift+alt+y', label: 'Copy a link to this page', group: 'Tools', run: () => { copySiteLink('the lounge', '/') } },
+  ])
   const [installHint, setInstallHint] = useState<string|null>(null)
   async function doInstall(){
     const dp:any = installPrompt || (window as any).__gglDeferredPrompt
@@ -456,8 +686,7 @@ export default function Page() {
       await refreshRequests();
     } catch (error) { window.alert(error instanceof Error ? error.message : 'Vote failed. Try again.'); }
   }
-  function openProxyTile(url:string){ window.location.href = '/proxy?url='+encodeURIComponent(url) }
-  function copyGameLink(path:string){ try{ navigator.clipboard.writeText(location.origin+path); }catch{} }
+  function openProxyTile(url:string){ window.location.assign('/proxy?url='+encodeURIComponent(url)) }
   // autosave now handled inside GameModal (Fix 3+5)
   async function doAuth(mode:'login'|'register'|'reset'){
     setAuthError(''); setAuthLoading(true)
@@ -473,6 +702,10 @@ export default function Page() {
       // fetch me
       const me = await fetch('/api/auth/me').then(x=> x.json()).catch(()=>null)
       if(me?.user) setAuthUser(me.user)
+      // Plays made while signed out live in localStorage; hand them to the
+      // account now, or they are lost the first time the browser clears up.
+      const carried = await mergeGuestPlays()
+      if(carried > 0) setGuestMergeNote(`${carried} play${carried === 1 ? '' : 's'} from before you signed in were added to your account.`)
       setShowAuth(null); setAuthForm({ username:'', password:'', favoriteFood:'', newPassword:'' })
     }catch(e:any){ setAuthError(e.message || 'Error') } finally{ setAuthLoading(false) }
   }
@@ -483,51 +716,30 @@ export default function Page() {
 
 
   return (
-    <main className="lounge-shell">
+    <main className="lounge-shell" id="main-content">
       <ErrorBoundary>
-      <a href="#games" className="sr-only focus:not-sr-only" style={{position:'absolute',left:12,top:12,zIndex:50,padding:'8px 12px',background:'var(--lime)',color:'#0b0d12',borderRadius:999,fontWeight:900}}>Skip to games</a>
+      {/* The skip link lives in the layout now, so there is exactly one. Two of
+          them meant a keyboard user tabbed through "skip to the games" twice. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{__html: JSON.stringify(jsonLd)}} />
       <div className="noise" aria-hidden="true" />
-      <header className="site-header">
-        <a href="#top" className="brand" aria-label="GG-Lounge home">
-          <span className="brand-mark">
-            <Gamepad2 size={19} />
-          </span>
-          <span>
-            GG-LOUNGE<span className="tm">™</span>
-          </span>
-        </a>
-        <button className="mobile-toggle" aria-label="Open menu" aria-expanded={mobileNavOpen} onClick={()=> setMobileNavOpen(v=>!v)}>{mobileNavOpen ? <X size={16}/> : <Menu size={16}/>}</button>
-        <nav className={`header-nav ${mobileNavOpen?'mobile-open':''}`} aria-label="Primary navigation">
-          <a href="#games" onClick={()=> setMobileNavOpen(false)}>Library</a>
-          <a href="/apps" onClick={()=> setMobileNavOpen(false)}>Apps</a>
-          <a href="/proxy" onClick={()=> setMobileNavOpen(false)}>Proxy</a>
-          <button onClick={()=> { setShowAchievementsHub(true); setMobileNavOpen(false) }} style={{background:'none',border:0,cursor:'pointer',font: 'inherit',color:'inherit',display:'flex',alignItems:'center',gap:6,fontWeight:800}}><Trophy size={12}/> Achievements</button>
-          <a href="#about" onClick={()=> setMobileNavOpen(false)}>Studio</a>
-          <a href="/request-game" onClick={()=> setMobileNavOpen(false)}>Request a game</a>
-          <a href="/admin" onClick={()=> setMobileNavOpen(false)}>Admin</a>
-        </nav>
-        <div className="header-actions" style={{display:'flex',alignItems:'center',gap:10}}>
-          <button onClick={()=> setShowAchievementsHub(true)} aria-label="Achievements" title={authUser ? `${achSummary?.unlocked||0}/${achSummary?.total||"--"} unlocked` : "View achievements — sign in to save"} style={{width:36,height:36,borderRadius:999,border:"1px solid var(--line)",background: authUser?"var(--lime)":"rgba(255,255,255,.06)",color: authUser?"#0b0d12":"var(--foreground)",display:"grid",placeItems:"center",cursor:"pointer",position:"relative"}}><Trophy size={16}/>{authUser && achSummary && achSummary.unlocked>0 ? <span style={{position:"absolute",top:-6,right:-6,background:"#0b0d12",color:"var(--lime)",border:"1px solid var(--lime)",fontSize:9,fontWeight:900,padding:"2px 5px",borderRadius:999,lineHeight:1}}>{achSummary.unlocked}</span> : null}</button>
-          <div className="header-status" style={{display:'flex',alignItems:'center',gap:6}}>
-            {online ? <Wifi size={12}/> : <WifiOff size={12} color="var(--coral)"/>}
-            <span className="live-dot" style={{background: online?'var(--lime)':'var(--coral)'}} /> {allGames.length} titles
-          </div>
-          {authUser ? (
-            <span style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',fontSize:12,fontWeight:800}}>
-              <User size={14}/> {authUser.username}
-              <span style={{display:'flex',alignItems:'center',gap:4,padding:'2px 6px',borderRadius:999,background:'rgba(34,197,94,.14)',border:'1px solid var(--line)',fontSize:10}}><Cloud size={10}/> Synced</span>
-              <button onClick={doLogout} aria-label="Log out" title="Log out" style={{width:24,height:24,display:'grid',placeItems:'center',borderRadius:999,border:'1px solid var(--line)',background:'var(--panel)',cursor:'pointer'}}><LogOut size={12}/></button>
-            </span>
-          ) : (
-            <button onClick={()=> setShowAuth('login')} style={{padding:'7px 12px',borderRadius:999,border:'1px solid var(--lime)',background:'var(--lime)',color:'#0b0d12',fontWeight:900,fontSize:12,display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}><LogIn size={14}/> Sign in</button>
-          )}
-          <button onClick={toggleTheme} aria-label="Toggle theme" title={theme==='dark'?'Switch to light mode':'Switch to dark mode'} style={{width:36,height:36,borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',display:'grid',placeItems:'center',cursor:'pointer'}}>
-            {theme==='dark' ? <Sun size={16}/> : <Moon size={16}/>}
-          </button>
-          {installable && <button onClick={doInstall} style={{padding:'7px 10px',borderRadius:999,border:'1px solid var(--lime)',background:'var(--lime)',color:'#0b0d12',fontWeight:900,fontSize:12,display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}><Download size={14}/> Install</button>}
-        </div>
-      </header>
+      {/* Above the dashboard and the header: the nav must never sit under it. */}
+      <AnnouncementBanner />
+      <SiteHeader
+        mobileNavOpen={mobileNavOpen}
+        setMobileNavOpen={setMobileNavOpen}
+        authUser={authUser}
+        achUnlocked={achSummary?.unlocked}
+        achTotal={achSummary?.total}
+        online={online}
+        gameCount={allGames.length}
+        theme={theme}
+        installable={installable}
+        onOpenAchievements={() => setShowAchievementsHub(true)}
+        onSignIn={() => setShowAuth('login')}
+        onLogOut={doLogout}
+        onToggleTheme={toggleTheme}
+        onInstall={doInstall}
+      />
       {showAuth && (
         <AuthDialog
           mode={showAuth}
@@ -541,92 +753,57 @@ export default function Page() {
         />
       )}
       {!online && <div role="status" aria-live="polite" style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(255,92,92,.12)',border:'1px solid rgba(255,92,92,.3)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:13}}><WifiOff size={16}/> You’re offline — browsing is limited. A few cached games may still work, but most need internet.</div>}
+      {guestMergeNote && <div role="status" aria-live="polite" style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(204,255,0,.12)',border:'1px solid rgba(204,255,0,.32)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:13}}><Cloud size={15}/> {guestMergeNote} <button onClick={()=> setGuestMergeNote('')} style={{marginLeft:'auto',background:'none',border:0,color:'var(--foreground)',cursor:'pointer',display:'flex'}} aria-label="Dismiss"><X size={14}/></button></div>}
       {dbMode==='local' && !authUser && <div role="note" style={{margin:'10px 18px 0',padding:'10px 14px',borderRadius:12,background:'rgba(255,190,70,.14)',border:'1px solid rgba(255,190,70,.3)',display:'flex',alignItems:'center',gap:8,color:'var(--foreground)',fontSize:12}}><AlertCircle size={14}/> Guest mode: progress saves locally. <button onClick={()=> setShowAuth('register')} style={{marginLeft:4, textDecoration:'underline', background:'none', border:0, color:'var(--foreground)', fontWeight:800, cursor:'pointer'}}>Sign in to keep it forever</button> — survives deploys.</div>}
       {installable && <div style={{margin:'12px 18px 0',padding:'12px 14px',borderRadius:14,background:'linear-gradient(135deg, rgba(204,255,0,.18), rgba(0,242,234,.14))',border:'1px solid rgba(204,255,0,.35)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
         <span style={{display:'flex',alignItems:'center',gap:10,fontWeight:800,fontSize:13}}><span style={{width:32,height:32,borderRadius:999,background:'var(--lime)',display:'grid',placeItems:'center',color:'#0b0d12'}}><Download size={16}/></span> Install GG Lounge — play offline & launch like an app</span>
         <span style={{display:'flex',gap:8}}><button onClick={doInstall} style={{padding:'8px 14px',borderRadius:999,background:'#0b0d12',color:'#fff',border:'1px solid rgba(255,255,255,.15)',fontWeight:800,cursor:'pointer'}}>Install</button><button onClick={()=> setInstallable(false)} style={{padding:'8px 10px',borderRadius:999,background:'transparent',border:'1px solid var(--line)',color:'var(--foreground)',cursor:'pointer'}}>Dismiss</button></span>
       </div>}
       {installHint && <div role="status" style={{margin:'10px 18px 0', padding:'10px 14px', borderRadius:12, background:'rgba(255,255,255,.06)', border:'1px solid var(--line)', fontSize:13, textAlign:'center'}}>{installHint}</div>}
-      <section className="hero" id="top" style={{position:"relative", overflow:"hidden", background:"radial-gradient(600px 400px at 15% 10%, rgba(125,107,255,.14), transparent 60%), radial-gradient(700px 500px at 85% 15%, rgba(215,243,74,.12), transparent 60%), radial-gradient(500px 400px at 50% 90%, rgba(255,108,131,.08), transparent 60%), var(--background)"}}>
-        <div className="hero-copy">
-          <p className="eyebrow">
-            <Sparkles size={14} /> THE INDEPENDENT ARCADE
-          </p>
-          <h1>
-            Stay a while.
-            <br />
-            <em>Play forever.</em>
-          </h1>
-          <p className="hero-text">A handpicked, no-filler collection of browser games for the minutes between everything. <span style={{opacity:.8}}><Keyboard size={12} style={{display:'inline',verticalAlign:'-2px'}}/> {CONTROLS_LEGEND.default} — hover any card to see its controls.</span></p>
-          <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:14}}>
-            <a className="hero-link" href="#games">
-              Enter the lounge <ArrowUpRight size={15} />
-            </a>
-            <button onClick={shufflePick} className="btn-ghost" style={{padding:'8px 14px',fontSize:13}}>
-              <Shuffle size={14}/> Surprise me
-            </button>
-            <button onClick={()=> launch(gameOfDay)} style={{padding:'8px 12px',borderRadius:999,border:'1px solid var(--line)',background:'rgba(255,255,255,.06)',color:'var(--foreground)',fontWeight:800,fontSize:12,display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}>
-              <Gift size={14}/> Game of the Day: {gameOfDay.title}
-            </button>
-          </div>
-          <div className="hero-stats" style={{gap:18, padding:'12px 16px', borderRadius:999, background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.06)', backdropFilter:'blur(8px)', display:'inline-flex', width:'fit-content', marginTop:22}}>
-            <span>
-              <strong>{allGames.length}</strong> games
-            </span>
-            <span>
-              <strong>∞</strong> replay value
-            </span>
-            <span style={{display:'flex',alignItems:'center',gap:6}}><Flame size={12} color={streak>2?'var(--lime)':'inherit'}/> <strong>{streak}</strong> day streak</span>
-            <span>
-              <strong>01</strong> lounge
-            </span>
-          </div>
-        </div>
-        <div className="spotlight">
-          <div className="spotlight-top">
-            <span>SPOTLIGHT / {(String(spotIdx+1).padStart(2,'0'))}</span>
-            <span className="spotlight-tag">FEATURED</span>
-          </div>
-          <div className="spotlight-art" onClick={()=> launch(spotlight)} role="button" tabIndex={0} onKeyDown={e=> e.key==='Enter'&&launch(spotlight)} style={{cursor:'pointer', overflow:'hidden', borderRadius:16, position:'relative'}}>
-            {spotlight.icon ? (
-              <img src={spotlight.icon} alt={spotlight.title} style={{position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', opacity:.9}} onError={(e)=> (e.currentTarget.style.display='none')} />
-            ) : null}
-            <div style={{position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 30%, rgba(0,0,0,.55) 100%)'}}/>
-            <div className="orbit orbit-a" style={{opacity:.5}} />
-            <div className="orbit orbit-b" style={{opacity:.4}} />
-            <span className="spotlight-mark" style={{position:'relative', zIndex:1, textShadow:'0 4px 20px rgba(0,0,0,.45)'}}>{spotlight.mark}</span>
-            <span className="spotlight-caption" style={{zIndex:1, background:'rgba(0,0,0,.32)', padding:'6px 10px', borderRadius:999, border:'1px solid rgba(255,255,255,.14)', backdropFilter:'blur(6px)'}}>
-              {spotlight.tone.toUpperCase()}<br/>{spotlight.genre.toUpperCase()}
-            </span>
-          </div>
-          <div className="spotlight-bottom">
-            <div>
-              <p className="card-kicker">{spotlight.genre} · {spotlight.tone}</p>
-              <h2>{spotlight.title}</h2>
-              <p>{spotlight.subtitle}</p>
-            </div>
-            <button className="circle-play" onClick={() => launch(spotlight)} aria-label={`Play ${spotlight.title}`}>
-              <Play size={18} fill="currentColor" />
-            </button>
-          </div>
-          <div style={{display:'flex',gap:6,justifyContent:'center',marginTop:10}}>
-            {featuredGames.map((_,i)=> <span key={i} style={{width: i===spotIdx?22:8,height:6,borderRadius:99,background: i===spotIdx?'var(--lime)':'rgba(255,255,255,.22)',transition:'all .3s',display:'block'}}/>)}
-          </div>
-        </div>
-      </section>
+      <HeroSection
+        gameCount={allGames.length}
+        streak={streak}
+        spotlight={spotlight}
+        spotIdx={spotIdx}
+        featuredCount={featuredGames.length}
+        gameOfDay={gameOfDay}
+        onShuffle={shufflePick}
+        onLaunch={launch}
+      />
+
+      <SiteExtras
+        games={allGames}
+        genres={filters.filter(filter => filter !== 'All games' && filter !== 'Favorites')}
+        onLaunch={game => { const found = allGames.find(candidate => candidate.id === game.id); if (found) launch(found) }}
+        playCounts={playCounts}
+        // The count is derived, not typed: a hard-coded "250" was already stale
+        // at 254 titles, and a share card that undercounts is a small lie.
+        shareTitle={`GG-Lounge — ${allGames.length} browser games, no installs`}
+        sharePath="/"
+      />
 
       <section className="catalog" id="games">
-        <div className="section-heading">
+        <Reveal className="section-heading">
           <div>
             <p className="eyebrow">THE ARCADE FLOOR</p>
-            <h2>Pick your poison<span>.</span></h2>
+            <h2>Pick your poison<span>.</span><Greeting name={authUser?.username} /></h2>
           </div>
           <div className="collection-note">
             <Trophy size={16} />
             <span><strong>{visibleGames.length.toString().padStart(2, '0')}</strong> available now</span>
+            <span className="collection-breakdown">{catalogSummary(visibleGames.length, genreCount, staffGames.length)}</span>
           </div>
-        </div>
-                <LibraryToolbar query={query} setQuery={setQuery} allGames={allGames} sortBy={sortBy} setSortBy={setSortBy} view={view} setView={setView} hideLow={hideLow} setHideLow={setHideLow} showStaffOnly={showStaffOnly} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} />
+        </Reveal>
+        <HomeDashboard
+          gameOfDay={gameOfDay} allGames={allGames} leaderboard={leaderboard}
+          favorites={favorites} recentlyPlayed={recentlyPlayed}
+          authUser={authUser} achSummary={achSummary}
+          showDashboard={showDashboard} setShowDashboard={setShowDashboard}
+          leaderTab={leaderTab} setLeaderTab={setLeaderTab}
+          launch={launch} openProxyTile={openProxyTile}
+          setShowAchievementsHub={setShowAchievementsHub} setRecentlyPlayed={setRecentlyPlayed}
+        />
+                <LibraryToolbar query={query} setQuery={setQuery} allGames={allGames} sortBy={sortBy} setSortBy={setSortBy} view={view} setView={setView} hideLow={hideLow} setHideLow={setHideLow} showStaffOnly={showStaffOnly} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} resultCount={visibleGames.length} />
         {favorites.length>0 && filter!=='Favorites' && (
           <div style={{marginBottom:12, padding:'10px 14px', borderRadius:12, background:'linear-gradient(135deg, rgba(215,243,74,.14), rgba(125,107,255,.08))', border:'1px solid rgba(215,243,74,.28)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
             <span style={{fontSize:13, fontWeight:800, display:'flex', alignItems:'center', gap:8}}><Heart size={14} fill="var(--coral)" color="var(--coral)"/> You have {favorites.length} favorite{favorites.length>1?'s':''}</span>
@@ -647,17 +824,13 @@ export default function Page() {
           <ul style={{ maxHeight: 220, overflowY: 'auto', fontSize: 12 }}>{unavailableGames.map(game => <li key={game.id}><strong>{game.title}</strong> — {getGameAssetIssues(game.id).join('; ')}</li>)}</ul>
           <a href="/request-game" style={{ fontSize: 12, color: 'var(--lime)' }}>View game requests</a>
         </details>}
-        <CatalogGrid view={view} filter={filter} query={query} visibleGames={visibleGames} paginatedGames={paginatedGames} grouped={grouped} staffGames={staffGames} allGames={allGames} favorites={favorites} toggleFavorite={toggleFavorite} launch={launch} loadMoreRef={loadMoreRef} visibleCount={visibleCount} setVisibleCount={setVisibleCount} setQuery={setQuery} setFilter={setFilter} setHideLow={setHideLow} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} />
-            <HomeDashboard
-        gameOfDay={gameOfDay} allGames={allGames} leaderboard={leaderboard}
-        favorites={favorites} recentlyPlayed={recentlyPlayed}
-        authUser={authUser} achSummary={achSummary}
-        showDashboard={showDashboard} setShowDashboard={setShowDashboard}
-        leaderTab={leaderTab} setLeaderTab={setLeaderTab}
-        launch={launch} openProxyTile={openProxyTile}
-        setShowAchievementsHub={setShowAchievementsHub} setRecentlyPlayed={setRecentlyPlayed}
+        <CatalogGrid view={view} filter={filter} query={query} visibleGames={visibleGames} paginatedGames={paginatedGames} grouped={grouped} staffGames={staffGames} allGames={allGames} newIds={newIds} favorites={favorites} toggleFavorite={toggleFavorite} launch={launch} loadMoreRef={loadMoreRef} visibleCount={visibleCount} setVisibleCount={setVisibleCount} setQuery={setQuery} setFilter={setFilter} setHideLow={setHideLow} setShowStaffOnly={setShowStaffOnly} shufflePick={shufflePick} />
+      <NextUpRail
+        games={allGames}
+        playCounts={playCounts}
+        recentlyPlayed={recentlyPlayed}
+        onLaunch={game => { const found = allGames.find(candidate => candidate.id === game.id); if (found) launch(found) }}
       />
-
       {/* Requests + Upvotes */}
                 <RequestPanel requests={requests} requestVotes={requestVotes} newReqTitle={newReqTitle} setNewReqTitle={setNewReqTitle} submitRequest={submitRequest} upvoteRequest={upvoteRequest} />
       </section>
@@ -670,7 +843,7 @@ export default function Page() {
             <strong>GG-LOUNGE<span className="tm">™</span></strong>
           </div>
           <span className="footer-rule" />
-          <p>Made by <strong>Kai Chauhan</strong></p>
+          <p>Made by <strong>DAGOD22</strong></p>
         </div>
         <div className="footer-bottom">
           <span>© 2026 GG-LOUNGE STUDIOS™. All rights reserved.</span>
@@ -682,15 +855,24 @@ export default function Page() {
         <ShieldCheck size={19} />
         <span>Admin</span>
       </a>
+      <WelcomeTour />
+      <CommandPalette commands={paletteCommands} open={showPalette} onClose={() => setShowPalette(false)} />
+      <ShortcutSheet shortcuts={shortcuts} open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+      <Scratchpad open={showScratch} onClose={() => setShowScratch(false)} />
+      <StatusLine status={status.state} message={status.message} />
+      <StoragePanel open={showStorage} onClose={() => setShowStorage(false)} />
+      <BackToTop />
       {showAchievementsHub && <AchievementsHub open={showAchievementsHub} onClose={()=> setShowAchievementsHub(false)} authUser={authUser} onPlayGame={(id)=> { const g=allGames.find(x=> x.id===id); if(g){ setShowAchievementsHub(false); launch(g) } }} />}
       {activeGame && (
+        <ErrorBoundary resetKey={activeGame.id}>
         <GameModal
           game={activeGame}
           isFavorite={favorites.includes(activeGame.id)}
           onToggleFavorite={toggleFavorite}
-          onClose={() => { setActiveGame(null); if(authUser) fetch('/api/achievements/stats').then(r=> r.ok? r.json():null).then((d:any)=>{ if(d?.signedIn) setAchSummary({ total:d.total||0, unlocked:d.totalUnlocked||0, points:d.totalPoints||0 }) }).catch(()=>{}) }}
+          onClose={() => { closeGame(); pushHome(); if(authUser) fetch('/api/achievements/stats').then(r=> r.ok? r.json():null).then((d:any)=>{ if(d?.signedIn) setAchSummary({ total:d.total||0, unlocked:d.totalUnlocked||0, points:d.totalPoints||0 }) }).catch(()=>{}) }}
           authUser={authUser}
         />
+        </ErrorBoundary>
       )}
           </ErrorBoundary>
 </main>

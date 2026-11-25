@@ -1,6 +1,6 @@
 import { ANIMATED_CURSOR_IDS } from './cursor-presets';
 export const SETTINGS_KEY = 'ggl_customization_v1';
-export const RELEASE_NAME = 'new upadted version';
+export const RELEASE_NAME = 'New updated version';
 export type Colors = { background: string; surface: string; panel: string; text: string; muted: string; accent: string; secondary: string };
 export const THEMES: Record<string, { name: string; mode: 'dark' | 'light'; colors: Colors }> = {
   lounge: { name: 'Original Lounge', mode: 'dark', colors: { background:'#0b0d12',surface:'#14161a',panel:'#141720',text:'#f4f2ec',muted:'#9699a8',accent:'#d7f34a',secondary:'#7d6bff' } },
@@ -9,6 +9,15 @@ export const THEMES: Record<string, { name: string; mode: 'dark' | 'light'; colo
   cyber: { name: 'Cyberpunk', mode: 'dark', colors: { background:'#140c21',surface:'#20102f',panel:'#2b1642',text:'#fff0ff',muted:'#c0a5d2',accent:'#fb79dd',secondary:'#62f5e9' } },
   forest: { name: 'Forest', mode: 'dark', colors: { background:'#0b1713',surface:'#10251d',panel:'#183427',text:'#e9fff2',muted:'#a1beae',accent:'#a7ed83',secondary:'#58cbc2' } },
   ember: { name: 'Ember', mode: 'dark', colors: { background:'#1c1110',surface:'#2a1a17',panel:'#39241e',text:'#fff2e7',muted:'#cfada0',accent:'#ffb077',secondary:'#fa799d' } },
+  // Six later additions. Each is picked for a use rather than a mood: a
+  // low-blue one for late nights, a high-contrast one that survives a washed-out
+  // projector, and a couple that are simply nicer than the default.
+  midnight_oil: { name: 'Midnight Oil', mode: 'dark', colors: { background:'#0a0a0d',surface:'#141418',panel:'#1c1c22',text:'#e8e6df',muted:'#8e8c84',accent:'#e8c547',secondary:'#6c7bd1' } },
+  paper: { name: 'Paper', mode: 'light', colors: { background:'#faf8f3',surface:'#ffffff',panel:'#f0ede4',text:'#1a1815',muted:'#6b6459',accent:'#b4532a',secondary:'#3d6b8f' } },
+  terminal: { name: 'Terminal', mode: 'dark', colors: { background:'#000000',surface:'#0a0f0a',panel:'#0f1a0f',text:'#c8f5c8',muted:'#6f9a6f',accent:'#3ddc84',secondary:'#8bd4ff' } },
+  contrast: { name: 'High Contrast', mode: 'dark', colors: { background:'#000000',surface:'#0d0d0d',panel:'#191919',text:'#ffffff',muted:'#d6d6d6',accent:'#ffd400',secondary:'#5ec8ff' } },
+  cherry: { name: 'Cherry', mode: 'dark', colors: { background:'#180a12',surface:'#25111c',panel:'#331826',text:'#fff0f6',muted:'#c9a3b7',accent:'#ff5c8a',secondary:'#ffb26b' } },
+  ocean: { name: 'Ocean', mode: 'dark', colors: { background:'#061220',surface:'#0b1e30',panel:'#102a41',text:'#e6f4ff',muted:'#8fb2cc',accent:'#4dd2c4',secondary:'#6aa9ff' } },
 };
 export const WALLPAPERS = [
   { id:'none', name:'No wallpaper', kind:'none', preview:'linear-gradient(135deg,#0b0d12,#242a36)' },
@@ -24,20 +33,22 @@ export type KeyBinding = { code: string; key: string; ctrl: boolean; alt: boolea
 export type Settings = {
   version: 1;
   cloak: { enabled: boolean; title: string; icon: string };
-  panic: { enabled: boolean; binding: KeyBinding; destination: string; whileTyping: boolean };
+  panic: { enabled: boolean; binding: KeyBinding; destination: string; whileTyping: boolean; mode: 'redirect' | 'doc' };
   theme: { preset: string; mode: 'dark' | 'light'; colors: Colors };
   background: { preset: string; mediaId: string; mediaKind: 'image' | 'video'; mediaName: string; dim: number; blur: number; fit: 'cover' | 'contain'; respectMotion: boolean };
   cursor: { preset: string; image: string; size: number; trail: boolean; speed: number; glow: boolean };
   reactive: { enabled: boolean; style: 'ripples' | 'particles' | 'constellation'; intensity: number; pointer: boolean };
+  live: { enabled: boolean; ghosts: boolean; feed: boolean; ghostOpacity: number };
 };
 export function defaults(): Settings { return {
   version:1,
   cloak:{enabled:false,title:'My workspace',icon:'📚'},
-  panic:{enabled:false,binding:{code:'Backquote',key:'`',ctrl:false,alt:false,shift:false,meta:false},destination:'about:blank',whileTyping:false},
+  panic:{enabled:false,binding:{code:'Backquote',key:'`',ctrl:false,alt:false,shift:false,meta:false},destination:'about:blank',whileTyping:false,mode:'redirect'},
   theme:{preset:'lounge',mode:'dark',colors:{...THEMES.lounge.colors}},
   background:{preset:'none',mediaId:'',mediaKind:'image',mediaName:'',dim:38,blur:0,fit:'cover',respectMotion:true},
   cursor:{preset:'system',image:'',size:40,trail:false,speed:0.6,glow:true},
   reactive:{enabled:false,style:'ripples',intensity:50,pointer:true},
+  live:{enabled:true,ghosts:true,feed:true,ghostOpacity:55},
 }; }
 const text=(v:unknown,fallback:string,max=200)=> typeof v==='string' ? v.slice(0,max) : fallback;
 const bool=(v:unknown,fallback:boolean)=>typeof v==='boolean'?v:fallback;
@@ -65,7 +76,7 @@ export function iconHref(input:string,base='https://gg-lounge.vercel.app'):strin
 const LEGACY_CURSOR_MAP: Record<string, string> = { crosshair: 'sonar', dot: 'lounge', ring: 'halo' };
 
 export function sanitizeSettings(input:unknown):Settings {
-  const d=defaults(),v=obj(input),c=obj(v.cloak),p=obj(v.panic),b=obj(p.binding),t=obj(v.theme),bg=obj(v.background),cu=obj(v.cursor),r=obj(v.reactive);
+  const d=defaults(),v=obj(input),c=obj(v.cloak),p=obj(v.panic),b=obj(p.binding),t=obj(v.theme),bg=obj(v.background),cu=obj(v.cursor),r=obj(v.reactive),lv=obj(v.live);
   const colors={...d.theme.colors};const supplied=obj(t.colors);
   for(const k of Object.keys(colors) as (keyof Colors)[])if(typeof supplied[k]==='string'&&/^#[0-9a-f]{6}$/i.test(supplied[k]))colors[k]=supplied[k];
   let icon=text(c.icon,d.cloak.icon,180000);try{iconHref(icon)}catch{icon=d.cloak.icon;}
@@ -73,11 +84,12 @@ export function sanitizeSettings(input:unknown):Settings {
   const code=text(b.code,d.panic.binding.code,64).replace(/[^a-z\d_-]/gi,'');
   return {version:1,
     cloak:{enabled:bool(c.enabled,false),title:text(c.title,d.cloak.title,120),icon},
-    panic:{enabled:bool(p.enabled,false),destination,whileTyping:bool(p.whileTyping,false),binding:{code,key:text(b.key,d.panic.binding.key,60),ctrl:bool(b.ctrl,false),alt:bool(b.alt,false),shift:bool(b.shift,false),meta:bool(b.meta,false)}},
+    panic:{enabled:bool(p.enabled,false),destination,whileTyping:bool(p.whileTyping,false),mode:oneOf(p.mode,['redirect','doc'],'redirect'),binding:{code,key:text(b.key,d.panic.binding.key,60),ctrl:bool(b.ctrl,false),alt:bool(b.alt,false),shift:bool(b.shift,false),meta:bool(b.meta,false)}},
     theme:{preset:oneOf(t.preset,[...Object.keys(THEMES),'custom'],'lounge'),mode:oneOf(t.mode,['dark','light'],'dark'),colors},
     background:{preset:oneOf(bg.preset,[...WALLPAPERS.map(x=>x.id),'upload'],'none'),mediaId:text(bg.mediaId,'',80),mediaKind:oneOf(bg.mediaKind,['image','video'],'image'),mediaName:text(bg.mediaName,'',160),dim:num(bg.dim,38,0,90),blur:num(bg.blur,0,0,24),fit:oneOf(bg.fit,['cover','contain'],'cover'),respectMotion:bool(bg.respectMotion,true)},
     cursor:{preset:oneOf(LEGACY_CURSOR_MAP[cu.preset as string] ?? cu.preset,['system','custom',...ANIMATED_CURSOR_IDS],'system'),image:/^data:image\/png;base64,[a-z\d+/=]+$/i.test(text(cu.image,'',180000))?cu.image:'',size:num(cu.size,40,16,64),trail:bool(cu.trail,false),speed:num(cu.speed,0.6,0,1),glow:bool(cu.glow,true)},
     reactive:{enabled:bool(r.enabled,false),style:oneOf(r.style,['ripples','particles','constellation'],'ripples'),intensity:num(r.intensity,50,10,100),pointer:bool(r.pointer,true)},
+    live:{enabled:bool(lv.enabled,true),ghosts:bool(lv.ghosts,true),feed:bool(lv.feed,true),ghostOpacity:num(lv.ghostOpacity,55,10,90)},
   };
 }
 export function bindingFromEvent(e:Pick<KeyboardEvent,'code'|'key'|'ctrlKey'|'altKey'|'shiftKey'|'metaKey'>):KeyBinding {

@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Ban, Clock, Skull, Activity, ShieldAlert } from 'lucide-react'
+import { Ban, Clock, Skull, Activity } from 'lucide-react'
 
 export default function BannedPage(){
   const [gate, setGate] = useState<{ banned:boolean, expiresAt:string|null, left:number } | null>(null)
@@ -42,7 +42,7 @@ export default function BannedPage(){
   if(gate?.banned){
     const isPerm = !gate.expiresAt || gate.left >= 86400*365
     return (
-      <main style={{ minHeight:'100vh', background:'#05070a', color:'#fecaca', display:'grid', placeItems:'center', padding:20, fontFamily:'ui-monospace, monospace' }}>
+      <main style={{ minHeight:'100vh', background:'#05070a', color:'#fecaca', display:'grid', placeItems:'center', padding:20, fontFamily:'ui-monospace, monospace' }} id="main-content">
         <style>{`@keyframes flicker{0%,19%,21%,23%,25%,54%,56%,100%{opacity:1}20%,24%,55%{opacity:.45}} @keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}`}</style>
         <div style={{ position:'absolute', inset:0, opacity:.08, backgroundImage:'linear-gradient(rgba(239,68,68,.15) 1px, transparent 1px), linear-gradient(90deg, rgba(239,68,68,.1) 1px, transparent 1px)', backgroundSize:'40px 40px' }} />
         <div style={{ width:'min(560px,100%)', background:'linear-gradient(180deg, rgba(239,68,68,.12), rgba(0,0,0,.5))', border:'1px solid rgba(239,68,68,.35)', borderRadius:18, overflow:'hidden', backdropFilter:'blur(16px)', boxShadow:'0 20px 80px rgba(0,0,0,.6)', position:'relative' }}>
@@ -74,7 +74,7 @@ export default function BannedPage(){
 
   // default admin ban fallback (loading or not gate)
   return (
-    <main className="admin-shell">
+    <main className="admin-shell" id="main-content">
       <section className="admin-login">
         <div className="admin-lock" style={{ background: loaded && gate?.banned ? '#ef4444' : undefined }}>
           <Ban />

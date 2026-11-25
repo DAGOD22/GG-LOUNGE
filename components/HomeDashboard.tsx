@@ -1,6 +1,6 @@
 'use client'
-import { Crown, Globe, Flame, ShieldCheck, Star, Heart, Timer, Trophy, Sparkles, Play, ArrowUpRight } from 'lucide-react'
-import type { Game } from '@/lib/games'
+import { Crown, Globe, Flame, Star, Heart, Timer, Trophy, Sparkles, Play, ArrowUpRight } from 'lucide-react'
+import type {  } from '@/lib/games'
 import { PROXY_TILES } from '@/lib/games'
 
 export function HomeDashboard({

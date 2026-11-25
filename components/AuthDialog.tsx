@@ -37,12 +37,21 @@ export function AuthDialog({
         background: 'rgba(6,7,10,.72)',
         backdropFilter: 'blur(8px)',
         padding: 16,
+        /* The register and reset forms are taller than a 600px-tall window, and
+           a grid with place-items:center clips the overflow at BOTH ends — the
+           title went off the top and the submit button off the bottom with no
+           way to reach either. Scrolling the overlay keeps centering when it
+           fits and lets it scroll when it does not. */
+        overflowY: 'auto',
+        overscrollBehavior: 'contain',
       }}
     >
       <div
         style={{
           width: '100%',
           maxWidth: 380,
+          maxHeight: 'calc(100dvh - 32px)',
+          overflowY: 'auto',
           background: 'var(--panel)',
           border: '1px solid var(--line)',
           borderRadius: 18,
@@ -50,7 +59,7 @@ export function AuthDialog({
           boxShadow: '0 20px 60px rgba(0,0,0,.4)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10 }}>
           <h3 style={{ margin: 0, fontSize: 18, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 8 }}>
             <User size={16} /> {mode === 'login' ? 'Sign in' : mode === 'register' ? 'Create account' : 'Reset password'}
           </h3>

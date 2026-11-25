@@ -7,6 +7,13 @@
     return Promise.resolve();
   };
   window.PokiSDK = {
+    gameLoadingProgress: function () {},
+    adBlocked: false,
+    usePokiSDK: true,
+    customEvent: function () {},
+    createAVM: function () { return {}; },
+    displayAd: function () {},
+    destroyAd: function () {},
     init: ok,
     gameLoadingStart: function () {},
     gameLoadingFinished: function () {},

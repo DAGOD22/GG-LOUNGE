@@ -1,8 +1,21 @@
+# Which dependencies are allowed to run install scripts.
+#
+# These were left as the literal placeholder text `set this to true or false`
+# by an interactive `pnpm approve-builds` prompt. With a placeholder value pnpm
+# treats every build as *ignored* and aborts `--frozen-lockfile` with
+# ERR_PNPM_IGNORED_BUILDS — which is why CI failed on the install step for 83
+# consecutive runs while the same command passed locally against a warm store.
+#
+# All four are needed:
+#   · esbuild        — fetches/links its native binary (used by prepare:customization)
+#   · @mercuryworkshop/scramjet — the proxy worker's postinstall
+#   · unrs-resolver  — native resolver used by eslint-config-next
+#   · bufferutil     — optional native speedup for ws, pulled in by bare-mux
 allowBuilds:
-  '@mercuryworkshop/scramjet': set this to true or false
-  bufferutil: set this to true or false
-  esbuild: set this to true or false
-  unrs-resolver: set this to true or false
+  '@mercuryworkshop/scramjet': true
+  bufferutil: true
+  esbuild: true
+  unrs-resolver: true
 minimumReleaseAgeExclude:
   - '@next/*'
   - next

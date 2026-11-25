@@ -1,0 +1,496 @@
+/* ===== CHATVERSE ========================================================
+ * A private room, so the styling goes quieter than the arcade: one accent, one
+ * surface, and no decoration competing with the text. Everything is sized from
+ * a 4px rhythm and the type scale matches the rest of the lounge so the page
+ * does not feel like it was bolted on.
+ * ===================================================================== */
+
+.cv-shell {
+  min-height: 100dvh;
+  background:
+    radial-gradient(900px 500px at 12% -10%, rgba(215, 243, 74, .07), transparent 60%),
+    radial-gradient(700px 420px at 92% 108%, rgba(125, 107, 255, .10), transparent 62%),
+    var(--background);
+  color: var(--foreground);
+}
+
+/* ---- the door ---------------------------------------------------------- */
+.cv-gate {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 28px 18px;
+}
+.cv-gate-card {
+  width: min(430px, 94vw);
+  padding: 30px 26px 24px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .5);
+  backdrop-filter: blur(16px);
+  text-align: left;
+}
+.cv-gate-badge {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--lime);
+  color: #0b0d12;
+  margin-bottom: 16px;
+}
+.cv-overline {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .18em;
+  color: var(--lime);
+}
+.cv-gate-card h1 {
+  margin: 6px 0 10px;
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: .04em;
+}
+.cv-gate-copy {
+  margin: 0 0 20px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.cv-gate-form {
+  display: flex;
+  gap: 8px;
+}
+.cv-gate-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .04);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: .16em;
+}
+.cv-gate-form input:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+.cv-gate-form button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  border: 0;
+  background: var(--lime);
+  color: #0b0d12;
+  font-weight: 900;
+  font-size: 13px;
+  cursor: pointer;
+}
+.cv-gate-form button:disabled { opacity: .5; cursor: not-allowed; }
+.cv-gate-error {
+  margin: 12px 0 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: #ff8f9a;
+}
+.cv-gate-foot {
+  margin: 18px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--muted) 85%, transparent);
+}
+
+/* ---- app shell --------------------------------------------------------- */
+.cv-app {
+  display: grid;
+  grid-template-columns: minmax(210px, 260px) minmax(0, 1fr);
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.cv-rooms {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 14px 12px;
+  gap: 10px;
+  border-right: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+}
+.cv-rooms-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 8px;
+}
+.cv-rooms-head .cv-overline { grid-column: 1 / -1; }
+.cv-rooms-head h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 900;
+}
+.cv-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .05);
+  color: var(--foreground);
+  cursor: pointer;
+}
+.cv-icon-btn:hover { border-color: var(--lime); }
+.cv-icon-btn:disabled { opacity: .5; }
+
+.cv-new-room {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px dashed var(--line);
+  background: transparent;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.cv-new-room:hover { border-color: var(--lime); color: var(--lime); }
+.cv-new-room-form { display: flex; gap: 6px; }
+.cv-new-room-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .05);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 12px;
+}
+.cv-new-room-form button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  border-radius: 9px;
+  border: 0;
+  background: var(--lime);
+  color: #0b0d12;
+  cursor: pointer;
+}
+
+.cv-room-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cv-room-list li { display: flex; align-items: center; gap: 2px; }
+.cv-room {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 9px;
+  border-radius: 9px;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.cv-room:hover { background: rgba(255, 255, 255, .06); }
+.cv-room.active { background: rgba(215, 243, 74, .14); color: var(--lime); }
+.cv-room-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv-room-count {
+  font-size: 10px;
+  font-weight: 900;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .1);
+  color: var(--muted);
+}
+.cv-room-del {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+}
+.cv-room-list li:hover .cv-room-del,
+.cv-room-del:focus-visible { opacity: 1; }
+.cv-room-del:hover { color: #ff8f9a; }
+.cv-room-del.armed { opacity: 1; color: #ff8f9a; background: rgba(255, 92, 92, .16); }
+
+.cv-empty-rooms {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.cv-rooms-foot { border-top: 1px solid var(--line); padding-top: 10px; }
+.cv-name-field { display: flex; flex-direction: column; gap: 4px; }
+.cv-name-field span {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cv-name-field input {
+  padding: 7px 9px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .04);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ---- the room ---------------------------------------------------------- */
+.cv-room-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.cv-room-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.cv-room-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 900;
+}
+.cv-room-head p {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.cv-here {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--lime);
+  white-space: nowrap;
+}
+.cv-here-names {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.cv-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 18px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cv-no-messages,
+.cv-room-empty p {
+  margin: 40px auto;
+  max-width: 420px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--muted);
+  text-align: center;
+}
+.cv-room-empty {
+  margin: auto;
+  text-align: center;
+  color: var(--muted);
+}
+.cv-room-empty h2 { margin: 10px 0 4px; font-size: 18px; color: var(--foreground); }
+
+.cv-msg {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  max-width: min(680px, 92%);
+}
+.cv-msg-who {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--lime);
+}
+.cv-msg-body { min-width: 0; }
+.cv-msg-body p {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border-top-left-radius: 4px;
+  background: rgba(255, 255, 255, .055);
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cv-msg-media {
+  display: block;
+  margin-top: 6px;
+  max-width: min(420px, 100%);
+  max-height: 320px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  object-fit: contain;
+}
+.cv-msg-time {
+  align-self: end;
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.cv-msg.mine { margin-left: auto; text-align: right; }
+.cv-msg.mine .cv-msg-who { color: var(--muted); }
+.cv-msg.mine .cv-msg-body p {
+  background: rgba(215, 243, 74, .16);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 4px;
+  text-align: left;
+}
+.cv-msg.mine .cv-msg-media { margin-left: auto; }
+.cv-msg.pending { opacity: .6; }
+.cv-msg.failed .cv-msg-body p { background: rgba(255, 92, 92, .14); }
+.cv-msg.failed .cv-msg-time { color: #ff8f9a; }
+
+.cv-compose {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 14px 4px;
+  border-top: 1px solid var(--line);
+}
+.cv-compose textarea {
+  flex: 1;
+  min-width: 0;
+  max-height: 140px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .045);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.45;
+  resize: none;
+  field-sizing: content;
+}
+.cv-compose textarea:focus-visible { outline: 2px solid var(--lime); outline-offset: 1px; }
+.cv-send {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 0;
+  background: var(--lime);
+  color: #0b0d12;
+  cursor: pointer;
+}
+.cv-send:disabled { opacity: .45; cursor: not-allowed; }
+.cv-compose-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 0 18px 10px;
+  font-size: 10px;
+  color: color-mix(in srgb, var(--muted) 80%, transparent);
+}
+
+.cv-error {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 92, 92, .4);
+  background: #2a1620;
+  color: #ffd4d8;
+  font-size: 12px;
+  font-weight: 700;
+  z-index: 40;
+  max-width: 92vw;
+}
+.cv-error button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: .7;
+}
+
+.cv-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  min-height: 100dvh;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.cv-spin { animation: cv-spin 900ms linear infinite; }
+@keyframes cv-spin { to { transform: rotate(360deg); } }
+
+/* ---- narrow screens ---------------------------------------------------- */
+@media (max-width: 760px) {
+  .cv-app { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  .cv-rooms {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    max-height: 38vh;
+  }
+  .cv-room-list { flex-direction: row; flex-wrap: wrap; overflow: visible; }
+  .cv-room-list li { flex: 0 1 auto; }
+  .cv-msg { max-width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cv-spin { animation: none; }
+}

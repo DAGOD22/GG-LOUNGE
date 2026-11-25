@@ -1,13 +1,42 @@
+# GG-Lounge — https://gg-lounge.vercel.app
+#
+# Everything the catalogue serves is meant to be indexed: the game landing
+# pages are the site's real search traffic. Private surfaces (admin, the gate,
+# the proxy itself, anything account-scoped) are excluded because indexing them
+# either leaks moderation data or creates duplicate content for no benefit.
+
 User-agent: *
 Allow: /
+Allow: /g/
+Allow: /games/
+Allow: /gg-gpt
+Allow: /request-game
 Allow: /privacy
 Allow: /terms
-Allow: /api/games/search
+
+# Proxied browsing sessions and app frames: infinite duplicate URLs, no value
+# in an index, and not something a crawler should be able to open.
 Disallow: /proxy
 Disallow: /apps
-Disallow: /api/bare/
-Disallow: /api/yt/
+Disallow: /uv/
+Disallow: /service/
+Disallow: /app-frames/
+Disallow: /api/
+Disallow: /_next/
+
+# Operator and moderation surfaces.
 Disallow: /admin
 Disallow: /gate
 Disallow: /banned
+
+# The link directory is a reference page, not a landing page. Indexing it would
+# put 250 near-duplicate game listings into search results next to the real
+# library, which is the duplicate-content problem the sitemap exists to avoid.
+Disallow: /secret-link-doc
+
+# Assets carry no indexable text; crawling them only burns crawl budget.
+Disallow: /*.webp$
+Disallow: /*.wasm$
+Disallow: /*.js$
+
 Sitemap: https://gg-lounge.vercel.app/sitemap.xml

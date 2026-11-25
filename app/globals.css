@@ -22,10 +22,15 @@
 [data-theme="light"] {
   --background: #ffffff;
   --foreground: #111118;
-  --muted: #6b7280;
+  /* #6b7280 measured 4.40:1 on the light panel — just under the 4.5 AA floor
+     for body text, which is where small captions actually live. #656b78 is
+     4.86:1 on the panel and 5.35:1 on white. */
+  --muted: #656b78;
   --line: rgba(17, 17, 24, 0.12);
   --panel: #f4f4f5;
-  --ink: #ffffff;
+  /* --ink is the colour of text that sits ON lime buttons and badges. It has
+     to stay dark in the light theme too — white-on-lime was unreadable. */
+  --ink: #111118;
   --surface: rgba(0, 0, 0, 0.04);
   --surface-hover: rgba(0, 0, 0, 0.06);
   --surface-strong: rgba(0, 0, 0, 0.08);
@@ -118,7 +123,11 @@ a {
 .hero,
 .catalog,
 footer {
-  max-width: 1240px;
+  /* 1240px was narrower than the header's own contents at the width the site
+     is actually used at, so the nav, the account chip and the Install button
+     were fighting over about a hundred pixels of slack and collided. The
+     header now has room to breathe on a laptop screen. */
+  max-width: 1440px;
   margin-inline: auto;
   padding-inline: 38px;
 }
@@ -127,6 +136,10 @@ footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* A minimum gutter between the three groups. `space-between` alone let the
+     nav butt straight up against the wordmark and the account chip, which is
+     what "squashed together" looked like. */
+  gap: 18px;
   border-bottom: 1px solid var(--line);
   position: relative;
 }
@@ -159,12 +172,34 @@ footer {
 }
 .header-nav {
   display: flex;
-  gap: 34px;
+  align-items: center;
+  /* The gap tracks the viewport so the row tightens before anything wraps —
+     "GG-GPT" was breaking across two lines at 1440px because the nav had a
+     fixed 34px gap, eight items and nowhere to put them. */
+  gap: clamp(10px, 1.4vw, 30px);
   color: var(--muted);
   font-size: 12px;
+  /* If space does run out, scrolling beats wrapping: a nav item split across
+     two lines makes the header taller and reads as a layout bug. */
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow: hidden;
+}
+.header-nav > * {
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 .header-nav a:hover {
   color: var(--foreground);
+}
+/* The page you are already on. An underline rather than a colour alone, so the
+   distinction survives a colour-blind reader and forced-colors mode. */
+.header-nav a[aria-current='page'] {
+  color: var(--foreground);
+  text-decoration: underline;
+  text-decoration-color: var(--lime);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
 }
 .header-status {
   color: var(--muted);
@@ -758,6 +793,11 @@ footer {
     width: 100%;
     margin-bottom: 12px;
   }
+  /* The result count is the first thing that should go when the toolbar
+     stacks — on a phone it is the least useful of the four rows. */
+  .toolbar-count {
+    display: none;
+  }
   .filter-tabs {
     justify-content: start;
   }
@@ -1211,7 +1251,9 @@ footer {
   display: flex;
   flex-direction: column;
   background: var(--bg, #0b0e12);
-  color: var(--ink);
+  /* --ink is the DARK colour, used for text sitting on lime buttons. On this
+     dark shell it made the heading and body copy black-on-black. */
+  color: var(--foreground);
 }
 .proxy-bar {
   display: flex;
@@ -1222,7 +1264,10 @@ footer {
   background: rgba(255, 255, 255, 0.03);
   flex-wrap: wrap;
 }
+/* Brand + nav sit on the dark proxy bar with a fixed dark backdrop, so pin
+   their colours instead of inheriting the (theme-dependent) shell colour. */
 .proxy-brand {
+  color: #f4f2ec;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1272,8 +1317,16 @@ footer {
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--ink);
+  /* The bar has a fixed dark backdrop, so the typed address needs a light
+     colour. --ink is the DARK colour used on lime buttons — using it here made
+     the URL you typed unreadable (black on black). */
+  color: #f4f2ec;
+  caret-color: var(--lime);
   font-size: 14px;
+}
+.proxy-form input::selection {
+  background: rgba(215, 243, 74, 0.35);
+  color: #ffffff;
 }
 .proxy-form input::placeholder {
   color: rgba(255, 255, 255, 0.4);
@@ -2059,10 +2112,8 @@ footer {
   margin: 0;
   font-size: 15px;
   letter-spacing: -0.04em;
-  cursor: pointer;
-}
-.shelf-info h4:hover {
-  color: var(--lime);
+  /* The heading is no longer a click target (the art and the Play button are),
+     so it does not get a pointer or a hover colour that promises one. */
 }
 .shelf-info p {
   margin: 0;
@@ -2550,6 +2601,20 @@ a:focus-visible {
   place-items: center;
   cursor: pointer;
 }
+/* Between the drawer breakpoint and a full desktop the header still has all
+   eight nav items plus every action chip, which is a lot for one row. Drop the
+   lowest-value chips first — the title count, then the "Synced" pill — so the
+   nav and the Install button keep their room instead of colliding. */
+@media (max-width: 1180px) {
+  .header-status {
+    display: none;
+  }
+}
+@media (max-width: 1100px) {
+  .header-user-sync {
+    display: none;
+  }
+}
 @media (max-width: 1020px) {
   .site-header {
     gap: 12px;
@@ -2589,6 +2654,161 @@ a:focus-visible {
     margin-left: auto;
   }
 }
+/* Header actions: one row of round buttons that never wraps the wordmark. */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* This used to be `flex-shrink: 0`, so when the nav grew the action row
+     pushed Install past the right edge of the container instead of giving up
+     six pixels of gap. It may shrink now; the buttons themselves stay put. */
+  flex-shrink: 1;
+  min-width: 0;
+  justify-content: flex-end;
+}
+.brand {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.brand-name {
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.icon-button {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--foreground);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+.icon-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.header-achievements.is-active {
+  background: var(--lime);
+  border-color: var(--lime);
+  color: #0b0d12;
+}
+.header-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #0b0d12;
+  color: var(--lime);
+  border: 1px solid var(--lime);
+  font-size: 9px;
+  font-weight: 900;
+  padding: 2px 5px;
+  border-radius: 999px;
+  line-height: 1;
+}
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.header-signin,
+.header-install {
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--lime);
+  background: var(--lime);
+  color: #0b0d12;
+  font-weight: 900;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  /* `min-width: 0` on the parent flex row is what actually lets this shrink;
+     without it a nowrap button sets a floor and the row overflows instead. */
+  flex: 0 0 auto;
+}
+.header-user {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+  font-weight: 800;
+  max-width: 170px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.header-user-sync {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid var(--line);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+.header-user-logout {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  cursor: pointer;
+  color: inherit;
+}
+/* Phones: drop the low-value chips so the wordmark and Sign in stay on one row. */
+@media (max-width: 640px) {
+  .site-header {
+    height: 64px;
+    gap: 8px;
+    padding-inline: 14px;
+  }
+  .brand {
+    font-size: 13px;
+    min-width: 0;
+  }
+  .header-status,
+  .header-user-sync {
+    display: none;
+  }
+  .header-user {
+    max-width: 96px;
+  }
+  .header-signin,
+  .header-install {
+    padding: 8px 12px;
+  }
+  .header-signin span,
+  .header-install span {
+    display: none;
+  }
+  .header-signin,
+  .header-install {
+    width: 36px;
+    height: 36px;
+    justify-content: center;
+    padding: 0;
+  }
+  .header-nav.mobile-open {
+    top: 64px;
+  }
+}
 @media (max-width: 560px) {
   .hero {
     grid-template-columns: 1fr;
@@ -2600,6 +2820,59 @@ a:focus-visible {
   }
   .site-header {
     height: 72px;
+  }
+}
+/* Hero stats settle into place on load. The digits are the real digits at
+   every moment — only their scale/opacity animates — so the page can never
+   render a wrong count, and a snapshot always reads the true figure. */
+.stat-pop {
+  display: inline-block;
+  animation: stat-pop 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.hero-stats > span:nth-child(2) .stat-pop {
+  animation-delay: 60ms;
+}
+.hero-stats > span:nth-child(3) .stat-pop {
+  animation-delay: 120ms;
+}
+.hero-stats > span:nth-child(4) .stat-pop {
+  animation-delay: 180ms;
+}
+@keyframes stat-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stat-pop {
+    animation: none;
+  }
+}
+/* Scroll reveal — the element is visible by default; .reveal-init is only
+   added once mounted, so no-JS readers and crawlers see everything. */
+.reveal-init {
+  opacity: 0;
+  transform: translateY(14px);
+}
+.reveal {
+  transition:
+    opacity 0.55s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: opacity, transform;
+}
+.reveal-init.reveal-in {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-init {
+    opacity: 1;
+    transform: none;
   }
 }
 /* skeleton shimmer */
@@ -2833,4 +3106,2500 @@ h4,
 .launch-splash strong,
 .gg-wordmark {
   font-family: var(--gg-font-display);
+}
+
+/* Inline status messages (apps launcher, proxy relay notices). */
+.notice {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin: 0.75rem 0;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--lime);
+  border-radius: 0.6rem;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.notice-warn {
+  border-left-color: var(--coral);
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--coral) 12%, transparent);
+}
+.notice a {
+  color: var(--lime);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ======================================================================
+   Live layer — ghost cursors, activity feed, co-op room, mini-player,
+   split screen and the fake document.
+
+   Everything here is either `pointer-events:none` decoration or a small
+   fixed-position control. Nothing adds a scrolling container or a backdrop
+   filter over the page body, because the 60fps promise is mostly a promise
+   about not making the compositor re-layout the whole lounge.
+   ====================================================================== */
+
+/* ---- ghost cursors --------------------------------------------------- */
+.gg-ghost-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  contain: strict;
+}
+.gg-ghost-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.gg-ghost-label {
+  position: absolute;
+  transform: translate(14px, 16px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 2px 7px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  color: #0b0d12;
+  background: var(--lime);
+  box-shadow: 0 4px 12px rgba(0,0,0,.35);
+  pointer-events: none;
+  max-width: 190px;
+}
+.gg-ghost-name,
+.gg-ghost-action {
+  display: block;
+  max-width: 176px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Second line, quieter than the name: it is context, not identity. */
+.gg-ghost-action {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  opacity: .72;
+  text-transform: lowercase;
+}
+
+/* ---- activity feed --------------------------------------------------- */
+.gg-live-feed {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 61;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  pointer-events: none;
+  max-width: min(320px, 84vw);
+}
+.gg-live-pill,
+.gg-live-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--foreground);
+  background: rgba(14,17,24,.92);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(0,0,0,.42);
+  backdrop-filter: blur(10px);
+  animation: gg-live-in .28s ease-out both;
+}
+.gg-live-toast { border-radius: 14px; pointer-events: auto; }
+.gg-live-toast .gg-live-dot,
+.gg-live-pill .gg-live-dot {
+  width: 7px; height: 7px; border-radius: 999px; background: var(--lime);
+  box-shadow: 0 0 0 3px rgba(215,243,74,.16);
+  flex: none;
+}
+.gg-live-pill { opacity: .82; pointer-events: auto; padding: 4px 6px 4px 10px; }
+/* The count itself is the button that opens the roster. */
+.gg-live-who {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  padding: 4px 2px;
+  border-radius: 999px;
+  font: inherit;
+}
+.gg-live-who:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+.gg-live-who:hover { color: var(--lime); }
+
+/*
+ * The one-line "what is everyone doing" preview.
+ *
+ * Deliberately quieter than the pill: it is context, and it disappears the
+ * moment the roster is open, where the same information is spelled out per
+ * person.
+ */
+.gg-live-summary {
+  margin: 0;
+  padding: 0 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  color: color-mix(in srgb, var(--foreground) 62%, transparent);
+  text-align: right;
+  text-shadow: 0 1px 8px rgba(0,0,0,.7);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- who's online ---------------------------------------------------- */
+.gg-roster-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 62;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: rgba(4,6,10,.42);
+  cursor: default;
+  animation: gg-roster-fade .18s ease-out both;
+}
+.gg-roster {
+  position: fixed;
+  right: 18px;
+  bottom: 64px;
+  z-index: 63;
+  width: min(304px, 88vw);
+  max-height: min(58vh, 420px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 11px 12px 12px;
+  border-radius: 16px;
+  background: rgba(13,16,23,.97);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px rgba(0,0,0,.55);
+  backdrop-filter: blur(14px);
+  animation: gg-live-in .22s ease-out both;
+}
+.gg-roster:focus { outline: none; }
+.gg-roster-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  letter-spacing: .02em;
+  color: var(--foreground);
+  padding-bottom: 9px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.gg-roster-head strong { flex: 1; font-weight: 800; }
+.gg-roster-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.gg-roster-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 2px;
+  border-radius: 10px;
+}
+.gg-roster-row + .gg-roster-row { border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
+.gg-roster-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 4px;
+  border-radius: 999px;
+  flex: none;
+}
+.gg-roster-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gg-roster-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gg-roster-you,
+.gg-roster-tabs {
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: 1px 5px;
+  border-radius: 6px;
+  color: #0b0d12;
+  background: var(--lime);
+  flex: none;
+}
+.gg-roster-tabs { color: var(--foreground); background: color-mix(in srgb, var(--line) 90%, transparent); }
+.gg-roster-activity {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--foreground) 68%, transparent);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gg-roster-activity svg { flex: none; opacity: .75; }
+.gg-roster-empty {
+  margin: 8px 2px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--foreground) 55%, transparent);
+}
+@keyframes gg-roster-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.gg-live-close {
+  all: unset;
+  cursor: pointer;
+  margin-left: 4px;
+  opacity: .55;
+  display: grid;
+  place-items: center;
+}
+.gg-live-close:hover { opacity: 1; }
+@keyframes gg-live-in {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- recent activity list -------------------------------------------- */
+/*
+ * Shown in place of toasts when nothing has happened since the page opened.
+ * Without it the corner was simply empty for every new visitor, which is why
+ * the feature looked fake rather than quiet.
+ */
+.gg-live-history {
+  pointer-events: auto;
+  width: min(280px, 78vw);
+  border-radius: 14px;
+  background: rgba(14,17,24,.92);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(0,0,0,.42);
+  backdrop-filter: blur(10px);
+  padding: 9px 11px;
+  animation: gg-live-in .28s ease-out both;
+}
+.gg-live-history-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.gg-live-history-head .gg-live-hide { margin-left: auto; }
+.gg-live-history ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.gg-live-history li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--foreground);
+  line-height: 1.35;
+}
+.gg-live-history li .gg-live-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gg-live-history li time {
+  flex: none;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.gg-live-history .gg-live-icon { color: var(--lime); flex: none; }
+@media (max-width: 640px) {
+  .gg-live-feed { right: 10px; bottom: 74px; max-width: 78vw; }
+  .gg-live-toast, .gg-live-pill { font-size: 11px; padding: 7px 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gg-live-toast, .gg-live-pill { animation: none; }
+}
+
+/* ---- mini-player (fallback panel) ------------------------------------ */
+.gg-mini-player {
+  position: fixed;
+  z-index: 75;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #07090e;
+  border: 1px solid var(--line);
+  box-shadow: 0 26px 70px rgba(0,0,0,.6);
+  min-width: 280px;
+  min-height: 200px;
+}
+.gg-mini-player-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: linear-gradient(180deg, rgba(125,107,255,.18), rgba(11,13,18,.9));
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.gg-mini-player-bar:active { cursor: grabbing; }
+.gg-mini-player-buttons { display: flex; gap: 4px; }
+.gg-mini-player-buttons button {
+  all: unset;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  width: 20px; height: 20px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  color: var(--foreground);
+}
+.gg-mini-player-buttons button:hover { background: rgba(255,255,255,.18); }
+.gg-mini-player-slot { position: relative; flex: 1; min-height: 0; }
+.gg-mini-player-slot iframe { width: 100%; height: 100%; border: 0; display: block; }
+.gg-mini-player-resize {
+  position: absolute;
+  right: 0; bottom: 0;
+  width: 18px; height: 18px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,.28) 50%);
+  border-bottom-right-radius: 16px;
+}
+
+/* ---- split screen ---------------------------------------------------- */
+/* The area is the same 1280px column the frame normally occupies, so the
+   divider percentage and the game's own edges line up at every width. */
+/* Why this is a grid and not two absolutely-positioned frames:
+   the right pane used to be `position:absolute; left:var(--gg-split)`, which
+   meant it only occupied the box it was painted into and only matched the left
+   pane at exactly 50%. Every game whose own layout reads its viewport (nearly
+   all canvas games, which size to `innerWidth`/`innerHeight`) then got a pane
+   that was the right size only by luck. A two-track grid gives both panes a
+   real box at every percentage, and `minmax(0, …)` stops a wide game from
+   forcing the grid to overflow. */
+.gg-split-area {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.gg-split-area.is-split {
+  grid-template-columns: minmax(0, var(--gg-split, 50%)) minmax(0, 1fr);
+  gap: 0;
+}
+.gg-split-area .frame-wrap { flex: 1; min-width: 0; max-width: none; margin: 0; grid-column: 1; grid-row: 1; }
+/* A portrait-shaped pane cannot show a landscape game at a usable size, so
+   under 900px of window the split becomes a stacked pair: two full-width games
+   is worth more than two unplayable slivers. */
+@media (max-width: 900px) {
+  .gg-split-area.is-split {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .gg-split-area.is-split .frame-wrap { grid-column: 1; grid-row: 1; }
+  .gg-split-area.is-split .gg-split-right { grid-column: 1; grid-row: 2; }
+  .gg-split-handle, .gg-split-divider { display: none; }
+}
+/* `display: contents` lets the right pane and the divider become grid items of
+   .gg-split-area directly, so the pane occupies a real track instead of a
+   floating box. The divider and handle inside it are absolutely positioned, and
+   they resolve against that same area because it is the nearest positioned
+   ancestor — the pane itself is a separate grid item, not their container. */
+.gg-split {
+  display: contents;
+}
+/* The right pane is a grid track, not a floating box. */
+.gg-split-right {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #07090e;
+  border-left: 1px solid var(--line);
+}
+.gg-split-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-left: 1px solid var(--line);
+  background: rgba(11,13,18,.9);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.gg-split-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gg-split-bar button {
+  all: unset;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  width: 22px; height: 22px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.07);
+  color: var(--foreground);
+}
+.gg-split-bar button:hover { background: rgba(255,255,255,.16); }
+.gg-split-frame { flex: 1; min-height: 0; width: 100%; border: 0; border-left: 1px solid var(--line); background: #07090e; }
+.gg-split-empty {
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  gap: 8px;
+}
+.gg-split-divider {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: var(--gg-split, 50%);
+  width: 2px;
+  margin-left: -1px;
+  z-index: 6;
+  background: linear-gradient(180deg, transparent, var(--lime), transparent);
+  opacity: .5;
+  pointer-events: none;
+}
+.gg-split-handle {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: var(--gg-split, 50%);
+  width: 22px;
+  margin-left: -11px;
+  display: grid;
+  place-items: center;
+  cursor: col-resize;
+  pointer-events: auto;
+  touch-action: none;
+  z-index: 7;
+}
+.gg-split-handle span {
+  width: 6px; height: 46px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.22);
+  border: 1px solid rgba(255,255,255,.16);
+  transition: background .15s ease;
+}
+.gg-split-handle:hover span,
+.gg-split-handle:focus-visible span { background: var(--lime); }
+.gg-split-handle:focus-visible { outline: none; }
+body.gg-split-dragging { cursor: col-resize; user-select: none; }
+body.gg-split-dragging iframe { pointer-events: none; }
+
+.gg-modal-extras {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto 6px;
+  padding: 0 2px;
+}
+.gg-votes { display: inline-flex; gap: 4px; }
+.gg-votes button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.05);
+  color: var(--foreground);
+  border-radius: 9px;
+  padding: 5px 10px;
+  font: 800 11px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+.gg-votes button:hover { background: rgba(255,255,255,.1); }
+.gg-votes button.on { border-color: var(--lime); color: var(--lime); background: rgba(190,242,100,.14); }
+.gg-votes button.on.bad { border-color: #ff8f96; color: #ffb4b8; background: rgba(255,92,92,.14); }
+.gg-session-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font: 700 10.5px/1 ui-monospace, monospace;
+  color: var(--muted);
+}
+.gg-playtime {
+  position: absolute;
+  top: 10px;
+  left: 34px;
+  z-index: 3;
+  font: 800 9px/1 ui-monospace, monospace;
+  letter-spacing: .02em;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(11,13,18,.82);
+  color: var(--lime);
+  border: 1px solid rgba(190,242,100,.3);
+}
+.gg-upnext { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.gg-upnext-label {
+  display: inline-flex; align-items: center; gap: 4px;
+  font: 800 10px/1 system-ui, sans-serif; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted);
+}
+.gg-upnext button {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); background: rgba(255,255,255,.05);
+  color: var(--foreground); border-radius: 999px; padding: 4px 10px 4px 4px;
+  font: 700 11px/1 system-ui, sans-serif; cursor: pointer; max-width: 190px;
+}
+.gg-upnext button:hover { background: rgba(255,255,255,.1); border-color: var(--lime); }
+.gg-upnext button > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gg-upnext .game-badge { width: 22px; height: 22px; font-size: 8px; }
+.gg-playtime-note {
+  display: flex; align-items: center; gap: 6px;
+  margin: 0 0 6px; padding: 7px 11px; border-radius: 10px;
+  background: rgba(190,242,100,.1); border: 1px solid rgba(190,242,100,.28);
+  font: 700 11.5px/1.2 system-ui, sans-serif;
+}
+.gg-playtime-note button {
+  margin-left: auto; border: 0; background: transparent; color: inherit;
+  cursor: pointer; display: grid; place-items: center; opacity: .6;
+}
+
+.gg-split-touch {
+  display: none;
+  grid-template-columns: repeat(4, 1fr) 1.4fr;
+  gap: 6px;
+  padding: 6px;
+  border-top: 1px solid var(--line);
+  background: rgba(11,13,18,.92);
+}
+.gg-split-touch button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255,255,255,.06);
+  color: var(--foreground);
+  font: 800 12px/1 system-ui, sans-serif;
+  cursor: pointer;
+  touch-action: none;
+}
+.gg-split-touch button:active { background: var(--lime); color: #0b0d12; }
+/* Only on touch-sized screens: a mouse user has the keyboard, and five extra
+   buttons under a game they are playing with WASD is just clutter. */
+@media (pointer: coarse), (max-width: 900px) {
+  .gg-split-touch { display: grid; }
+}
+
+.gg-split-leftbar {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  background: rgba(11,13,18,.9);
+  border-top: 1px solid var(--line);
+}
+.gg-split-leftbar em { font-style: normal; opacity: .7; font-weight: 700; }
+.gg-split-leftbar button {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.07);
+  border: 1px solid var(--line);
+  color: var(--foreground);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+.gg-split-leftbar button[aria-pressed='true'] { color: var(--coral); border-color: rgba(255,92,92,.4); }
+
+.gg-split-picker {
+  position: absolute;
+  z-index: 9;
+  right: 16px;
+  bottom: 16px;
+  width: min(360px, 92vw);
+  max-height: min(460px, 72vh);
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  background: rgba(12,15,22,.98);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px rgba(0,0,0,.55);
+  pointer-events: auto;
+  overflow: hidden;
+}
+.gg-split-picker header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 900;
+}
+.gg-split-picker header button {
+  all: unset; cursor: pointer; display: grid; place-items: center;
+  width: 26px; height: 26px; border-radius: 999px; background: rgba(255,255,255,.07);
+}
+.gg-split-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 12px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.04);
+  color: var(--muted);
+}
+.gg-split-search input {
+  all: unset;
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+.gg-split-picker ul { list-style: none; margin: 0; padding: 0 8px 10px; overflow-y: auto; }
+.gg-split-picker li button {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border-radius: 12px;
+}
+.gg-split-picker li button:hover,
+.gg-split-picker li button:focus-visible { background: rgba(255,255,255,.06); }
+.gg-split-pick-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.gg-split-pick-text strong { font-size: 12px; font-weight: 800; }
+.gg-split-pick-text small { font-size: 10.5px; color: var(--muted); font-weight: 700; }
+.gg-split-current { font-size: 10px; font-weight: 800; color: var(--lime); display: flex; align-items: center; gap: 2px; }
+
+/* ---- co-op trigger sits clear of Customize and of the feed ----------- */
+/*
+ * There are three floating things in the two bottom corners:
+ *
+ *   bottom-left : Customize (20px) then "Play with a friend" to its right
+ *   bottom-right: the live activity pill / toasts
+ *
+ * They used to collide: Customize was at left:20/bottom:20 z-index 60 and
+ * co-op at left:18/bottom:18 z-index 62 — two pills in the same place, and
+ * the one underneath was unclickable. Co-op now starts after Customize's
+ * width instead of on top of it, so both are reachable and the co-op panel
+ * opens into clear space rather than behind the Customize button.
+ *
+ * 190px is Customize at its widest label ("Customize" + icon at 12px/800).
+ */
+.gg-coop-trigger {
+  position: fixed;
+  left: 190px;
+  bottom: 22px;
+  z-index: 63;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(14,17,24,.94);
+  color: var(--foreground);
+  font-size: 11.5px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 12px 34px rgba(0,0,0,.45);
+  backdrop-filter: blur(10px);
+}
+.gg-coop-trigger:hover { border-color: rgba(215,243,74,.5); }
+.gg-coop-trigger.is-live { border-color: var(--lime); color: var(--lime); }
+.gg-coop-dot {
+  width: 7px; height: 7px; border-radius: 999px; background: var(--lime);
+  animation: gg-coop-pulse 1.8s ease-in-out infinite;
+}
+@keyframes gg-coop-pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+@media (max-width: 640px) {
+  /* Customize collapses to an icon-only pill at this width (its label is
+     hidden in customization.css), so co-op can start much further left. */
+  .gg-coop-trigger { left: 62px; bottom: 14px; font-size: 11px; padding: 9px 12px; }
+}
+.gg-coop-panel {
+  position: fixed;
+  left: 18px;
+  bottom: 74px;
+  /* Above the Customize trigger (60) and the co-op trigger (63): the panel is
+     the thing the user is reading, so nothing else may sit on top of it. It
+     used to be 63 with `bottom: 68px`, i.e. exactly level with the Customize
+     button it opens above. */
+  z-index: 64;
+  width: min(340px, 92vw);
+  max-height: min(560px, 76vh);
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  background: rgba(12,15,22,.98);
+  border: 1px solid var(--line);
+  box-shadow: 0 26px 70px rgba(0,0,0,.6);
+  overflow: hidden;
+}
+@media (max-width: 640px) { .gg-coop-panel { left: 10px; bottom: 66px; max-height: min(520px, 68vh); } }
+.gg-coop-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(125,107,255,.16), transparent);
+}
+.gg-coop-panel > header strong { font-size: 13px; font-weight: 900; }
+.gg-overline {
+  margin: 0 0 2px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .14em;
+  color: var(--lime);
+}
+.gg-coop-head-actions { display: flex; gap: 4px; }
+.gg-coop-head-actions button {
+  all: unset; cursor: pointer; display: grid; place-items: center;
+  width: 26px; height: 26px; border-radius: 999px; background: rgba(255,255,255,.07);
+}
+.gg-coop-panel { padding-bottom: 0; }
+.gg-live-status {
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.gg-coop-start { display: flex; flex-direction: column; gap: 10px; padding: 14px; }
+.gg-coop-join { display: flex; gap: 8px; }
+.gg-coop-join input,
+.gg-coop-chat input {
+  all: unset;
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.05);
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+.gg-coop-join input::placeholder,
+.gg-coop-chat input::placeholder { letter-spacing: 0; color: var(--muted); }
+.gg-coop-code {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.gg-coop-code-value {
+  all: unset;
+  cursor: pointer;
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(215,243,74,.1);
+  border: 1px dashed rgba(215,243,74,.5);
+  color: var(--lime);
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: .22em;
+  text-align: center;
+}
+.gg-coop-leave {
+  all: unset; cursor: pointer; padding: 8px 12px; border-radius: 999px;
+  border: 1px solid var(--line); font-size: 11px; font-weight: 800; color: var(--muted);
+}
+.gg-coop-tools { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; }
+.gg-coop-toggle { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; color: var(--muted); }
+.gg-coop-launch {
+  all: unset; cursor: pointer; text-align: center; padding: 9px 12px; border-radius: 999px;
+  background: var(--lime); color: #0b0d12; font-size: 11.5px; font-weight: 900;
+}
+.gg-coop-reaction-row { display: flex; gap: 6px; padding: 0 14px 10px; }
+.gg-coop-reaction-row button {
+  all: unset; cursor: pointer; width: 34px; height: 34px; display: grid; place-items: center;
+  border-radius: 999px; background: rgba(255,255,255,.06); font-size: 16px;
+}
+.gg-coop-reaction-row button:hover { background: rgba(255,255,255,.14); }
+.gg-coop-chat {
+  flex: 1;
+  min-height: 90px;
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+}
+.gg-coop-chat .them { align-self: flex-start; padding: 6px 10px; border-radius: 12px 12px 12px 4px; background: rgba(255,255,255,.07); font-weight: 700; }
+.gg-coop-chat .me { align-self: flex-end; padding: 6px 10px; border-radius: 12px 12px 4px 12px; background: rgba(215,243,74,.16); color: var(--lime); font-weight: 800; }
+.gg-coop-chat .system { align-self: center; font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.gg-coop-chat form { display: flex; gap: 8px; margin-top: auto; }
+.gg-coop-send {
+  all: unset; cursor: pointer; padding: 9px 12px; border-radius: 12px;
+  background: var(--violet); color: #fff; font-size: 11px; font-weight: 900;
+}
+.gg-coop-reactions {
+  position: fixed;
+  inset: 0;
+  z-index: 64;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 12px;
+  padding-bottom: 140px;
+}
+.gg-coop-reactions span { font-size: 30px; animation: gg-coop-float 2.2s ease-out forwards; }
+@keyframes gg-coop-float {
+  0% { opacity: 0; transform: translateY(20px) scale(.8); }
+  18% { opacity: 1; transform: translateY(0) scale(1.05); }
+  100% { opacity: 0; transform: translateY(-120px) scale(1); }
+}
+
+/* ---- fake document --------------------------------------------------- */
+.gg-doc {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  background: #f9fbfd;
+  color: #202124;
+  font-family: -apple-system, 'Segoe UI', Arial, sans-serif;
+  cursor: text;
+}
+.gg-doc-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px 4px;
+  background: #f9fbfd;
+}
+.gg-doc-logo { display: grid; place-items: center; width: 40px; }
+.gg-doc-titleblock { flex: 1; min-width: 0; }
+.gg-doc-titleline { display: flex; align-items: center; gap: 8px; }
+.gg-doc-title { font-size: 17px; font-weight: 500; color: #202124; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
+.gg-doc-star, .gg-doc-move { color: #5f6368; font-size: 13px; }
+.gg-doc-menus { display: flex; gap: 12px; margin-top: 2px; font-size: 11.5px; color: #444746; }
+.gg-doc-menus span { padding: 1px 2px; }
+.gg-doc-right { display: flex; align-items: center; gap: 10px; }
+.gg-doc-saved { font-size: 10.5px; color: #5f6368; }
+.gg-doc-avatar {
+  width: 28px; height: 28px; border-radius: 999px; background: #1a73e8; color: #fff;
+  display: grid; place-items: center; font-size: 11px; font-weight: 700;
+}
+.gg-doc-share {
+  padding: 7px 14px; border-radius: 999px; background: #c2e7ff; color: #001d35;
+  font-size: 12px; font-weight: 600;
+}
+.gg-doc-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  background: #edf2fa;
+  border-radius: 999px;
+  margin: 2px 14px 6px;
+  font-size: 11.5px;
+  color: #444746;
+  overflow: hidden;
+  transition: opacity .18s ease;
+}
+.gg-doc-toolbar.is-dim { opacity: 0; pointer-events: none; }
+.gg-doc-tool {
+  width: 24px; height: 24px; display: grid; place-items: center; border-radius: 999px;
+  font-size: 11px;
+}
+.gg-doc-tool:hover { background: rgba(68,71,70,.1); }
+.gg-doc-sep { width: 1px; height: 18px; background: rgba(68,71,70,.18); }
+.gg-doc-zoom, .gg-doc-style, .gg-doc-font, .gg-doc-size { padding: 0 6px; white-space: nowrap; }
+.gg-doc-spacer { flex: 1; }
+.gg-doc-focus {
+  all: unset; cursor: pointer; padding: 4px 10px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 600; color: #444746; background: rgba(68,71,70,.08);
+}
+.gg-doc-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 0 60px;
+  background: #f1f3f4;
+  display: flex;
+  justify-content: center;
+  gap: 0;
+}
+.gg-doc-page {
+  width: min(816px, 92vw);
+  min-height: 1056px;
+  padding: 72px 84px 96px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(60,64,67,.3), 0 4px 8px rgba(60,64,67,.12);
+  position: relative;
+}
+.gg-doc-page::after {
+  /* the faint ruled texture of a real document, not a flat white box */
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(0,0,0,.022) 1px, transparent 1px);
+  background-size: 3px 3px;
+  mix-blend-mode: multiply;
+}
+.gg-doc-h1 { margin: 0 0 4px; font-size: 15px; font-weight: 700; color: #202124; }
+.gg-doc-meta { margin: 0 0 22px; font-size: 10.5px; color: #5f6368; }
+.gg-doc-para {
+  margin: 0 0 14px;
+  font-family: Arial, 'Helvetica Neue', sans-serif;
+  font-size: 11pt;
+  line-height: 1.55;
+  color: #202124;
+  white-space: pre-wrap;
+  text-align: left;
+}
+.gg-doc-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  margin-left: 1px;
+  vertical-align: -0.16em;
+  background: #1a73e8;
+}
+.gg-doc-endnote { margin-top: 18px; font-family: Arial, sans-serif; font-size: 10.5pt; color: #5f6368; font-style: italic; }
+.gg-doc-gutter { width: 0; }
+.gg-doc-comment { display: none; }
+.gg-doc-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 18px;
+  background: #f9fbfd;
+  border-top: 1px solid #e0e3e7;
+  font-size: 11px;
+  color: #5f6368;
+}
+.gg-doc-words {
+  all: unset;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #5f6368;
+}
+.gg-doc-words:hover { background: rgba(68,71,70,.08); }
+.gg-doc-pages, .gg-doc-lang, .gg-doc-comments { color: #5f6368; }
+@media (max-width: 760px) {
+  .gg-doc-page { padding: 40px 26px 70px; min-height: 0; }
+  .gg-doc-menus { display: none; }
+  .gg-doc-title { max-width: 52vw; font-size: 15px; }
+  .gg-doc-toolbar { overflow-x: auto; }
+}
+
+/* panic mode chooser */
+.gg-mode-choice { display: grid; gap: 8px; margin: 10px 0 4px; }
+.gg-mode-choice button {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.04);
+  transition: border-color .15s ease, background .15s ease;
+}
+.gg-mode-choice button strong { font-size: 12.5px; font-weight: 900; color: var(--foreground); }
+.gg-mode-choice button small { font-size: 11px; line-height: 1.4; color: var(--muted); font-weight: 700; }
+.gg-mode-choice button:hover { border-color: rgba(255,255,255,.22); }
+.gg-mode-choice button.is-active {
+  border-color: var(--lime);
+  background: rgba(215,243,74,.08);
+  box-shadow: inset 0 0 0 1px rgba(215,243,74,.25);
+}
+
+.gg-coop-p2-keys {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(215,243,74,.07);
+  border: 1px solid rgba(215,243,74,.22);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.gg-coop-p2-keys span { margin-right: 4px; color: var(--lime); letter-spacing: .04em; }
+.gg-coop-p2-keys kbd {
+  font: inherit;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid var(--line);
+  color: var(--foreground);
+}
+/* The seat note wraps under the key chips rather than squeezing them. */
+.gg-coop-p2-keys small {
+  flex-basis: 100%;
+  font-weight: 600;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* ---- two-player picks in the room ------------------------------------ */
+/*
+ * The room used to offer "send this game" for whatever happened to be open,
+ * which is useless for a title with one player in it. These tiles are the
+ * verified two-player list, and they are shown while the room is still waiting
+ * for the friend so both people can see the same short menu.
+ */
+.gg-coop-games {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--line);
+}
+.gg-coop-games .gg-overline { margin: 0; }
+.gg-coop-games-list {
+  display: grid;
+  gap: 6px;
+  /* Two columns on a wide panel, one on a phone: the controls line needs the
+     room and a squeezed two-column grid wraps it into unreadable fragments. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  max-height: 216px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.gg-coop-game {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.04);
+  color: var(--foreground);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.gg-coop-game:hover { border-color: rgba(215,243,74,.45); background: rgba(215,243,74,.08); }
+.gg-coop-game:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+.gg-coop-game.is-current { border-color: var(--lime); background: rgba(215,243,74,.14); }
+.gg-coop-game strong {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+  letter-spacing: .01em;
+}
+.gg-coop-game span { font-size: 10px; color: var(--muted); line-height: 1.35; }
+.gg-coop-games .gg-help { margin: 0; font-size: 10px; }
+
+/* ---- first-run welcome ------------------------------------------------ */
+.gg-welcome {
+  position: fixed;
+  right: 18px;
+  top: 84px;
+  z-index: 59;
+  width: min(320px, calc(100vw - 36px));
+  padding: 14px 14px 12px;
+  border-radius: 18px;
+  background: rgba(14, 17, 24, .97);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px rgba(0,0,0,.5);
+  backdrop-filter: blur(12px);
+  animation: gg-welcome-in .32s cubic-bezier(.2,.9,.3,1) both;
+}
+.gg-welcome.is-leaving { animation: gg-welcome-out .18s ease-in both; }
+@keyframes gg-welcome-in {
+  from { opacity: 0; transform: translateY(-10px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes gg-welcome-out {
+  to { opacity: 0; transform: translateY(-8px) scale(.98); }
+}
+.gg-welcome header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.gg-welcome header button {
+  all: unset;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  width: 24px; height: 24px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.07);
+  color: var(--foreground);
+}
+.gg-welcome header button:hover { background: rgba(255,255,255,.16); }
+.gg-welcome ul { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 9px; }
+.gg-welcome li { display: flex; gap: 9px; align-items: flex-start; }
+.gg-welcome-icon {
+  flex: none;
+  width: 26px; height: 26px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: rgba(215,243,74,.12);
+  color: var(--lime);
+  border: 1px solid rgba(215,243,74,.22);
+}
+.gg-welcome li strong { display: block; font-size: 12px; font-weight: 900; }
+.gg-welcome li small { display: block; font-size: 11px; line-height: 1.45; color: var(--muted); font-weight: 600; }
+.gg-welcome-actions { display: flex; gap: 8px; }
+.gg-welcome-actions .gg-primary,
+.gg-welcome-actions .gg-secondary { flex: 1; text-align: center; }
+@media (max-width: 640px) {
+  .gg-welcome { right: 10px; left: 10px; top: auto; bottom: 132px; width: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gg-welcome, .gg-welcome.is-leaving { animation: none; }
+}
+
+/* ---------------- command palette & shortcut sheet ----------------
+   Both are overlays, so they sit above the header and the game modal. The
+   backdrop is deliberately the same in either theme: it is a dimmer, not a
+   surface, and a white dimmer over a dark page reads as a flash. */
+
+.palette-overlay,
+.shortcut-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 16px 24px;
+  background: rgba(4, 5, 9, 0.66);
+  backdrop-filter: blur(6px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.palette,
+.shortcut-sheet {
+  width: min(620px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.palette-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.palette-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 15px;
+}
+
+.palette-search kbd,
+.palette-foot kbd,
+.shortcut-row kbd {
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.palette-results {
+  max-height: min(46vh, 420px);
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.palette-group {
+  margin: 8px 0 4px;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.palette-item span:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.palette-item.is-active {
+  background: var(--surface-strong);
+}
+
+.palette-item.is-active svg {
+  color: var(--lime);
+}
+
+.palette-hint {
+  color: var(--muted);
+  font-size: 11px;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-empty {
+  margin: 0;
+  padding: 24px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.palette-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.palette-foot span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.palette-foot kbd + kbd {
+  margin-left: 2px;
+}
+
+.shortcut-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.shortcut-head h2 {
+  margin: 0;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+
+.shortcut-head button {
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.shortcut-note {
+  margin: 0;
+  padding: 12px 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.shortcut-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  padding: 0 18px 18px;
+}
+
+.shortcut-group h3 {
+  margin: 0 0 6px;
+  color: var(--lime);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px dotted var(--line);
+  font-size: 12px;
+}
+
+.shortcut-row:last-child {
+  border-bottom: 0;
+}
+
+@media (max-width: 560px) {
+  .palette-overlay,
+  .shortcut-overlay {
+    padding: 6vh 10px 16px;
+  }
+}
+
+/* ---------------- extras strip ----------------
+   Four cards between the hero and the catalogue. The grid is auto-fit with a
+   200px floor so it becomes a 2x2 on a tablet and a single column on a phone
+   without any breakpoints of its own. */
+
+.extras-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 22px 0 8px;
+}
+
+.extras-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  min-width: 0;
+}
+
+.extras-daily {
+  /* The daily pick is the reason to come back, so it gets the accent border. */
+  border-color: color-mix(in srgb, var(--lime) 38%, var(--line));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--lime) 8%, var(--panel)), var(--panel));
+}
+
+.extras-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.extras-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--lime);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.extras-meta {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.extras-link {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.extras-card h3 {
+  margin: 0;
+  font-size: 17px;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+.extras-copy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.extras-tip {
+  font-size: 14px !important;
+  font-weight: 600;
+}
+
+.extras-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.extras-chip {
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+a.extras-chip:hover {
+  color: var(--foreground);
+  border-color: var(--muted);
+}
+
+.extras-progress {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  overflow: hidden;
+}
+
+.extras-progress span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--lime);
+}
+
+.extras-play {
+  margin-top: auto;
+  padding: 8px 12px;
+  border: 1px solid var(--lime);
+  border-radius: 9px;
+  background: var(--lime);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  text-align: center;
+}
+
+.extras-share {
+  display: flex;
+  gap: 6px;
+}
+
+.extras-share-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: 11px;
+}
+
+.extras-copybtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.extras-share-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.extras-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.extras-bar-row {
+  display: grid;
+  grid-template-columns: minmax(52px, 0.8fr) minmax(0, 1.4fr) 26px;
+  align-items: center;
+  gap: 7px;
+  font-size: 10.5px;
+}
+
+.extras-bar-label {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.extras-bar-track {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  overflow: hidden;
+}
+
+.extras-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--lime);
+}
+
+.extras-bar-count {
+  color: var(--muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- next up rail ---------------- */
+
+.nextup {
+  margin: 30px 0 10px;
+}
+
+.nextup-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.nextup-head h2 {
+  margin: 2px 0 0;
+  font-size: clamp(22px, 3vw, 30px);
+  letter-spacing: -0.02em;
+}
+
+.nextup-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.nextup-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nextup-actions button:hover {
+  color: var(--foreground);
+  border-color: var(--muted);
+}
+
+.nextup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.nextup-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--panel);
+  min-width: 0;
+}
+
+.nextup-card h3 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nextup-genre {
+  align-self: flex-start;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nextup-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.nextup-buttons {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.nextup-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 11px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--lime);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.nextup-skip {
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nextup-skip:hover {
+  color: var(--coral);
+  border-color: var(--coral);
+}
+
+.nextup-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* ==================================================================
+   Accessibility layer
+   ==================================================================
+
+   These are not decoration. Each rule below fixes a case where a person
+   using a keyboard, a screen reader, or a display with poor contrast could
+   not use the site at all.
+   ================================================================== */
+
+/* A skip link that is invisible until it is focused. Hidden with clip rather
+   than display:none, because a display:none link cannot receive focus. */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 200;
+  padding: 10px 14px;
+  border-radius: 9px;
+  background: var(--lime);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 120ms ease;
+}
+
+.skip-link:focus-visible,
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+/* One focus ring, everywhere, and never removed without a replacement.
+   `outline: none` was set in three places; each of those left a keyboard user
+   with no idea where they were. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Firefox draws its own inner ring; keeping both is noisy. */
+:where(button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
+/* Forced-colours mode (Windows High Contrast) throws away our palette, so the
+   things that carry meaning by colour alone need a border to survive. */
+@media (forced-colors: active) {
+  .filter-tabs button.active,
+  .palette-item.is-active,
+  .tool-badge,
+  .nextup-genre {
+    border: 1px solid CanvasText;
+  }
+
+  .tool-verdict.good,
+  .tool-verdict.bad,
+  .tool-error {
+    border: 2px solid CanvasText;
+  }
+
+  .extras-bar-fill,
+  .tool-bar-fill,
+  .extras-progress span {
+    background: Highlight;
+  }
+}
+
+/* Reduced motion already covers most of the site; this catches the handful of
+   components added since, and makes the rule global rather than per-file. */
+@media (prefers-reduced-motion: reduce) {
+  .skip-link,
+  .extras-progress span,
+  .nextup-card,
+  .palette,
+  .shortcut-sheet {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Screen-reader-only text: available to assistive tech, invisible on screen.
+   Used for the labels that a sighted visitor gets from layout. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Make a target announce its pressed state to assistive tech even when it is a
+   plain button with a visual class. */
+[aria-pressed='true'] {
+  font-weight: 800;
+}
+
+/* Long words in headings (a game called "Supercalifragilistic") must not push
+   the layout wider than the viewport. */
+h1, h2, h3, .game-card h2, .nextup-card h3 {
+  overflow-wrap: anywhere;
+}
+
+/* ---------------- scratchpad ---------------- */
+
+.scratch-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(4, 5, 9, 0.66);
+  backdrop-filter: blur(6px);
+}
+
+.scratch {
+  width: min(640px, 100%);
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.scratch-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.scratch-head h2 {
+  margin: 0 0 2px;
+  font-size: 16px;
+}
+
+.scratch-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.scratch-head button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+
+.scratch-area {
+  flex: 1;
+  min-height: 220px;
+  padding: 14px 16px;
+  border: 0;
+  outline: 0;
+  resize: vertical;
+  background: transparent;
+  color: var(--foreground);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.scratch-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.scratch-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.scratch-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.scratch-clear,
+.scratch-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.scratch-clear {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+}
+
+.scratch-save {
+  border: 1px solid var(--lime);
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.scratch-save:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---------------- misc small surfaces ---------------- */
+
+.reading-time {
+  display: inline-block;
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* The single polite live region. It is visually hidden when empty and a small
+   pill when it has something to say, so it never shifts the layout. */
+.status-line {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: 140;
+  transform: translateX(-50%) translateY(8px);
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 140ms ease, transform 140ms ease;
+  pointer-events: none;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+}
+
+.status-line:not(:empty) {
+  padding: 9px 16px;
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.status-line[data-status='error'] {
+  border-color: var(--coral);
+  color: var(--coral);
+}
+
+.status-line[data-status='saved'] {
+  border-color: var(--lime);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-line,
+  .scratch-overlay {
+    transition: none;
+  }
+}
+
+.new-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--lime);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* Cards get a visible focus ring when navigated with the arrow keys, because
+   the focus has moved to an element that is not naturally focusable. */
+[data-grid-item]:focus-within {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+  border-radius: 14px;
+}
+
+/* ---------------- storage panel ---------------- */
+
+.storage-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 135;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(4, 5, 9, 0.66);
+  backdrop-filter: blur(6px);
+}
+
+.storage-panel {
+  width: min(560px, 100%);
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.storage-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.storage-head h2 {
+  margin: 0 0 3px;
+  font-size: 15px;
+}
+
+.storage-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.storage-head button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.storage-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  overflow-y: auto;
+}
+
+.storage-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'name size' 'key size';
+  gap: 1px 10px;
+  padding: 7px 16px;
+}
+
+.storage-list li + li {
+  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+
+.storage-name {
+  grid-area: name;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.storage-key {
+  grid-area: key;
+  color: var(--muted);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10px;
+}
+
+.storage-size {
+  grid-area: size;
+  align-self: center;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.storage-empty {
+  grid-template-areas: none !important;
+  grid-template-columns: 1fr !important;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 18px 16px !important;
+}
+
+.storage-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.storage-wipe {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border: 1px solid var(--coral);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--coral);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.storage-wipe:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---------------- back to top ---------------- */
+
+.back-to-top {
+  position: fixed;
+  right: 18px;
+  bottom: 76px;
+  z-index: 90;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--foreground);
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.back-to-top:hover {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+/* The ring is a conic gradient clipped to a border, so it shows progress
+   without a second element or a canvas. */
+.back-to-top-ring {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(var(--lime) var(--progress, 0%), transparent 0);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .back-to-top {
+    right: 12px;
+    bottom: 68px;
+    width: 38px;
+    height: 38px;
+  }
+}
+
+.greeting {
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.privacy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.section-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--lime);
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.section-link:hover {
+  text-decoration: underline;
+}
+
+.recent-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 10px 0 0;
+}
+
+.recent-tools-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.recent-tools-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--foreground);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.recent-tools-chip:hover {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+@media (forced-colors: active) {
+  .back-to-top,
+  .storage-panel,
+  .scratch {
+    border: 1px solid CanvasText;
+  }
+  .storage-wipe {
+    forced-color-adjust: none;
+  }
+}
+
+
+/* ---------------- reading comfort ---------------- */
+
+/* Balanced headline wrapping. `balance` on short headings stops a single word
+   from being orphaned onto its own line, which is the most common ugly break on
+   a narrow screen. `pretty` on body copy avoids a one-word last line. */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p,
+li {
+  text-wrap: pretty;
+}
+
+/* Anchored sections need room under the sticky header, or a jump link parks the
+   heading underneath it. */
+:target,
+section[id],
+h1[id],
+h2[id],
+h3[id] {
+  scroll-margin-top: 84px;
+}
+
+/* Anything that can be focused should show where the focus is, even in a
+   browser that does not support :focus-visible — the fallback is deliberate. */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
+/* Mobile notch and home-indicator padding. Without this the footer's last line
+   sits under the gesture bar on an iPhone. */
+.lounge-shell {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ---------------- print ---------------- */
+
+/* Nobody prints a games site, but if they do — a list of favourites, a
+   permission slip — the chrome should not waste the page. */
+@media print {
+  .site-header,
+  .admin-fab,
+  .back-to-top,
+  .status-line,
+  .scratch-overlay,
+  .storage-overlay,
+  .palette-overlay,
+  .shortcut-overlay,
+  .gg-welcome,
+  .noise,
+  .orbit,
+  footer .footer-bottom a[href='/api/health'] {
+    display: none !important;
+  }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .game-card {
+    break-inside: avoid;
+  }
+
+  a[href^='http']::after {
+    content: ' (' attr(href) ')';
+    font-size: 9px;
+    color: #555;
+  }
+}
+
+/* The "New" badge sits on the artwork, top-right, opposite the rating. */
+.card-new-badge {
+  position: absolute;
+  top: 10px;
+  right: 44px;
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* The greeting is a quiet second line under the section heading, not a rival
+   headline: lowercase weight at heading size reads as a note, not a slogan. */
+.section-heading h2 .greeting {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* The secondary breakdown in the collection note: same row, quieter weight. */
+.collection-note .collection-breakdown {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-left: 1px solid var(--line);
+  padding-left: 10px;
+  margin-left: 2px;
+}
+
+/* ---------------- toolbar result count ---------------- */
+
+.toolbar-count {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- toolbar keyboard hint ---------------- */
+
+.grid-key-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .grid-key-hint {
+    display: none;
+  }
 }

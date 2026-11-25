@@ -27,7 +27,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ gameId: string
   try{
     const body = await req.json() as any
     const data = typeof body.data === 'string' ? body.data : JSON.stringify(body.data || {})
-    if(data.length > 500_000) return NextResponse.json({ error: "Save too large" }, { status: 400 })
+    // Real web builds carry big save files (Leaf Blower Revolution's is ~1.2 MB
+    // raw, ~85 KB gzipped), so allow a generous cap while staying under the
+    // Postgres row/ TEXT practical limits.
+    const MAX_SAVE_BYTES = 4_000_000
+    if(data.length > MAX_SAVE_BYTES) return NextResponse.json({ error: "Save too large (limit 4 MB)" }, { status: 413 })
     const saved = await setSave(user.id, gameId, data)
     return NextResponse.json({ ok: true, save: saved })
   }catch(e:any){

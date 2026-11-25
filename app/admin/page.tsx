@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react';
 import {
   Ban,
@@ -22,20 +23,18 @@ import {
   X,
   Zap,
   TrendingUp,
-  Sparkles,
-  Activity,
+    Activity,
   FileCode,
   Image as ImageIcon,
   Search,
-  Filter,
-  Crown,
+    Crown,
 } from 'lucide-react';
 import { readFileAsDataUrl, uploadGameHtml } from '@/lib/upload-client';
 
 type BanRow = { id: string; identifier: string; reason: string | null; createdAt: string; expiresAt: string | null };
 type RequestRow = { id: string; title: string; icon: string | null; status: string; createdAt: string };
 type GameRow = { id: string; title: string; icon: string | null; createdAt: string };
-type VisitRow = { id: string; ip: string; ua: string; path: string; createdAt: string };
+type VisitRow = { id: string; ip: string; ua: string; path: string; createdAt: string; userId?: string | null; username?: string | null };
 type Data = { bans: BanRow[]; requests: RequestRow[]; games: GameRow[]; visits: VisitRow[]; mode: string };
 
 const empty: Data = { bans: [], requests: [], games: [], visits: [], mode: 'local' };
@@ -185,7 +184,7 @@ export default function AdminPage() {
 
   if (checking) {
     return (
-      <main className="admin-shell">
+      <main className="admin-shell" id="main-content">
         <section className="admin-login-card" style={{background:'linear-gradient(145deg, rgba(125,107,255,.12), rgba(215,243,74,.08))'}}>
           <div className="admin-spinner" aria-hidden />
           <p className="muted" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8}}><Activity size={16} className="spin"/> Contacting control room…</p>
@@ -219,9 +218,9 @@ export default function AdminPage() {
             <button type="submit" className="btn-primary" style={{borderRadius:14, padding:'14px', background:'linear-gradient(135deg, var(--lime), #c6ff00)', boxShadow:'0 8px 24px rgba(215,243,74,.25)'}}>Unlock console <Zap size={14}/></button>
           </form>
           {error && <p className="admin-error" style={{textAlign:'center', background:'rgba(255,92,92,.12)', border:'1px solid rgba(255,92,92,.22)', padding:'10px 14px', borderRadius:12}}>{error}</p>}
-          <a className="admin-back" href="/" style={{display:'inline-flex', alignItems:'center', gap:6, justifyContent:'center', width:'100%', marginTop:16}}>
+          <Link className="admin-back" href="/" style={{display:'inline-flex', alignItems:'center', gap:6, justifyContent:'center', width:'100%', marginTop:16}}>
             ← Back to lounge
-          </a>
+          </Link>
         </section>
       </main>
     );
@@ -235,11 +234,15 @@ export default function AdminPage() {
     { icon: <ShieldAlert size={20} />, label: 'Bans', value: data.bans.length, sub: data.bans.length? 'active':'peace', color: 'muted', trend: data.bans.length? 'enforced':'calm' },
   ];
 
-  const filteredVisits = data.visits.filter(v=> !search || v.ip.includes(search) || v.path.toLowerCase().includes(search.toLowerCase()) || shortUa(v.ua).toLowerCase().includes(search.toLowerCase())).slice(0,20)
+  const filteredVisits = data.visits.filter(v=> !search
+    || v.ip.includes(search)
+    || v.path.toLowerCase().includes(search.toLowerCase())
+    || (v.username || 'anonymous').toLowerCase().includes(search.toLowerCase())
+    || shortUa(v.ua).toLowerCase().includes(search.toLowerCase())).slice(0,20)
   const filteredBans = data.bans.filter(b=> !search || b.identifier.includes(search) || (b.reason||'').toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <main className="admin-shell" style={{maxWidth:1280}}>
+    <main className="admin-shell" style={{maxWidth:1280}} id="main-content">
       <header className="console-header" style={{background:'linear-gradient(135deg, rgba(215,243,74,.14) 0%, rgba(125,107,255,.12) 45%, rgba(255,255,255,.04) 100%)', border:'1px solid rgba(255,255,255,.10)', boxShadow:'0 16px 40px rgba(0,0,0,.25)', backdropFilter:'blur(12px)', padding:'22px 24px', borderRadius:22}}>
         <div className="console-brand" style={{gap:16}}>
           <span className="console-shield" style={{background:'linear-gradient(135deg, var(--lime), #b8ff00)', boxShadow:'0 10px 30px rgba(215,243,74,.35)', width:52, height:52, borderRadius:16}}>
@@ -257,7 +260,7 @@ export default function AdminPage() {
         <div className="console-actions" style={{flexDirection:'column',alignItems:'stretch',gap:12, minWidth:280}}>
           <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
             <div style={{flex:1, display:'flex',alignItems:'center',gap:8, padding:'8px 12px', borderRadius:999, background:'rgba(0,0,0,.25)', border:'1px solid rgba(255,255,255,.08)'}}><Search size={14} style={{opacity:.5}}/><input value={search} onChange={e=> setSearch(e.target.value)} placeholder="Search IP, path, ban reason" style={{background:'transparent', border:0, outline:'none', color:'#fff', fontSize:12, flex:1}} /></div>
-            <a className="btn-ghost" href="/" style={{padding:'10px 14px', borderRadius:12, background:'rgba(255,255,255,.06)', backdropFilter:'blur(6px)'}}><Gamepad2 size={14}/> Lounge</a>
+            <Link className="btn-ghost" href="/" style={{padding:'10px 14px', borderRadius:12, background:'rgba(255,255,255,.06)', backdropFilter:'blur(6px)'}}><Gamepad2 size={14}/> Lounge</Link>
             <button className="btn-ghost" onClick={() => void logout()} style={{padding:'10px 14px', borderRadius:12}}>
               <LogOut size={15} /> Log out
             </button>
@@ -309,7 +312,21 @@ export default function AdminPage() {
               {filteredVisits.map((v) => (
                 <div className="visit-row" key={v.id} style={{padding:'12px 14px', borderRadius:14, background:'rgba(0,0,0,.22)', border:'1px solid rgba(255,255,255,.06)', transition:'border-color .2s'}}>
                   <div className="row-main" style={{gap:4}}>
-                    <strong style={{display:'flex',alignItems:'center',gap:8, fontSize:13}}><span style={{width:28, height:28, borderRadius:999, background:'linear-gradient(135deg, #7d6bff, #5a48d6)', color:'#fff', display:'grid', placeItems:'center', fontSize:10, fontWeight:900}}>{v.ip.slice(0,2).toUpperCase()}</span> {v.ip} <span style={{fontSize:10, padding:'2px 7px', borderRadius:999, background:'rgba(215,243,74,.14)', border:'1px solid rgba(215,243,74,.25)', color:'var(--lime)'}}>{v.path}</span></strong>
+                    <strong style={{display:'flex',alignItems:'center',gap:8, fontSize:13, flexWrap:'wrap'}}>
+                      {v.username
+                        ? <>
+                            <span style={{width:28, height:28, borderRadius:999, background:'linear-gradient(135deg, #22c55e, #15803d)', color:'#fff', display:'grid', placeItems:'center', fontSize:10, fontWeight:900}}>{(v.username[0] || '?').toUpperCase()}</span>
+                            <span title="Signed in">{v.username}</span>
+                            <span style={{fontSize:10, padding:'2px 7px', borderRadius:999, background:'rgba(34,197,94,.16)', border:'1px solid rgba(34,197,94,.35)', color:'#22c55e'}}>signed in</span>
+                            <span style={{fontSize:11, opacity:.55, fontFamily:'ui-monospace, monospace'}}>{v.ip}</span>
+                          </>
+                        : <>
+                            <span style={{width:28, height:28, borderRadius:999, background:'linear-gradient(135deg, #7d6bff, #5a48d6)', color:'#fff', display:'grid', placeItems:'center', fontSize:10, fontWeight:900}}>an</span>
+                            <span style={{opacity:.85}}>anonymous</span>
+                            <span style={{fontSize:11, opacity:.7, fontFamily:'ui-monospace, monospace'}} title="IP address — the only identifier for a guest">{v.ip}</span>
+                          </>}
+                      <span style={{fontSize:10, padding:'2px 7px', borderRadius:999, background:'rgba(215,243,74,.14)', border:'1px solid rgba(215,243,74,.25)', color:'var(--lime)'}}>{v.path}</span>
+                    </strong>
                     <span style={{display:'flex',alignItems:'center',gap:6, fontSize:11, opacity:.6}}>
                       {shortUa(v.ua)} • {timeAgo(v.createdAt)} <span style={{width:6,height:6,borderRadius:999,background:'#22c55e', display:'inline-block', boxShadow:'0 0 6px #22c55e'}}/>
                     </span>

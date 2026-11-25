@@ -1,18 +1,20 @@
+import Link from 'next/link'
 import type { Metadata } from 'next'
 import { Gamepad2, ShieldCheck, Eye, Trash2, Cookie, Lock, Mail } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — GG-Lounge',
+  // The root layout appends " | GG-Lounge"; repeating it here printed it twice.
+  title: 'Privacy Policy',
   description: 'Privacy policy for GG-Lounge — what we store, why, and how to delete it.',
 }
 
 export default function PrivacyPage() {
   return (
-    <main className="lounge-shell">
+    <main className="lounge-shell" id="main-content">
       <div className="noise" aria-hidden="true" />
       <header className="site-header">
-        <a href="/" className="brand"><span className="brand-mark"><Gamepad2 size={19} /></span><span>GG-LOUNGE<span className="tm">™</span></span></a>
-        <nav className="header-nav"><a href="/">Library</a><a href="/apps">Apps</a><a href="/proxy">Proxy</a><a href="/terms">Terms</a></nav>
+        <Link href="/" className="brand"><span className="brand-mark"><Gamepad2 size={19} /></span><span>GG-LOUNGE<span className="tm">™</span></span></Link>
+        <nav className="header-nav"><Link href="/">Library</Link><Link href="/apps">Apps</Link><Link href="/proxy">Proxy</Link><Link href="/terms">Terms</Link></nav>
         <div className="header-status"><span className="live-dot" /> Privacy</div>
       </header>
       <section className="catalog" style={{ maxWidth: 860 }}>
@@ -52,7 +54,7 @@ export default function PrivacyPage() {
             <p style={{ marginTop: 10, padding: 12, borderRadius: 12, background: 'rgba(215,243,74,.08)', border: '1px solid rgba(215,243,74,.2)', fontSize: 13 }}><strong>Under 13?</strong> Don't register. Play as guest — no personal info needed.</p>
           </Card>
           <Card icon={<Mail size={16} />} title="Contact & age">
-            <p>This is a hobby project by <strong>Kai Chauhan — GG-Lounge Studios™</strong>. For privacy requests: open <a href="/request-game" style={{ textDecoration: 'underline' }}>Request page</a> and type "privacy". We respond within 7 days.</p>
+            <p>This is a hobby project by <strong>DAGOD22 — GG-Lounge Studios™</strong>. For privacy requests: open <a href="/request-game" style={{ textDecoration: 'underline' }}>Request page</a> and type "privacy". We respond within 7 days.</p>
             <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 12 }}>If we change this policy, we bump the date above and post a banner on the lounge for 7 days.</p>
           </Card>
         </div>
@@ -64,7 +66,7 @@ export default function PrivacyPage() {
         </div>
       </section>
       <footer style={{ maxWidth: 860, margin: '40px auto 0', padding: '20px 38px', borderTop: '1px solid var(--line)', color: 'var(--muted)', fontSize: 11, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <span>© 2026 GG-LOUNGE STUDIOS™</span><span><a href="/terms" style={{ textDecoration: 'underline' }}>Terms</a> • <a href="/privacy" style={{ textDecoration: 'underline' }}>Privacy</a> • <a href="/">Home</a></span>
+        <span>© 2026 GG-LOUNGE STUDIOS™</span><span><Link href="/terms" style={{ textDecoration: 'underline' }}>Terms</Link> • <Link href="/privacy" style={{ textDecoration: 'underline' }}>Privacy</Link> • <Link href="/">Home</Link></span>
       </footer>
     </main>
   )

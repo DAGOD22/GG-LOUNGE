@@ -24,7 +24,17 @@ var platforms = [],
   animloop,
   flag = 0,
   menuloop, broken = 0,
-  dir, score = 0, firstRun = true;
+  dir, score = 0, firstRun = true,
+  // Highest score seen on this device. GGSave degrades to cookies / window.name
+  // when the browser blocks localStorage, so the record still survives a reload.
+  bestScore = (window.GGSave ? GGSave.get('best', 0) : 0) || 0;
+
+function recordBest() {
+  if (score > bestScore) {
+    bestScore = score;
+    if (window.GGSave) GGSave.set('best', bestScore);
+  }
+}
 
 //Base object
 var Base = function() {
@@ -443,6 +453,9 @@ function init() {
     } 
     else if(player.y < height / 2) flag = 1;
     else if(player.y + player.height > height) {
+      recordBest();
+      var bestEl = document.getElementById("go_best");
+      if (bestEl) bestEl.textContent = "best " + bestScore + " points";
       showGoMenu();
       hideScore();
       player.isDead = "lol";

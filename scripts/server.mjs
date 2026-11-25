@@ -27,7 +27,9 @@ const server = createServer({ maxHeaderSize: 64 * 1024 }, (req, res) => {
 });
 server.on('upgrade', (req, socket, head) => {
   const path = new URL(req.url, 'http://internal.invalid').pathname;
-  if (path !== '/wisp/' && path !== '/wisp') {
+  // Both the historical /wisp path and the Next route path are accepted so the
+  // client can point at /api/wisp and stay same-origin.
+  if (path !== '/wisp/' && path !== '/wisp' && path !== '/api/wisp' && path !== '/api/wisp/') {
     if (upgrade) upgrade(req, socket, head); else socket.destroy();
     return;
   }

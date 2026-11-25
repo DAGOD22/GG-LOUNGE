@@ -1,19 +1,53 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { rateLimit, rateLimitResponse, type RateDecision } from "@/lib/rate-limit";
 
-// ——— Simple in-memory rate limit for API abuse (per-IP, per-route) ———
-const _rlBuckets = new Map<string, { count: number; resetAt: number }>()
-function _rl(key: string, limit: number, windowMs: number) {
-  const now = Date.now()
-  if (_rlBuckets.size > 5000) for (const [key, bucket] of _rlBuckets) if (bucket.resetAt <= now) _rlBuckets.delete(key)
-  const b = _rlBuckets.get(key)
-  if (!b || b.resetAt <= now) {
-    const nb = { count: 1, resetAt: now + windowMs }
-    _rlBuckets.set(key, nb)
-    return { ok: true, remaining: limit - 1, resetAt: nb.resetAt }
-  }
-  if (b.count >= limit) return { ok: false, remaining: 0, resetAt: b.resetAt }
-  b.count++
-  return { ok: true, remaining: limit - b.count, resetAt: b.resetAt }
+/**
+ * One limiter, one set of buckets.
+ *
+ * This file used to carry its own copy of the sliding-window code while
+ * lib/rate-limit.ts carried another, so an address could spend its budget twice
+ * over — once against the middleware counter and once against the route counter —
+ * and the two disagreed about how much was left. Everything now shares the
+ * buckets in lib/rate-limit.ts; the policies below stay here because they are
+ * about *this* edge, not about counting.
+ */
+const API_POLICIES: { match: (pathname: string) => boolean; key: string; limit: number; windowMs: number; message: string }[] = [
+  {
+    match: p => p.startsWith("/api/yt"),
+    key: "yt",
+    limit: 120,
+    windowMs: 60_000,
+    message: "Rate limited — slow down",
+  },
+  {
+    match: p => p.startsWith("/api/bare") || p.startsWith("/api/edu") || p.startsWith("/api/learn") || p.startsWith("/api/t"),
+    key: "bare",
+    limit: 1800,
+    windowMs: 60_000,
+    message: "Rate limited — bare busy",
+  },
+  { match: p => p.startsWith("/api/visit"), key: "visit", limit: 30, windowMs: 60_000, message: "Rate limited" },
+  { match: p => p.startsWith("/api/game-requests"), key: "req", limit: 20, windowMs: 60_000, message: "Rate limited" },
+  { match: p => p.startsWith("/api/presence"), key: "presence", limit: 240, windowMs: 60_000, message: "Rate limited" },
+  { match: p => p.startsWith("/api/coop"), key: "coop", limit: 240, windowMs: 60_000, message: "Rate limited" },
+  { match: p => p.startsWith("/api/gg-gpt"), key: "gg-gpt", limit: 30, windowMs: 60_000, message: "Rate limited — one question at a time" },
+  { match: p => p.startsWith("/api/uploads"), key: "uploads", limit: 120, windowMs: 60_000, message: "Rate limited — too many pieces" },
+  { match: p => p.startsWith("/api/report"), key: "report", limit: 20, windowMs: 60_000, message: "Rate limited" },
+  { match: p => p.startsWith("/api/achievements") || p.startsWith("/api/game-stats") || p.startsWith("/api/user-state"), key: "progress", limit: 300, windowMs: 60_000, message: "Rate limited" },
+  { match: p => p.startsWith("/api/search"), key: "search", limit: 120, windowMs: 60_000, message: "Rate limited" },
+  { match: p => p.startsWith("/api/leaderboard") || p.startsWith("/api/games") || p.startsWith("/api/health"), key: "read", limit: 240, windowMs: 60_000, message: "Rate limited" },
+];
+
+function limited(decision: RateDecision, limit: number, message: string): NextResponse {
+  const retryAfter = Math.max(1, Math.ceil((decision.resetAt - Date.now()) / 1000));
+  return new NextResponse(JSON.stringify({ error: message, retryAfter }), {
+    status: 429,
+    headers: {
+      "content-type": "application/json",
+      "retry-after": String(retryAfter),
+      ...rateLimitResponse(limit, decision.remaining, decision.resetAt),
+    },
+  });
 }
 
 /**
@@ -24,23 +58,19 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // ——— Rate limit high-abuse APIs ———
-  const _ipRL = (request.headers.get("x-forwarded-for") || "").split(",")[0].trim() || request.headers.get("x-real-ip") || "unknown";
-  if (pathname.startsWith("/api/yt")) {
-    const media = pathname === '/api/yt/media' || pathname === '/api/yt/img';
-    const r = _rl(`yt:${media ? 'media' : 'api'}:${_ipRL}`, media ? 1200 : 120, 60_000);
-    if (!r.ok) return new NextResponse(JSON.stringify({ error: "Rate limited — slow down", retryAfter: Math.ceil((r.resetAt - Date.now()) / 1000) }), { status: 429, headers: { "content-type": "application/json", "retry-after": String(Math.ceil((r.resetAt - Date.now()) / 1000)), "x-ratelimit-limit": "60", "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(Math.ceil(r.resetAt / 1000)) } });
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() || request.headers.get("x-real-ip") || "unknown";
+
+  // The media routes carry video, so they get their own much larger budget
+  // rather than a string comparison in three places.
+  if (pathname === "/api/yt/media" || pathname === "/api/yt/img") {
+    const media = rateLimit(`yt:media:${ip}`, 1200, 60_000);
+    if (!media.ok) return limited(media, 1200, "Rate limited — slow down");
   }
-  if (pathname.startsWith("/api/bare") || pathname.startsWith("/api/edu") || pathname.startsWith("/api/learn") || pathname.startsWith("/api/t")) {
-    const r = _rl(`bare:${_ipRL}`, 1800, 60_000);
-    if (!r.ok) return new NextResponse(JSON.stringify({ error: "Rate limited — bare busy", retryAfter: Math.ceil((r.resetAt - Date.now()) / 1000) }), { status: 429, headers: { "content-type": "application/json", "retry-after": String(Math.ceil((r.resetAt - Date.now()) / 1000)), "x-ratelimit-limit": "120", "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(Math.ceil(r.resetAt / 1000)) } });
-  }
-  if (pathname === "/api/visit" || pathname.startsWith("/api/visit")) {
-    const r = _rl(`visit:${_ipRL}`, 30, 60_000);
-    if (!r.ok) return new NextResponse(JSON.stringify({ error: "Rate limited" }), { status: 429, headers: { "retry-after": String(Math.ceil((r.resetAt - Date.now()) / 1000)) } });
-  }
-  if (pathname.startsWith("/api/game-requests")) {
-    const r = _rl(`req:${_ipRL}`, 20, 60_000);
-    if (!r.ok) return new NextResponse(JSON.stringify({ error: "Rate limited" }), { status: 429, headers: { "retry-after": String(Math.ceil((r.resetAt - Date.now()) / 1000)) } });
+
+  const policy = API_POLICIES.find(entry => entry.match(pathname));
+  if (policy) {
+    const decision = rateLimit(`${policy.key}:${ip}`, policy.limit, policy.windowMs);
+    if (!decision.ok) return limited(decision, policy.limit, policy.message);
   }
 
   // Everything is public now — no gate, no ban redirect

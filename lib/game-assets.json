@@ -1,9 +1,102 @@
 {
   "2048": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+    "available": true,
+    "issues": []
+  },
+  "state-io": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "shell-shockers": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "ev-io": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "drift-hunters": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "qwop": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "krunker": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "1v1-lol": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "skribbl": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "slither": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "agar": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "geoguessr": {
+    "available": true,
+    "proxy": true,
+    "issues": []
+  },
+  "mykonos": {
+    "available": true,
+    "issues": []
+  },
+  "series-of-tubes": {
+    "available": true,
+    "issues": []
+  },
+  "quake": {
+    "available": true,
+    "issues": []
+  },
+  "diablo": {
+    "available": true,
+    "issues": []
+  },
+  "doom-js13k": {
+    "available": true,
+    "issues": []
+  },
+  "wolfenstein": {
+    "available": true,
+    "issues": []
+  },
+  "wolf3d-classic": {
+    "available": true,
+    "issues": []
+  },
+  "prince-of-persia": {
+    "available": true,
+    "issues": []
+  },
+  "candy-crush": {
+    "available": true,
+    "issues": []
+  },
+  "webretro": {
+    "available": true,
+    "issues": []
   },
   "suika": {
     "available": true,
@@ -21,6 +114,10 @@
     "available": true,
     "issues": []
   },
+  "leaf-blower-revolution": {
+    "available": true,
+    "issues": []
+  },
   "level-devil": {
     "available": true,
     "issues": []
@@ -29,25 +126,9 @@
     "available": true,
     "issues": []
   },
-  "stickman-hook": {
-    "available": true,
-    "issues": []
-  },
   "ragdoll-archers": {
     "available": true,
     "issues": []
-  },
-  "hextris": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "solar-smash": {
-    "available": false,
-    "issues": [
-      "Remote CDN loader, not a local game"
-    ]
   },
   "drift-boss": {
     "available": true,
@@ -57,28 +138,7 @@
     "available": true,
     "issues": []
   },
-  "subway-surfers": {
-    "available": false,
-    "issues": [
-      "Remote CDN loader, not a local game",
-      "Missing runtime: /games/subway-surfers/4399.z.js",
-      "Missing runtime: /games/subway-surfers/master-loader.js"
-    ]
-  },
-  "survival-race": {
-    "available": false,
-    "issues": [
-      "Remote CDN loader, not a local game",
-      "Missing runtime: /games/survival-race/Build/yandexBrotli.loader.js"
-    ]
-  },
   "geometry-dash": {
-    "available": false,
-    "issues": [
-      "Authorized browser build not installed"
-    ]
-  },
-  "poki": {
     "available": true,
     "issues": []
   },
@@ -125,12 +185,6 @@
   "jetpack-joyride": {
     "available": true,
     "issues": []
-  },
-  "drift-hunters": {
-    "available": false,
-    "issues": [
-      "External Unity asset: dataUrl"
-    ]
   },
   "rooftop-snipers": {
     "available": true,
@@ -328,6 +382,322 @@
     "available": true,
     "issues": []
   },
+  "kittensgame": {
+    "available": true,
+    "issues": []
+  },
+  "universal-paperclips": {
+    "available": true,
+    "issues": []
+  },
+  "antimatter-dimensions": {
+    "available": true,
+    "issues": []
+  },
+  "space-company": {
+    "available": true,
+    "issues": []
+  },
+  "hextris": {
+    "available": true,
+    "issues": []
+  },
+  "hexgl": {
+    "available": true,
+    "issues": []
+  },
+  "react-tetris": {
+    "available": true,
+    "issues": []
+  },
+  "snakes": {
+    "available": true,
+    "issues": []
+  },
+  "pong": {
+    "available": true,
+    "issues": []
+  },
+  "breakout-arcade": {
+    "available": true,
+    "issues": []
+  },
+  "pacman-classic": {
+    "available": true,
+    "issues": []
+  },
+  "minesweeper-css": {
+    "available": true,
+    "issues": []
+  },
+  "bomberman": {
+    "available": true,
+    "issues": []
+  },
+  "infinite-mario": {
+    "available": true,
+    "issues": []
+  },
+  "asteroids": {
+    "available": true,
+    "issues": []
+  },
+  "invaderz": {
+    "available": true,
+    "issues": []
+  },
+  "space-invaders": {
+    "available": true,
+    "issues": []
+  },
+  "sudoku": {
+    "available": true,
+    "issues": []
+  },
+  "js-paint": {
+    "available": true,
+    "issues": []
+  },
+  "cut-the-rope": {
+    "available": true,
+    "issues": []
+  },
+  "cut-the-rope-time-travel": {
+    "available": true,
+    "issues": []
+  },
+  "server-survival": {
+    "available": true,
+    "issues": []
+  },
+  "isocity": {
+    "available": true,
+    "issues": []
+  },
+  "sandspiel": {
+    "available": true,
+    "issues": []
+  },
+  "sandboxels": {
+    "available": true,
+    "issues": []
+  },
+  "evolve-idle": {
+    "available": true,
+    "issues": []
+  },
+  "civis": {
+    "available": true,
+    "issues": []
+  },
+  "loopy": {
+    "available": true,
+    "issues": []
+  },
+  "classic-pool": {
+    "available": true,
+    "issues": []
+  },
+  "quantum-game": {
+    "available": true,
+    "issues": []
+  },
+  "pacman-tribute": {
+    "available": true,
+    "issues": []
+  },
+  "flexbox-froggy": {
+    "available": true,
+    "issues": []
+  },
+  "grid-garden": {
+    "available": true,
+    "issues": []
+  },
+  "tetris-classic": {
+    "available": true,
+    "issues": []
+  },
+  "star-battle": {
+    "available": true,
+    "issues": []
+  },
+  "dino-3d": {
+    "available": true,
+    "issues": []
+  },
+  "kaboom-minesweeper": {
+    "available": true,
+    "issues": []
+  },
+  "mahjong-solitaire": {
+    "available": true,
+    "issues": []
+  },
+  "solitaire": {
+    "available": true,
+    "issues": []
+  },
+  "polygons": {
+    "available": true,
+    "issues": []
+  },
+  "rush-3d": {
+    "available": true,
+    "issues": []
+  },
+  "cut-the-rope-holiday": {
+    "available": true,
+    "issues": []
+  },
+  "big-tower-tiny-square": {
+    "available": true,
+    "issues": []
+  },
+  "a-dark-room": {
+    "available": true,
+    "issues": []
+  },
+  "trimp": {
+    "available": true,
+    "issues": []
+  },
+  "untrusted": {
+    "available": true,
+    "issues": []
+  },
+  "browserquest": {
+    "available": true,
+    "issues": []
+  },
+  "pacman": {
+    "available": true,
+    "issues": []
+  },
+  "astray": {
+    "available": true,
+    "issues": []
+  },
+  "clumsy-bird": {
+    "available": true,
+    "issues": []
+  },
+  "2048-classic": {
+    "available": true,
+    "issues": []
+  },
+  "skifree": {
+    "available": true,
+    "issues": []
+  },
+  "js-racer": {
+    "available": true,
+    "issues": []
+  },
+  "gauntlet": {
+    "available": true,
+    "issues": []
+  },
+  "javascript-tetris": {
+    "available": true,
+    "issues": []
+  },
+  "snake-arcade": {
+    "available": true,
+    "issues": []
+  },
+  "simple-chess-ai": {
+    "available": true,
+    "issues": []
+  },
+  "pathfinding-visualizer": {
+    "available": true,
+    "issues": []
+  },
+  "snowbattle": {
+    "available": true,
+    "issues": []
+  },
+  "the-final-earth": {
+    "available": true,
+    "issues": []
+  },
+  "ns-shaft": {
+    "available": true,
+    "issues": []
+  },
+  "idle-breakout": {
+    "available": true,
+    "issues": []
+  },
+  "craftmine": {
+    "available": true,
+    "issues": []
+  },
+  "sand-game": {
+    "available": true,
+    "issues": []
+  },
+  "missile-game": {
+    "available": true,
+    "issues": []
+  },
+  "connect3": {
+    "available": true,
+    "issues": []
+  },
+  "meme-2048": {
+    "available": true,
+    "issues": []
+  },
+  "cupcake-2048": {
+    "available": true,
+    "issues": []
+  },
+  "doge-2048": {
+    "available": true,
+    "issues": []
+  },
+  "flappy-2048": {
+    "available": true,
+    "issues": []
+  },
+  "smashkarts": {
+    "available": true,
+    "issues": []
+  },
+  "DogeMiner": {
+    "available": true,
+    "issues": []
+  },
+  "defend-the-tank": {
+    "available": true,
+    "issues": []
+  },
+  "boxhead2play": {
+    "available": true,
+    "issues": []
+  },
+  "canyondefense": {
+    "available": true,
+    "issues": []
+  },
+  "adrenaline-challenge": {
+    "available": true,
+    "issues": []
+  },
+  "tosstheturtle": {
+    "available": true,
+    "issues": []
+  },
+  "matrixrampage": {
+    "available": true,
+    "issues": []
+  },
+  "gimme-the-airpod": {
+    "available": true,
+    "issues": []
+  },
   "stickman-golf": {
     "available": true,
     "issues": []
@@ -364,338 +734,308 @@
     "available": true,
     "issues": []
   },
-  "hole-io": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "1v1-lol": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "krunker": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "smashkarts": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "ev-io": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "shell-shockers": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "agar-io": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "slither-io": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "paper-io-2-3d": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "stumble-guys": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "baseball-bros": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "gunspin": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "football-bros": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "steep-descent": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "rocket-goal-io": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "sandbox": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "crazy-crash-landing": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "monster-truck": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "cyber-cars": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "volley-random": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "soccer-random": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "dash-arena": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "stick-war": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "extreme-racing": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "monster-survival": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "obby-shooter": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "helix-jump": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "ninja-parkour": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "red-vs-blue": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "build-defend": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "basket-bros": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "bad-simulator": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "a-small-world-cup": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "bitlife-simulator": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "big-tower-tiny-square": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "house-of-hazards": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "ball-blast": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "rocket-league-2d": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "noob-survival": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "car-king-arena-2": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "basketball-physics": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "12-minibattles": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "miner-dash": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "draw-climber": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "fall-guys": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "grindcraft-remastered": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "stick-archers-battle": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
   "piano-tiles": {
     "available": true,
     "issues": []
   },
-  "wheelie-bike": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "pixel-shooter": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "qwop": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "the-final-earth-2": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "uno": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
-  "sonic-the-hedgehog": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
-  },
   "there-is-no-game": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+    "available": true,
+    "issues": []
   },
-  "run-rabbit-run": {
-    "available": false,
-    "issues": [
-      "Missing local index.html"
-    ]
+  "superhot": {
+    "available": true,
+    "issues": []
+  },
+  "sm64": {
+    "available": true,
+    "issues": []
+  },
+  "HexGL": {
+    "available": true,
+    "issues": []
+  },
+  "bloonstd2": {
+    "available": true,
+    "issues": []
+  },
+  "bloonstd": {
+    "available": true,
+    "issues": []
+  },
+  "paperio2": {
+    "available": true,
+    "issues": []
+  },
+  "worlds-hardest-game-2": {
+    "available": true,
+    "issues": []
+  },
+  "wolf3d": {
+    "available": true,
+    "issues": []
+  },
+  "theheist": {
+    "available": true,
+    "issues": []
+  },
+  "stickwar": {
+    "available": true,
+    "issues": []
+  },
+  "vex3": {
+    "available": true,
+    "issues": []
+  },
+  "vex4": {
+    "available": true,
+    "issues": []
+  },
+  "vex5": {
+    "available": true,
+    "issues": []
+  },
+  "vex6": {
+    "available": true,
+    "issues": []
+  },
+  "tank-trouble-2": {
+    "available": true,
+    "issues": []
+  },
+  "cannon-basketball-4": {
+    "available": true,
+    "issues": []
+  },
+  "soldier-legend": {
+    "available": true,
+    "issues": []
+  },
+  "ducklife1": {
+    "available": true,
+    "issues": []
+  },
+  "ducklife3": {
+    "available": true,
+    "issues": []
+  },
+  "motox3m-spooky": {
+    "available": true,
+    "issues": []
+  },
+  "motox3m-winter": {
+    "available": true,
+    "issues": []
+  },
+  "motox3m-pool": {
+    "available": true,
+    "issues": []
+  },
+  "papery-planes": {
+    "available": true,
+    "issues": []
+  },
+  "push-the-square": {
+    "available": true,
+    "issues": []
+  },
+  "glass-city": {
+    "available": true,
+    "issues": []
+  },
+  "sort-the-court": {
+    "available": true,
+    "issues": []
+  },
+  "pandemic2": {
+    "available": true,
+    "issues": []
+  },
+  "endlesswar3": {
+    "available": true,
+    "issues": []
+  },
+  "blackknight": {
+    "available": true,
+    "issues": []
+  },
+  "creativekillchamber": {
+    "available": true,
+    "issues": []
+  },
+  "stormthehouse2": {
+    "available": true,
+    "issues": []
+  },
+  "factoryballs": {
+    "available": true,
+    "issues": []
+  },
+  "interactivebuddy": {
+    "available": true,
+    "issues": []
+  },
+  "miniputt": {
+    "available": true,
+    "issues": []
+  },
+  "hexempire": {
+    "available": true,
+    "issues": []
+  },
+  "circlo": {
+    "available": true,
+    "issues": []
+  },
+  "polybranch": {
+    "available": true,
+    "issues": []
+  },
+  "rolly-vortex": {
+    "available": true,
+    "issues": []
+  },
+  "minesweeper": {
+    "available": true,
+    "issues": []
+  },
+  "google-snake": {
+    "available": true,
+    "issues": []
+  },
+  "om-bounce": {
+    "available": true,
+    "issues": []
+  },
+  "bigredbutton": {
+    "available": true,
+    "issues": []
+  },
+  "doublewires": {
+    "available": true,
+    "issues": []
+  },
+  "tube-jumpers": {
+    "available": true,
+    "issues": []
+  },
+  "draw-the-hill": {
+    "available": true,
+    "issues": []
+  },
+  "just-one-boss": {
+    "available": true,
+    "issues": []
+  },
+  "deal-or-no-deal": {
+    "available": true,
+    "issues": []
+  },
+  "avalanche": {
+    "available": true,
+    "issues": []
+  },
+  "helicopter": {
+    "available": true,
+    "issues": []
+  },
+  "kittencannon": {
+    "available": true,
+    "issues": []
+  },
+  "smokingbarrels": {
+    "available": true,
+    "issues": []
+  },
+  "championarcher": {
+    "available": true,
+    "issues": []
+  },
+  "battleforgondor": {
+    "available": true,
+    "issues": []
+  },
+  "tacticalassasin2": {
+    "available": true,
+    "issues": []
+  },
+  "hba": {
+    "available": true,
+    "issues": []
+  },
+  "bad-ice-cream-2": {
+    "available": true,
+    "issues": []
+  },
+  "bad-ice-cream-3": {
+    "available": true,
+    "issues": []
+  },
+  "flashtetris": {
+    "available": true,
+    "issues": []
+  },
+  "learntofly2": {
+    "available": true,
+    "issues": []
+  },
+  "minecraftbeta": {
+    "available": true,
+    "issues": []
+  },
+  "portalflash": {
+    "available": true,
+    "issues": []
+  },
+  "push-your-luck": {
+    "available": true,
+    "issues": []
+  },
+  "riddleschool2": {
+    "available": true,
+    "issues": []
+  },
+  "riddleschool3": {
+    "available": true,
+    "issues": []
+  },
+  "slope-2": {
+    "available": true,
+    "issues": []
+  },
+  "slope-ball": {
+    "available": true,
+    "issues": []
+  },
+  "csgo-clicker": {
+    "available": true,
+    "issues": []
+  },
+  "idle-shark": {
+    "available": true,
+    "issues": []
+  },
+  "particle-clicker": {
+    "available": true,
+    "issues": []
+  },
+  "tv-static": {
+    "available": true,
+    "issues": []
+  },
+  "you-are-bezos": {
+    "available": true,
+    "issues": []
+  },
+  "grindcraft": {
+    "available": true,
+    "issues": []
+  },
+  "motox3m": {
+    "available": true,
+    "issues": []
+  },
+  "youtube": {
+    "available": true,
+    "issues": []
   }
 }

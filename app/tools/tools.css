@@ -1,0 +1,1369 @@
+/*
+ * Styles for the tools page.
+ *
+ * Kept in its own file rather than globals.css because it is a hundred panels'
+ * worth of small classes and none of it is used anywhere else. Everything is
+ * built on the site's existing tokens (--panel, --line, --lime) so the page
+ * inherits the light/dark switch for free, and every colour that is not a token
+ * is a colour the user picked in a tool.
+ */
+
+.tools-page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 28px 24px 80px;
+}
+
+/* ---------------- hero ---------------- */
+
+.tools-hero {
+  margin-bottom: 26px;
+}
+
+.tools-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lime);
+  margin: 0 0 10px;
+}
+
+.tools-hero h1 {
+  font-size: clamp(34px, 5vw, 54px);
+  letter-spacing: -0.03em;
+  line-height: 0.98;
+  margin: 0 0 12px;
+}
+
+.tools-lede {
+  max-width: 64ch;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* ---------------- layout ---------------- */
+
+.tools-layout {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+  scroll-margin-top: 18px;
+}
+
+.tools-rail {
+  position: sticky;
+  /* Below the sticky header, so the list does not slide under it. */
+  top: 76px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100dvh - 100px);
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+}
+
+.tools-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.tools-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+}
+
+.tools-search button {
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tools-category-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.tools-category-row button {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.tools-category-row button.is-active {
+  border-color: var(--lime);
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.tools-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* The list is the scrollable part: with 100 entries the whole rail must not
+     grow past the viewport. */
+  flex: 1;
+  min-height: 120px;
+  padding-right: 2px;
+}
+
+.tools-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--foreground);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tools-list-item:hover {
+  background: var(--surface-hover);
+}
+
+.tools-list-item.is-active {
+  border-color: var(--line);
+  background: var(--surface-strong);
+}
+
+.tools-list-name {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.tools-list-blurb {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  /* One line only — the rail is a table of contents, not a reading surface. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tools-surprise {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tools-surprise:hover {
+  color: var(--foreground);
+}
+
+/* ---------------- main panel ---------------- */
+
+.tools-main {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+}
+
+.tools-main-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tools-main-category {
+  display: inline-block;
+  margin-bottom: 6px;
+  color: var(--lime);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.tools-main-head h2 {
+  margin: 0 0 4px;
+  font-size: clamp(22px, 2.6vw, 30px);
+  letter-spacing: -0.02em;
+}
+
+.tools-main-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  max-width: 62ch;
+}
+
+.tools-back {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tools-main-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* ---------------- shared tool primitives ---------------- */
+
+.tool-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tool-grid-2 {
+  display: grid;
+  /* minmax(0,1fr) rather than 1fr: a long unbroken string in an output box
+     otherwise forces the whole grid wider than its container. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+}
+
+.tool-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tool-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tool-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.tool-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.tool-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.tool-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.tool-hint code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--surface-strong);
+  font-size: 11px;
+}
+
+.tool-input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+}
+
+.tool-input:focus-visible,
+.tool-textarea:focus-visible,
+.calc-display:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 1px;
+}
+
+.tool-input[type='color'] {
+  padding: 3px;
+  height: 34px;
+  cursor: pointer;
+}
+
+.tool-select {
+  cursor: pointer;
+}
+
+.tool-textarea-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.tool-textarea {
+  width: 100%;
+  padding: 10px 12px 22px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.tool-textarea-count {
+  position: absolute;
+  right: 10px;
+  bottom: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.tool-output {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  min-width: 0;
+}
+
+.tool-output-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tool-output-body {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  /* A pasted hash or a long URL has no spaces to break at. */
+  overflow-wrap: anywhere;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.tool-output-body.is-mono {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+  font-size: 12.5px;
+}
+
+.tool-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tool-copy:hover:not(:disabled) {
+  color: var(--foreground);
+  border-color: var(--muted);
+}
+
+.tool-copy:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.tool-copy.done {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+.tool-copy.failed {
+  border-color: var(--coral);
+  color: var(--coral);
+}
+
+.tool-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.tool-button.primary {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.tool-button.ghost {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--foreground);
+}
+
+.tool-button.ghost:hover {
+  background: var(--surface-hover);
+}
+
+.tool-button.danger {
+  border-color: var(--coral);
+  background: transparent;
+  color: var(--coral);
+}
+
+.tool-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tool-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.tool-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  min-width: 0;
+}
+
+.tool-stat-value {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.tool-stat-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tool-verdict {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.tool-verdict.good {
+  border-color: color-mix(in srgb, var(--lime) 55%, transparent);
+  background: color-mix(in srgb, var(--lime) 12%, transparent);
+}
+
+.tool-verdict.bad {
+  border-color: color-mix(in srgb, var(--coral) 55%, transparent);
+  background: color-mix(in srgb, var(--coral) 12%, transparent);
+}
+
+.tool-error {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--coral) 55%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--coral) 10%, transparent);
+  color: var(--coral);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.tool-empty {
+  padding: 22px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.tool-chip {
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tool-chip:hover {
+  color: var(--foreground);
+  border-color: var(--muted);
+}
+
+.tool-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tool-badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tool-badge.good {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.tool-badge.bad {
+  background: var(--coral);
+  color: var(--ink);
+}
+
+.tool-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-slider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---------------- QR ---------------- */
+
+.tool-qr-result {
+  gap: 12px;
+}
+
+.tool-qr-preview {
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.tool-qr-preview svg {
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+  /* Crisp module edges when scaled: a blurred QR is an unscannable QR. */
+  image-rendering: pixelated;
+  border-radius: 4px;
+}
+
+.tool-qr-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* ---------------- calculator ---------------- */
+
+.calc-display {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--foreground);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 24px;
+  text-align: right;
+}
+
+.calc-preview {
+  min-height: 20px;
+  color: var(--lime);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 14px;
+  text-align: right;
+}
+
+.calc-preview.is-invalid {
+  color: var(--coral);
+}
+
+.calc-keys {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.calc-key {
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.calc-key:hover {
+  background: var(--surface-hover);
+}
+
+.calc-key.op {
+  color: var(--lime);
+}
+
+.calc-key.wide {
+  grid-column: span 2;
+  font-size: 13px;
+}
+
+.calc-key.equals {
+  grid-column: span 2;
+  border-color: var(--lime);
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.calc-history {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.calc-history-line {
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  text-align: right;
+  cursor: pointer;
+}
+
+.calc-history-line:hover {
+  background: var(--surface-hover);
+  color: var(--foreground);
+}
+
+/* ---------------- text ---------------- */
+
+.tool-diff {
+  display: flex;
+  flex-direction: column;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.tool-diff-line {
+  display: flex;
+  gap: 8px;
+  padding: 2px 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tool-diff-line.added {
+  background: color-mix(in srgb, var(--lime) 14%, transparent);
+}
+
+.tool-diff-line.removed {
+  background: color-mix(in srgb, var(--coral) 14%, transparent);
+}
+
+.tool-diff-mark {
+  flex: 0 0 12px;
+  color: var(--muted);
+}
+
+.tool-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tool-bar-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.tool-bar-label {
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.tool-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  overflow: hidden;
+}
+
+.tool-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--lime);
+}
+
+.tool-bar-count {
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- numbers ---------------- */
+
+.tool-bits {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.tool-bit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 38px;
+  padding: 8px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.tool-bit.is-on {
+  border-color: var(--lime);
+  background: color-mix(in srgb, var(--lime) 18%, transparent);
+}
+
+.tool-bit-value {
+  font-family: ui-monospace, monospace;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.tool-bit-weight {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.tool-table {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.tool-table-head,
+.tool-table-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(52px, 0.7fr)) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.tool-table-head span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ---------------- time ---------------- */
+
+.tool-countdown {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  padding: 22px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.tool-countdown-value {
+  font-size: clamp(30px, 5vw, 46px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.tool-countdown-value.is-mono {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.tool-countdown-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tool-countdown.is-winner .tool-countdown-value {
+  color: var(--lime);
+}
+
+.tool-laps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tool-lap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.tool-lap:nth-child(odd) {
+  background: var(--surface);
+}
+
+.is-mono {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.tool-clock-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tool-clock-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.tool-clock-row:nth-child(odd) {
+  background: var(--surface);
+}
+
+.tool-clock-city {
+  font-weight: 700;
+}
+
+.tool-clock-time {
+  font-family: ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.tool-clock-date {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* ---------------- design ---------------- */
+
+.tool-swatch {
+  height: 74px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.tool-palette {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.tool-palette-chip {
+  display: flex;
+  align-items: flex-end;
+  min-height: 76px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tool-palette-chip span {
+  padding: 2px 5px;
+  border-radius: 4px;
+  /* The label sits on a colour chosen by the user, so it carries its own
+     background rather than hoping for contrast. */
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+}
+
+.tool-contrast-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.tool-gradient-preview {
+  height: 110px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.tool-radius-preview,
+.tool-shadow-preview {
+  display: grid;
+  place-items: center;
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.tool-radius-box {
+  width: 130px;
+  height: 130px;
+  background: var(--lime);
+}
+
+.tool-shadow-box {
+  width: 130px;
+  height: 90px;
+  border-radius: 12px;
+  background: var(--background);
+}
+
+.tool-grid-preview {
+  height: 130px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.tool-ratio-preview {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  max-width: 320px;
+  border: 1px solid var(--lime);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--lime) 10%, transparent);
+  color: var(--lime);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.tool-font-pair {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.tool-font-pair-head {
+  font-size: 26px;
+}
+
+.tool-font-pair-body {
+  margin-bottom: 6px;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+/* ---------------- dev ---------------- */
+
+.tool-uuid-list,
+.tool-password-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.tool-uuid-row,
+.tool-password-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.tool-uuid-row code,
+.tool-password-row code {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.tool-dropzone {
+  display: grid;
+  place-items: center;
+  min-height: 110px;
+  padding: 18px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  user-select: none;
+}
+
+.tool-meter {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  overflow: hidden;
+}
+
+.tool-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--coral), var(--lime));
+  transition: width 160ms ease;
+}
+
+/* ---------------- random ---------------- */
+
+.tool-dice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.tool-die {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.tool-coin {
+  display: grid;
+  place-items: center;
+  min-height: 90px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.tool-coin.heads,
+.tool-coin.tails {
+  color: var(--lime);
+  border-color: color-mix(in srgb, var(--lime) 45%, transparent);
+}
+
+.tool-teams {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.tool-team {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.tool-team ul {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  font-size: 13px;
+}
+
+.tool-quote {
+  padding: 22px;
+  border-left: 3px solid var(--lime);
+  color: var(--foreground);
+  font-size: clamp(17px, 2.2vw, 22px);
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.tool-name-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.tool-name-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-weight: 700;
+}
+
+/* ---------------- directory ---------------- */
+
+.tools-directory {
+  margin-top: 40px;
+  padding-top: 26px;
+  border-top: 1px solid var(--line);
+}
+
+.tools-directory h2 {
+  margin: 0 0 16px;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.tools-directory-group {
+  margin-bottom: 16px;
+}
+
+.tools-directory-group h3 {
+  margin: 0 0 6px;
+  color: var(--lime);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.tools-directory-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.tools-directory-links a {
+  color: var(--muted);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+
+.tools-directory-links a:hover {
+  color: var(--foreground);
+  text-decoration: underline;
+}
+
+/* ---------------- responsive ---------------- */
+
+@media (max-width: 980px) {
+  .tools-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tools-rail {
+    position: static;
+    max-height: none;
+  }
+
+  .tools-list {
+    /* A scrolling box inside a page that already scrolls is a trap on a
+       trackpad, so on narrow screens the list grows instead. */
+    max-height: 320px;
+  }
+}
+
+@media (max-width: 560px) {
+  .tools-page {
+    padding: 18px 14px 60px;
+  }
+
+  .tools-main {
+    padding: 14px;
+  }
+
+  .tools-main-head {
+    flex-direction: column;
+  }
+
+  .tool-table-head,
+  .tool-table-row {
+    grid-template-columns: minmax(0, 1fr) minmax(48px, 0.6fr) minmax(48px, 0.6fr) minmax(48px, 0.6fr);
+  }
+
+  .tool-table-head span:last-child,
+  .tool-table-row .tool-copy {
+    display: none;
+  }
+
+  .tool-clock-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .tool-clock-date {
+    display: none;
+  }
+}
+
+/* ---------------- typing test ---------------- */
+
+.tool-typing-passage {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.8;
+  /* The passage is long; wrap at word boundaries so it does not overflow. */
+  overflow-wrap: break-word;
+}
+
+.tool-typing-passage .is-pending {
+  color: var(--muted);
+}
+
+.tool-typing-passage .is-correct {
+  color: var(--lime);
+}
+
+.tool-typing-passage .is-wrong {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--coral) 30%, transparent);
+  color: var(--coral);
+}
+
+/* Two actions sit side by side in the panel header; they wrap on a phone
+   rather than squeezing the heading. */
+.tools-main-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* The panel heading takes focus when a tool is chosen from the rail. It is
+   focusable but not a tab stop, so it must not grow a ring of its own. */
+.tools-main-head h2:focus {
+  outline: none;
+}
+
+.tools-main-head h2:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
+  border-radius: 6px;
+}

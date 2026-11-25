@@ -1,11 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-<script src="/customization-game.js"></script>
-
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
-    <title>Bloxors</title>
+    <title>Bloxors | 3kh0</title>
     <link rel="shortcut icon" type="image/ico" href="favicon.ico">
     <script>
       window.RufflePlayer = window.RufflePlayer || {};
@@ -43,11 +41,19 @@
           container.appendChild(player);
           player.style.height = "600px";
           player.style.width = "937px";
-          player.ruffle().load("bloxors.swf");
+          player.load("bloxors.swf");
       });
     </script>
-    <script src="/game-runtime/ruffle/ruffle.js"></script>
-    
-    </center>
+<script data-gg-flash-saves>
+      // Keep Flash shared objects (scores, saved levels, unlocks) on disk
+      // instead of in memory, so progress survives a reload.
+      window.RufflePlayer = window.RufflePlayer || {};
+      window.RufflePlayer.config = Object.assign(
+        { storage: "disk", localStorage: true, letterbox: "on" },
+        window.RufflePlayer.config || {}
+      );
+    </script>
+        <script src="ruffle/ruffle.js"></script>
+</center>
   </body>
 </html>

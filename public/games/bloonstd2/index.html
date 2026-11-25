@@ -1,0 +1,43 @@
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BloonsTD 2 | 3kh0</title>
+    <link rel="icon" type="image/x-icon" href="bloonstd2.png" />
+    <link rel="shortcut icon" type="image/x-icon" href="bloonstd2.png" />
+  </head>
+  <body>
+<div id="ruffle" width="100%" height="100%"></div>
+    <script>
+      // Persist Flash shared objects (level progress, high scores) instead of
+      // keeping them in memory. Must be set before ruffle.js loads.
+      window.RufflePlayer = window.RufflePlayer || {};
+      window.RufflePlayer.config = Object.assign(
+        { storage: "disk", localStorage: true },
+        window.RufflePlayer.config || {}
+      );
+    </script>
+<script data-gg-flash-saves>
+      // Keep Flash shared objects (scores, saved levels, unlocks) on disk
+      // instead of in memory, so progress survives a reload.
+      window.RufflePlayer = window.RufflePlayer || {};
+      window.RufflePlayer.config = Object.assign(
+        { storage: "disk", localStorage: true, letterbox: "on" },
+        window.RufflePlayer.config || {}
+      );
+    </script>
+        <script src="ruffle.js"></script>
+    <script>
+      window.RufflePlayer = window.RufflePlayer || {};
+      window.addEventListener("load", (event) => {
+        const ruffle = window.RufflePlayer.newest();
+        const player = ruffle.createPlayer();
+        const container = document.getElementById("ruffle");
+        player.id = "player";
+        player.style.width = "100%";
+        player.style.height = "100%";
+        container.appendChild(player);
+        player.load("btd2.swf");
+      });
+    </script>
+  </body>
+</html>

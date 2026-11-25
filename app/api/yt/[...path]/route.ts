@@ -66,14 +66,17 @@ export async function GET(
   const result = await pipedGet(upstreamPath);
 
   if (!result.ok) {
+    // 503 (not 502) so the UI can tell "no upstream right now" apart from a
+    // broken build, and say something true instead of "no internet".
     return NextResponse.json(
       {
-        error: "Video network unreachable",
+        error: "Video backend unavailable",
+        code: "piped_unreachable",
         detail:
-          "All Piped API instances failed from our server. Try again or pick another server in Settings.",
+          "Every YouTube relay this app knows about refused the request from this deployment. That is an upstream outage or a network block, not your connection.",
         upstream: result.error,
       },
-      { status: 502 },
+      { status: 503, headers: { "cache-control": "no-store" } },
     );
   }
 

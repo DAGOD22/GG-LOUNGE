@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeProxyUrl, waitForActivation } from '../lib/proxy-client';
-import { assertPublicTarget, isPublicAddress, publicLookup } from '../lib/network-target';
+import { assertPublicTarget, isPublicAddress } from '../lib/network-target';
 import { createBareHandler } from '../lib/bare-adapter';
 
 test('normalizes addresses and search; rejects executable/credential URLs', () => {

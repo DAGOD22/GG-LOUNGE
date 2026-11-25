@@ -1,10 +1,20 @@
 'use client'
+import { GAME_FRAME_SANDBOX } from '@/lib/frame-policy'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Heart, Maximize2, X, Copy, ExternalLink, Gamepad2, Keyboard, Monitor, Bug, Flag, AlertCircle, Loader2, Save, Trophy, Star, Lock, Medal, Crown, Zap, Target } from 'lucide-react'
+import { Heart, Maximize2, X, ExternalLink, Gamepad2, Keyboard, Monitor, Bug, Flag, AlertCircle, Loader2, Save, Trophy, Star, Lock, Medal, Crown, Columns2, Volume2, VolumeX, Share2, Check } from 'lucide-react'
 import type { Game } from '@/lib/games'
-import { CONTROLS_LEGEND } from '@/lib/games'
+import { getGameControls } from '@/lib/game-controls'
 import { inferAchievementUpdates } from '@/lib/achievement-tracker'
 import { getAchievementsForGame, RARITY_COLOR } from '@/lib/achievements'
+import { MiniPlayer } from '@/components/live/MiniPlayer'
+import { SplitScreen } from '@/components/live/SplitScreen'
+import { ArcadeLab } from '@/components/live/arcade/ArcadeLab'
+import { SessionClock, UpNext, VoteButtons, useSessionTimer } from '@/components/ArcadeExtras'
+import { useRegisterGameBridge } from '@/components/live/GameBridge'
+import { useLivePresence } from '@/components/live/PresenceProvider'
+import { dispatchKey, type InputFrame } from '@/lib/coop'
+import { sessionLabel } from '@/lib/site-kit'
+import { estimatedSessionMinutes } from '@/lib/site-extras'
 
 export function GameModal({
   game,
@@ -20,9 +30,111 @@ export function GameModal({
   authUser: { id: string; username: string } | null
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null)
+  // Time in the launcher is recorded on close, once — see useSessionTimer.
+  const session = useSessionTimer(game.id)
   const wrapRef = useRef<HTMLDivElement>(null)
+  // Split screen and pane mute. `splitGame` is the *right* pane; the left pane
+  // is this modal's own frame, so the save and achievement code keeps working
+  // exactly as it did before split screen existed.
+  const [splitGame, setSplitGame] = useState<Game | null>(null)
+  const [splitPercent, setSplitPercent] = useState(50)
+  const [leftMuted, setLeftMuted] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const live = useLivePresence()
+
+  /**
+   * Share the game, not the raw file.
+   *
+   * The old button copied `game.path` — `/games/slope/index.html` — which is the
+   * file the iframe loads, not a page a person should ever be sent to. A shared
+   * link now points at the game's own landing page (`/g/<id>`), which has a
+   * title, a description and an Open Graph card, so it unfurls properly in a
+   * group chat instead of arriving as a bare URL. Where the browser has a native
+   * share sheet, that is used; otherwise the link is copied and the button says
+   * so, because a copy with no feedback is indistinguishable from a broken one.
+   */
+  const shareGame = useCallback(async () => {
+    const url = `${location.origin}/g/${game.id}`
+    const payload = { title: `${game.title} — GG-Lounge`, text: `${game.title}: ${game.description}`, url }
+    try {
+      if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
+        await navigator.share(payload)
+        return
+      }
+    } catch {
+      // The person cancelled the sheet, or the browser refused. Either way the
+      // copied link below is the fallback and is never a worse outcome.
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setLinkCopied(true)
+      window.setTimeout(() => setLinkCopied(false), 1800)
+    } catch {
+      // Clipboard blocked (insecure context, permissions): open the page so the
+      // address bar can be copied by hand rather than silently doing nothing.
+      window.open(url, '_blank', 'noopener')
+    }
+  }, [game.id, game.title, game.description])
+  // `allGames` is needed by the split-screen picker; the modal only receives the
+  // one game, so the catalogue is imported lazily from the same module the rest
+  // of the site uses rather than threaded through every prop in between.
+  const [catalogue, setCatalogue] = useState<Game[]>([])
+  useEffect(() => { import('@/lib/games').then(m => setCatalogue(m.games)).catch(() => {}) }, [])
+
+  // Tell the room what is playing, and let a friend's "send this game" open it.
+  useRegisterGameBridge({
+    activeGameId: () => game.id,
+    launchGame: (gameId: string) => {
+      const target = catalogue.find(entry => entry.id === gameId)
+      if (target) setSplitGame(target)
+    },
+    launchTwoPlayer: (gameId: string) => {
+      // The modal is already open on one game, so "launch" means: close the
+      // split pane (which is for one person watching two games, not for two
+      // people sharing one) and let the page swap the active game.
+      setSplitGame(null)
+      window.dispatchEvent(new CustomEvent('ggl:launch-game', { detail: { gameId } }))
+    },
+    applyRemoteInput: (frame: InputFrame) => {
+      try { dispatchKey(frameRef.current?.contentWindow, frame) } catch { /* cross-origin */ }
+    },
+    onPeerGame: () => {},
+    frame: () => frameRef.current,
+  })
+
+  // Report the launch once, both to the Most Played counter (already handled by
+  // the launcher) and to the live feed, which is what other players see.
+  useEffect(() => {
+    live.setActiveGame(game.id)
+    live.announce('launch', { gameId: game.id })
+    // On close, drop the "playing …" tag from this player's ghost cursor so the
+    // room stops advertising a game that is no longer on screen.
+    return () => live.setActiveGame(null)
+  }, [game.id])
   const inspectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (inspectionTimer.current) clearTimeout(inspectionTimer.current) }, [])
+
+  /**
+   * Lock the page behind the game.
+   *
+   * The modal claims `aria-modal="true"`, which tells a screen reader that
+   * everything behind it is inert — but the document itself still scrolled, so
+   * on a phone a swipe inside the game panned the library underneath it. The
+   * padding compensates for the scrollbar on desktop so the layout does not jump
+   * when it disappears.
+   */
+  useEffect(() => {
+    const body = document.body
+    const previousOverflow = body.style.overflow
+    const previousPadding = body.style.paddingRight
+    const gap = window.innerWidth - document.documentElement.clientWidth
+    body.style.overflow = 'hidden'
+    if (gap > 0) body.style.paddingRight = `${gap}px`
+    return () => {
+      body.style.overflow = previousOverflow
+      body.style.paddingRight = previousPadding
+    }
+  }, [])
 
   // GOD LEVEL: a11y — ESC to close, trap focus, initial focus
   useEffect(() => {
@@ -59,8 +171,16 @@ export function GameModal({
   const timeRef = useRef(0)
   const lastAchSentRef = useRef<string>('')
 
+  // Games that save in a non-localStorage format (e.g. an Emscripten/IndexedDB
+  // filesystem) upload and restore their own save through /api/save. The generic
+  // localStorage snapshot below must not run for those, or it would overwrite a
+  // real save with a key dump.
+  const SELF_MANAGED_SAVES = new Set(['leaf-blower-revolution'])
+  const selfManagedSave = SELF_MANAGED_SAVES.has(game.id)
+
   // Fix 3: improved collect/save with diff and no reload loop
   const collectSaveFromFrame = useCallback((): string | null => {
+    if (selfManagedSave) return null
     const iframe = frameRef.current
     if (!iframe?.contentWindow) return null
     try {
@@ -160,6 +280,7 @@ export function GameModal({
     if (!authUser || !game) return
     saveAppliedRef.current = false
     pendingSaveRef.current = null
+    if (selfManagedSave) return
     lastSaveDataRef.current = null
     setSaveStatus('idle')
     const abort = new AbortController()
@@ -178,11 +299,13 @@ export function GameModal({
       })
       .catch(() => {})
     return () => abort.abort()
-  }, [authUser, game, applySaveToFrame])
+  }, [authUser, game, applySaveToFrame, selfManagedSave])
 
   // Fix 3+5: autosave only when visible, diff-aware, properly cleaned
   useEffect(() => {
     if (!authUser || !game) return
+    // self-managed games upload their own save format from inside the game frame
+    if (selfManagedSave) return
     // push every 7s, but only if document visible and game focused
     const id = window.setInterval(() => {
       if (document.visibilityState === 'hidden') return
@@ -210,7 +333,7 @@ export function GameModal({
       window.removeEventListener('beforeunload', onBeforeUnload)
       if (saveAbortRef.current) saveAbortRef.current.abort()
     }
-  }, [authUser, game, pushSave, collectSaveFromFrame])
+  }, [authUser, game, pushSave, collectSaveFromFrame, selfManagedSave])
 
   // --- Achievements: fetch + heartbeat + inference ---
   useEffect(() => {
@@ -247,13 +370,26 @@ export function GameModal({
   // timer + achievement inference loop (every 4s)
   useEffect(()=>{
     if(!game) return
+    // Seconds played in THIS session, which is what the server should receive.
+    // The old code tested `timeRef.current % 30 === 0`, but timeRef starts at the
+    // saved lifetime total and ticks by 4 — so the check was true only if the
+    // lifetime total happened to be a multiple of 30 minus a multiple of 4. In
+    // practice it was never true, and no session ever saved a single second of
+    // playtime. Accumulating unflushed seconds has no such arithmetic trap.
+    let unsaved = 0
+    const flush = (seconds: number) => {
+      if(!authUser || seconds <= 0) return
+      fetch('/api/game-stats', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ gameId: game.id, timeSeconds: seconds }) })
+        .then(() => { unsaved -= seconds })
+        .catch(()=>{ /* stays in `unsaved` and is retried on the next flush */ })
+    }
     const tick = window.setInterval(()=>{
       if(document.visibilityState==='hidden') return
       timeRef.current+=4
-      // heartbeat every 30s to server
-      if(authUser && timeRef.current % 30 === 0 && timeRef.current>0){
-        fetch('/api/game-stats', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ gameId: game.id, timeSeconds:30 }) }).catch(()=>{})
-      }
+      unsaved+=4
+      // Flush every 30s of play. The remainder is flushed on close.
+      if(authUser && unsaved >= 30) flush(unsaved)
+
       // try to infer progress from iframe
       let win: any = null
       try{ win = frameRef.current?.contentWindow as any }catch{}
@@ -293,13 +429,21 @@ export function GameModal({
       lastAchSentRef.current = key
       fetch('/api/achievements', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ updates }) }).catch(()=>{})
     }, 4000)
-    return ()=> clearInterval(tick)
+    return ()=> {
+      clearInterval(tick)
+      // Playtime is lossy if the tail is dropped: closing a game after 29
+      // seconds used to record nothing at all. Send what is left on unmount.
+      flush(unsaved)
+    }
   }, [game, authUser])
 
   // PROD: honest X-Frame check via HEAD fetch (local files have no header, external would)
   const [xFrameBlocked, setXFrameBlocked] = useState(false)
   useEffect(()=>{
     setXFrameBlocked(false)
+    // Proxy titles are mounted through our own proxy route; probing them
+    // directly would always trip CORS/cross-origin checks.
+    if (game.proxy) return
     let alive=true
     // For local /games/* files, header check is cheap HEAD; for external, this detects X-Frame-Options
     fetch(game.path, { method:'HEAD' }).then(r=>{
@@ -335,7 +479,6 @@ export function GameModal({
     } catch {}
     try {
       const doc = iframe.contentDocument
-      const win = iframe.contentWindow as any
       if (!doc) return
       // robust responsive patch — fill screen without cut-off
       if (!doc.querySelector('style[data-ggl-patch]')) {
@@ -470,9 +613,11 @@ export function GameModal({
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
           <span className={`game-badge ${game.color}`}>{game.mark}</span>
           <div style={{ minWidth: 0, overflow: 'hidden' }}>
-            <span className="modal-kicker">NOW PLAYING — {game.genre.toUpperCase()} / {game.tone.toUpperCase()}</span>
+            <span className="modal-kicker">
+              NOW PLAYING — {game.genre.toUpperCase()} / {game.tone.toUpperCase()} · {sessionLabel(estimatedSessionMinutes(game.genre)).toUpperCase()}
+            </span>
             <strong style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {game.title} {isFavorite && <Heart size={14} fill="var(--coral)" color="var(--coral)" />}
+              {game.title} {isFavorite && <Heart size={14} fill="var(--coral)" color="var(--coral)" />} <SessionClock startedAt={session.startedAt} />
             </strong>
           </div>
         </div>
@@ -574,15 +719,46 @@ export function GameModal({
           >
             <Bug size={14} /> {reportSent ? 'Reported' : 'Report'}
           </button>
-          <button onClick={() => { if (navigator.clipboard) navigator.clipboard.writeText(location.origin + game.path) }} title="Copy link" aria-label="Copy link">
-            <Copy size={16} />
+          <button onClick={shareGame} title="Share this game" aria-label="Share this game">
+            {linkCopied ? <Check size={16} /> : <Share2 size={16} />}
           </button>
-          <button onClick={() => window.open(game.path, '_blank')} title="Open in new tab" aria-label="Open in new tab">
+          <button onClick={() => window.open(game.proxy ? `/play/${game.id}` : game.path, '_blank')} title="Open in new tab" aria-label="Open in new tab">
             <ExternalLink size={16} />
           </button>
           <button onClick={() => onToggleFavorite(game.id)} title={isFavorite ? 'Remove favorite' : 'Add favorite'} aria-label="Favorite">
             <Heart size={16} fill={isFavorite ? 'currentColor' : 'none'} />
           </button>
+          <MiniPlayer frameRef={frameRef} />
+          <button
+            className={`controls-toggle ${splitGame ? 'active' : ''}`}
+            onClick={() => setSplitGame(current => (current ? null : catalogue[0] ?? null))}
+            title={splitGame ? 'Close split screen' : 'Run two games side by side'}
+            aria-pressed={Boolean(splitGame)}
+            style={{
+              width: 'auto',
+              padding: '0 10px',
+              fontSize: 11,
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              border: splitGame ? '1px solid var(--lime)' : '1px solid var(--line)',
+              background: splitGame ? 'var(--lime)' : 'rgba(255,255,255,.06)',
+              color: splitGame ? '#0b0d12' : 'var(--foreground)',
+              borderRadius: 999,
+              cursor: 'pointer',
+            }}
+          >
+            <Columns2 size={14} /> Split
+          </button>
+
+          {/* The wrap element is resolved lazily by the lab, so this render
+              never reads a ref: the node it wants is the one this component
+              already owns, and a snapshot here would be null on first paint. */}
+          <ArcadeLab
+            frame={() => frameRef.current}
+            wrap={() => wrapRef.current}
+          />
           <button
             onClick={() => {
               const el = wrapRef.current || frameRef.current
@@ -593,11 +769,67 @@ export function GameModal({
           >
             <Maximize2 size={18} />
           </button>
-          <button onClick={onClose} aria-label="Close game">
+          <button
+            onClick={() => {
+              session.finish('close')
+              onClose()
+            }}
+            aria-label="Close game"
+          >
             <X size={20} />
           </button>
         </div>
       </div>
+      <div className="gg-modal-extras">
+        <VoteButtons gameId={game.id} />
+        <UpNext
+          game={game}
+          catalogue={catalogue}
+          playCounts={{}}
+          onLaunch={candidate => {
+            session.finish('switch')
+            setSplitGame(candidate)
+          }}
+        />
+      </div>
+
+      {splitGame && (
+        <div className="gg-split-leftbar">
+          <span>{game.title} <em>· left pane</em></span>
+          <button
+            type="button"
+            onClick={() => {
+              setLeftMuted(value => {
+                const next = !value
+                try {
+                  const doc = frameRef.current?.contentDocument
+                  for (const element of doc?.querySelectorAll<HTMLMediaElement>('audio,video') ?? []) element.muted = next
+                } catch {}
+                return next
+              })
+            }}
+            aria-pressed={leftMuted}
+            title={leftMuted ? 'Unmute the left pane' : 'Mute the left pane'}
+          >
+            {leftMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+            {leftMuted ? 'Muted' : 'Sound on'}
+          </button>
+        </div>
+      )}
+      <div
+        className={`gg-split-area${splitGame ? ' is-split' : ''}`}
+        style={splitGame ? ({ ['--gg-split' as string]: `${splitPercent}%` }) : undefined}
+      >
+      {splitGame && (
+        <SplitScreen
+          games={catalogue}
+          rightGame={splitGame}
+          split={splitPercent}
+          onSplit={setSplitPercent}
+          onPick={setSplitGame}
+          onClose={() => setSplitGame(null)}
+        />
+      )}
       <div
         className="frame-wrap"
         ref={wrapRef}
@@ -630,7 +862,7 @@ export function GameModal({
             }}
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 800 }}>
-              <Keyboard size={14} /> {CONTROLS_LEGEND[game?.genre || 'default'] || CONTROLS_LEGEND.default}
+              <Keyboard size={14} /> {getGameControls(game?.id, game?.genre)}
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted)' }}>
               <Monitor size={12} /> Tap Fullscreen for best view •{' '}
@@ -677,7 +909,7 @@ export function GameModal({
               <button className="btn-mini" onClick={() => { setFrameError(null); setFrameLoading(true); if (frameRef.current) frameRef.current.src = frameRef.current.src }}>
                 Retry
               </button>
-              <button className="btn-mini" onClick={() => window.open(game.path, '_blank')}>
+              <button className="btn-mini" onClick={() => window.open(game.proxy ? `/play/${game.id}` : game.path, '_blank')}>
                 Open in new tab
               </button>
               <a className="btn-mini" href="/proxy">
@@ -692,9 +924,10 @@ export function GameModal({
         <iframe
           ref={frameRef}
           className="game-frame"
-          src={game.path}
+          src={game.proxy ? `/play/${game.id}` : game.path}
           title={game.title}
           allow="fullscreen; autoplay; gamepad; keyboard-map; clipboard-read; clipboard-write; encrypted-media; picture-in-picture; web-share"
+          sandbox={GAME_FRAME_SANDBOX}
           allowFullScreen
           onLoad={handleFrameLoad}
           onError={() => setFrameError('Failed to load game file.')}
@@ -728,6 +961,7 @@ export function GameModal({
             </button>
           </div>
         </div>
+      </div>
 
         {/* Achievements drawer */}
         {showAchievements && (

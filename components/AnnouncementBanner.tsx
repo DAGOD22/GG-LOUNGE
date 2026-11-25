@@ -1,0 +1,105 @@
+'use client';
+
+/**
+ * The summer drop announcement.
+ *
+ * Three things decide whether a bar like this helps or hurts:
+ *
+ *   · it must not shift the page after hydration, so the dismissed flag is
+ *     read in a layout effect and the bar renders nothing until it is known;
+ *     a flash of a banner someone already closed is worse than no banner;
+ *   · it must not cover the navigation, so it is a normal block in the flow
+ *     (the dashboard already sits above the header for the same reason),
+ *     never `position: fixed`;
+ *   · it must survive a theme change, so every colour comes from the site's
+ *     own custom properties rather than hard-coded hex.
+ *
+ * The CTA is a real link, never a button with a handler: it has to survive a
+ * middle-click, a copy-link and a crawler. When the destination is one of our
+ * own pages it is a router `Link` that navigates in the same tab — opening our
+ * own doc in a new tab was the other half of why this never felt like it
+ * "went anywhere". An external override still gets `rel="noopener noreferrer"`
+ * so it cannot hand this page's window to the destination.
+ */
+
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import Link from 'next/link';
+import { X, ArrowUpRight, Sparkles } from 'lucide-react';
+import { ANNOUNCEMENT_DOC_URL } from '@/lib/site-links';
+
+/** Anything that is not one of our own paths is treated as an external doc. */
+const IS_INTERNAL = ANNOUNCEMENT_DOC_URL.startsWith('/');
+
+const STORAGE_KEY = 'ggl_summer_banner_dismissed_v1';
+
+export function AnnouncementBanner() {
+  // `null` means "not decided yet" — the first paint renders nothing at all,
+  // so a returning visitor never sees the bar they closed last time.
+  const [dismissed, setDismissed] = useState<boolean | null>(null);
+
+  useLayoutEffect(() => {
+    let closed = false;
+    try {
+      closed = localStorage.getItem(STORAGE_KEY) === '1';
+    } catch {
+      // Storage can throw in private modes and in some embedded webviews.
+      // A banner that cannot remember being closed is still better than a
+      // crash, so fall through and show it.
+    }
+    setDismissed(closed);
+  }, []);
+
+  const dismiss = useCallback(() => {
+    setDismissed(true);
+    try {
+      localStorage.setItem(STORAGE_KEY, '1');
+    } catch {
+      /* see above */
+    }
+  }, []);
+
+  // Escape closes it, matching the dialog convention used elsewhere on the page.
+  useEffect(() => {
+    if (dismissed !== false) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') dismiss();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [dismissed, dismiss]);
+
+  if (dismissed !== false) return null;
+
+  return (
+    <aside className="gg-banner" role="region" aria-label="Announcement">
+      <div className="gg-banner-inner">
+        <span className="gg-banner-eyebrow" aria-hidden="true">
+          <Sparkles size={12} /> Summer drop
+        </span>
+        <p className="gg-banner-copy">
+          <strong>👀 HUGE THINGS ARE DROPPING OVER SUMMER:</strong> We&apos;re adding insane games,
+          secret features &amp; a steady stream of good stuff — and all the new links &amp;
+          drops will ONLY go inside{' '}
+          {IS_INTERNAL ? (
+            <Link className="gg-banner-cta" href={ANNOUNCEMENT_DOC_URL}>
+              THIS DOC <ArrowUpRight size={12} />
+            </Link>
+          ) : (
+            <a
+              className="gg-banner-cta"
+              href={ANNOUNCEMENT_DOC_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              THIS DOC <ArrowUpRight size={12} />
+            </a>
+          )}
+          . Save it before break or miss everything!
+        </p>
+        <button className="gg-banner-close" onClick={dismiss} aria-label="Dismiss announcement">
+          <X size={14} />
+        </button>
+      </div>
+    </aside>
+  );
+}

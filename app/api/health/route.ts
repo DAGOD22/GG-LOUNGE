@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 
+import { getDatabaseUrl } from "@/lib/db";
+import { CANONICAL_HOST, SITE_DOMAINS } from "@/lib/site-domains";
+
 export const dynamic = 'force-dynamic'
 
 const PIPED_PROBE = 'https://pipedapi.tokhmi.xyz/streams/dQw4w9WgXcQ'
-const BARE_LOCAL = '/api/bare/'
 
 export async function GET() {
   const started = Date.now()
@@ -12,7 +14,6 @@ export async function GET() {
   // 1) local bare health (same origin, should always be ok if server is up)
   try {
     const t = Date.now()
-    const url = process.env.NEXT_PUBLIC_SITE_URL ? `${process.env.NEXT_PUBLIC_SITE_URL}${BARE_LOCAL}` : BARE_LOCAL
     // In dev, use fetch to self via relative — but in route handler we can just check that bare module loads
     // We probe by importing bare health logic: just return ok
     checks['bare:local'] = { ok: true, ms: Date.now() - t }
@@ -46,6 +47,15 @@ export async function GET() {
     checks['games'] = { ok: false, ms: 0, error: e?.message }
   }
 
+  // Storage and routing facts an operator would otherwise have to read the
+  // source to learn: how much of the upload surface is in use (the quota in
+  // lib/db/uploads.ts returns 503 when it fills, so this is the number to watch),
+  // and where the site believes it lives. `siteUrl` was the only field and it was
+  // null on every host, which told a reader nothing.
+  const uploads = await import('@/lib/db/uploads')
+    .then(m => m.uploadStats())
+    .catch(() => ({ open: -1, bytes: -1, quota: 0, maxBytes: 0, ttlMs: 0 }));
+
   const allOk = Object.values(checks).every(c => c.ok || c.error === 'fetch blocked/skipped (sandbox)')
   const ms = Date.now() - started
 
@@ -58,9 +68,12 @@ export async function GET() {
       checks,
       gamesCount,
       env: {
-        hasDatabase: !!process.env.DATABASE_URL,
+        hasDatabase: !!getDatabaseUrl(),
         siteUrl: process.env.NEXT_PUBLIC_SITE_URL || null,
+        canonicalHost: CANONICAL_HOST,
+        addresses: SITE_DOMAINS.length,
       },
+      uploads,
     },
     { headers: { 'cache-control': 'no-store', 'x-health-ms': String(ms) } }
   )

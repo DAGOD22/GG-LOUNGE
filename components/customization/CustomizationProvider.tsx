@@ -1,23 +1,41 @@
 'use client';
-import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { Settings2 } from 'lucide-react';
 import { AnimatedCursor } from './AnimatedCursor';
 import { defaults, sanitizeSettings, SETTINGS_KEY, THEMES, WALLPAPERS, iconHref, normalizeDestination, matchesBinding, isTypingTarget, accentInk, cursorValue, type Settings } from '@/lib/customization/settings';
 import { getMedia } from '@/lib/customization/media';
 import { watchFrameEvents } from '@/lib/customization/frame-events';
 import { ReactiveBackdrop, REACTIVE_EVENT } from './ReactiveBackdrop';
-import { CustomizationDialog } from './CustomizationDialog';
+import dynamic from 'next/dynamic';
 
-type Context={settings:Settings;ready:boolean;update:(fn:(previous:Settings)=>Settings)=>void;openSettings:()=>void;reset:()=>void;capturing:boolean;setCapturing:(value:boolean)=>void;saveError:string;mediaError:string;runPanic:()=>void;};
+/**
+ * Both of these are full-page surfaces that are closed for almost every visitor:
+ * the settings dialog is ~30KB of form and gallery code, and the panic doc is a
+ * decoy page. They used to be imported eagerly here, and this provider wraps the
+ * entire site — so every page, including ones that never show a dialog, shipped
+ * both in its first bundle and server-rendered a closed <dialog> element into
+ * the HTML. Loading them on demand costs one chunk fetch the first time the
+ * visitor actually opens one.
+ */
+const CustomizationDialog = dynamic(() => import('./CustomizationDialog').then(m => m.CustomizationDialog), { ssr: false });
+const PanicDoc = dynamic(() => import('@/components/live/PanicDoc').then(m => m.PanicDoc), { ssr: false });
+
+type Context={settings:Settings;ready:boolean;update:(fn:(previous:Settings)=>Settings)=>void;openSettings:()=>void;reset:()=>void;capturing:boolean;setCapturing:(value:boolean)=>void;saveError:string;mediaError:string;runPanic:()=>void;panicDoc:boolean;closePanicDoc:()=>void;};
 const CustomizationContext=createContext<Context|null>(null);
 export function useCustomization(){const ctx=useContext(CustomizationContext);if(!ctx)throw new Error('CustomizationProvider is missing.');return ctx;}
 
 export function CustomizationProvider({children}:{children:ReactNode}) {
-  const [settings,setSettings]=useState<Settings>(defaults),[ready,setReady]=useState(false),[open,setOpen]=useState(false),[capturing,setCapturing]=useState(false),[saveError,setSaveError]=useState(''),[mediaError,setMediaError]=useState(''),[mediaUrl,setMediaUrl]=useState(''),[systemReduced,setSystemReduced]=useState(false);
+  const [settings,setSettings]=useState<Settings>(defaults),[ready,setReady]=useState(false),[open,setOpen]=useState(false),[capturing,setCapturing]=useState(false),[saveError,setSaveError]=useState(''),[mediaError,setMediaError]=useState(''),[mediaUrl,setMediaUrl]=useState(''),[systemReduced,setSystemReduced]=useState(false),[panicDoc,setPanicDoc]=useState(false);
   const state=useRef(settings),captureRef=useRef(false),openRef=useRef(false),documents=useRef(new Set<Document>()),pointer=useRef({x:0,y:0}),video=useRef<HTMLVideoElement>(null);
-  state.current=settings;captureRef.current=capturing;openRef.current=open;
+  // Latest-value refs, assigned in an effect so a discarded render cannot leave
+  // them pointing at state that never committed.
+  const panicDocRef=useRef(false),closePanicDocRef=useRef<()=>void>(()=>{});
+  useLayoutEffect(()=>{state.current=settings;captureRef.current=capturing;openRef.current=open;},[settings,capturing,open]);
   const update=useCallback((fn:(previous:Settings)=>Settings)=>setSettings(previous=>{const value=sanitizeSettings(fn(previous));state.current=value;return value;}),[]);
-  const openSettings=useCallback(()=>{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});setOpen(true);},[]);
+  // Once a dialog has been opened its chunk is warm, so keep it mounted: closing
+  // and reopening must not re-download or lose the visitor's in-dialog draft.
+  const [everOpened,setEverOpened]=useState(false);
+  const openSettings=useCallback(()=>{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});setEverOpened(true);setOpen(true);},[]);
   const reset=useCallback(()=>{setSettings(defaults());setSaveError('');setMediaError('');},[]);
   useEffect(()=>{try{const raw=localStorage.getItem(SETTINGS_KEY);if(raw)setSettings(sanitizeSettings(JSON.parse(raw)));else if(localStorage.getItem('ggl_theme')==='light'){const d=defaults();d.theme={preset:'arctic',mode:'light',colors:{...THEMES.arctic.colors}};setSettings(d);}}catch{setSaveError('Saved settings were unreadable. Defaults are active.');}setReady(true);
     const storage=(e:StorageEvent)=>{if(e.key!==SETTINGS_KEY)return;try{setSettings(e.newValue?sanitizeSettings(JSON.parse(e.newValue)):defaults());}catch{}};window.addEventListener('storage',storage);return()=>window.removeEventListener('storage',storage);
@@ -50,23 +68,126 @@ export function CustomizationProvider({children}:{children:ReactNode}) {
 
   const applyCursor=useCallback((doc:Document)=>{try{let style=doc.querySelector<HTMLStyleElement>('style[data-gg-cursor]');const cursor=cursorValue(state.current.cursor,state.current.theme.colors.accent);if(!cursor){style?.remove();return;}if(!style){style=doc.createElement('style');style.dataset.ggCursor='true';(doc.head||doc.documentElement).append(style);}const text=`html, body, body * {cursor:${cursor} !important;} input:not([type=button]):not([type=submit]), textarea, [contenteditable=true] {cursor:text !important;}`;if(style.textContent!==text)style.textContent=text;}catch{}},[]);
   useEffect(()=>{for(const doc of documents.current){if(!doc.defaultView){documents.current.delete(doc);continue;}applyCursor(doc);}},[settings.cursor,settings.theme.colors.accent,applyCursor]);
-  const runPanic=useCallback(()=>{const current=state.current;let destination:string;try{destination=normalizeDestination(current.panic.destination,location.origin);}catch{return;}
-    try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(current));}catch{}window.onbeforeunload=null;
+  /**
+   * Silence the game without destroying it.
+   *
+   * The redirect mode deletes every frame so a game's beforeunload prompt
+   * cannot trap the redirect. The fake-document mode must NOT do that: the
+   * whole promise is that the game resumes exactly where it left off, which is
+   * impossible once the frame is gone. So this pauses and mutes instead, and
+   * restores both on the way out.
+   */
+  const hushGame=useCallback(()=>{
+    const restore:{el:HTMLMediaElement;muted:boolean;paused:boolean}[]=[];
+    const loops:{win:Window;raf:typeof requestAnimationFrame;caf:typeof cancelAnimationFrame;pending:FrameRequestCallback[]}[]=[];
+    for(const doc of documents.current){
+      try{
+        doc.exitPointerLock?.();
+        for(const el of doc.querySelectorAll<HTMLMediaElement>('audio,video')){
+          restore.push({el,muted:el.muted,paused:el.paused});
+          el.muted=true;
+          try{el.pause();}catch{}
+        }
+      }catch{}
+      // Most browser games run their whole simulation inside requestAnimationFrame.
+      // Parking that loop freezes the game — not just its sound — which is the
+      // difference between "paused" and "still playing behind the document".
+      // `react-hooks/immutability` flags the assignments below. They are the
+      // point of the function: the panic path has to reach into the game's
+      // window and replace its animation loop so the game actually freezes.
+      // There is no declarative React equivalent for "stop someone else's rAF",
+      // and this code is deliberately imperative and already try/caught.
+      /* eslint-disable react-hooks/immutability */
+      try{
+        const win=doc.defaultView as (Window&{__ggParked?:boolean})|null;
+        if(win&&!win.__ggParked&&typeof win.requestAnimationFrame==='function'){
+          const raf=win.requestAnimationFrame.bind(win);
+          const caf=win.cancelAnimationFrame.bind(win);
+          const pending:FrameRequestCallback[]=[];
+          win.requestAnimationFrame=((callback:FrameRequestCallback)=>{pending.push(callback);return pending.length;}) as typeof win.requestAnimationFrame;
+          win.cancelAnimationFrame=(()=>{}) as typeof win.cancelAnimationFrame;
+          win.__ggParked=true;
+          loops.push({win,raf,caf,pending});
+        }
+      }catch{}
+      /* eslint-enable react-hooks/immutability */
+    }
+    return ()=>{
+      // Resume the loop where it stopped: the parked callback is the game's own
+      // next frame, so replaying it picks up exactly where it was.
+      for(const {win,raf,caf,pending} of loops){
+        try{
+          win.requestAnimationFrame=raf;
+          win.cancelAnimationFrame=caf;
+          delete (win as Window&{__ggParked?:boolean}).__ggParked;
+          const last=pending[pending.length-1];
+          if(last)raf(last);
+        }catch{}
+      }
+      for(const {el,muted,paused} of restore){try{el.muted=muted;if(!paused)void el.play().catch(()=>{});}catch{}}
+    };
+  },[]);
+
+  /**
+   * Undo for `hushGame`, held across renders.
+   *
+   * Declared above `runPanic` because that callback is the first thing to
+   * touch it. It previously sat below, which worked only because the closure
+   * runs late, but it made the read look like a use-before-define.
+   */
+  const resumeRef=useRef<(()=>void)|null>(null);
+
+  const runPanic=useCallback(()=>{
+    const current=state.current;
+    // Every mode closes the floating windows first: a mini-player or a co-op
+    // room left running behind a fake document is the fastest way to be caught.
+    window.dispatchEvent(new CustomEvent('ggl:panic'));
+    try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(current));}catch{}
+    if(current.panic.mode==='doc'){
+      // Hush exactly once and keep the undo. Calling it twice would record the
+      // already-muted state as the thing to restore, and the game would come
+      // back silent.
+      resumeRef.current?.();
+      resumeRef.current=hushGame();
+      setPanicDoc(true);
+      return;
+    }
+    let destination:string;try{destination=normalizeDestination(current.panic.destination,location.origin);}catch{return;}
+    // Same reason as above: silencing a game and tearing the frames down is
+    // exactly the imperative DOM work a panic needs, and React cannot express
+    // "clear another document's onbeforeunload".
+    /* eslint-disable react-hooks/immutability */
+    window.onbeforeunload=null;
     for(const doc of documents.current){try{if(doc.defaultView)doc.defaultView.onbeforeunload=null;for(const el of doc.querySelectorAll<HTMLMediaElement>('audio,video'))el.pause();doc.exitPointerLock?.();}catch{}}
     // Remove frames so a game's beforeunload prompt cannot trap a panic redirect.
     for(const frame of document.querySelectorAll('iframe'))frame.remove();
+    /* eslint-enable react-hooks/immutability */
     window.addEventListener('beforeunload',event=>event.stopImmediatePropagation(),{capture:true,once:true});
-    if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});window.location.replace(destination);
+    if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});
+    window.location.replace(destination);
+  },[hushGame]);
+
+  const closePanicDoc=useCallback(()=>{
+    setPanicDoc(false);
+    resumeRef.current?.();
+    resumeRef.current=null;
   },[]);
   useEffect(()=>{const requested=()=>{if(state.current.panic.enabled&&!captureRef.current)runPanic();};window.addEventListener('ggl:panic-request',requested);return()=>window.removeEventListener('ggl:panic-request',requested);},[runPanic]);
   useEffect(()=>{if(!ready)return;const cleanup=watchFrameEvents(window,(event)=>{
       if(captureRef.current||event.isComposing)return;const current=state.current;
+      if(panicDocRef.current){
+        // The fake document owns the keyboard. The one exception is the panic
+        // combo itself, which is how you leave.
+        if(current.panic.enabled&&matchesBinding(event,current.panic.binding)){event.preventDefault();event.stopImmediatePropagation();closePanicDocRef.current();}
+        return;
+      }
       if(current.panic.enabled&&matchesBinding(event,current.panic.binding)&&(current.panic.whileTyping||!isTypingTarget(event.target))){event.preventDefault();event.stopImmediatePropagation();runPanic();return;}
       if(!event.repeat&&!openRef.current&&!isTypingTarget(event.target)&&current.reactive.enabled){const hue=Array.from(event.code||event.key).reduce((sum,c)=>sum+c.charCodeAt(0),0)%360;window.dispatchEvent(new CustomEvent(REACTIVE_EVENT,{detail:{kind:'key',hue,x:current.reactive.pointer&&pointer.current.x?pointer.current.x:innerWidth*(.25+Math.random()*.5),y:current.reactive.pointer&&pointer.current.y?pointer.current.y:innerHeight*(.2+Math.random()*.6)}}));}
     },(event,win)=>{let x=event.clientX,y=event.clientY;try{let frame=win;while(frame!==window&&frame.frameElement){const rect=frame.frameElement.getBoundingClientRect();x+=rect.left;y+=rect.top;frame=frame.parent;}}catch{}pointer.current={x,y};if(state.current.cursor.trail)window.dispatchEvent(new CustomEvent(REACTIVE_EVENT,{detail:{kind:'pointer',x,y,hue:165}}));},doc=>{documents.current.add(doc);applyCursor(doc);return()=>{documents.current.delete(doc);doc.querySelector("style[data-gg-cursor]")?.remove();};});
     return()=>{cleanup();documents.current.clear();};
   },[ready,runPanic,applyCursor]);
-  return <CustomizationContext.Provider value={{settings,ready,update,openSettings,reset,capturing,setCapturing,saveError,mediaError,runPanic}}>
+  useLayoutEffect(()=>{panicDocRef.current=panicDoc;closePanicDocRef.current=closePanicDoc;},[panicDoc,closePanicDoc]);
+  return <CustomizationContext.Provider value={{settings,ready,update,openSettings,reset,capturing,setCapturing,saveError,mediaError,runPanic,panicDoc,closePanicDoc}}>
     <div className="gg-ambient" aria-hidden="true" data-testid="background-layer">
       <div className={`gg-wallpaper gg-scene-${wallpaper.kind}`} style={{background:!uploaded?wallpaper.preview:undefined,filter:`blur(${settings.background.blur}px)`,transform:settings.background.blur?'scale(1.08)':undefined}}>
         {source&&(isVideo?<video ref={video} data-testid="background-video" key={source} src={source} poster={poster} muted loop playsInline preload="auto" onError={()=>setMediaError('This video could not play. Try MP4 (H.264) or WebM.')} style={{objectFit:settings.background.fit}}/>:<img src={source} alt="" style={{objectFit:settings.background.fit}}/>)}
@@ -76,7 +197,8 @@ export function CustomizationProvider({children}:{children:ReactNode}) {
     </div>
     <div className="gg-site-content">{children}</div>
     <button type="button" className="gg-customize-trigger" onClick={openSettings} aria-label="Customize lounge" title="Customize appearance, tab and panic key"><Settings2 size={17}/><span>Customize</span></button>
-    <CustomizationDialog open={open} onClose={()=>{setOpen(false);setCapturing(false);}} onPlayVideo={()=>{video.current?.play().then(()=>setMediaError('')).catch(()=>setMediaError('Playback is blocked or the format is unsupported.'));}}/>
+      {(open || everOpened) && <CustomizationDialog open={open} onClose={()=>{setOpen(false);setCapturing(false);}} onPlayVideo={()=>{video.current?.play().then(()=>setMediaError('')).catch(()=>setMediaError('Playback is blocked or the format is unsupported.'));}}/>}
+      {panicDoc && <PanicDoc onExit={closePanicDoc}/>}
       <AnimatedCursor cursor={settings.cursor} />
   </CustomizationContext.Provider>;
 }

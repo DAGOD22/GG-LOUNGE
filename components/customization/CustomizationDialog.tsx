@@ -2,18 +2,64 @@
 import { CursorGallery } from './CursorGallery';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { X, Palette, Image as ImageIcon, MousePointer2, Keyboard, EyeOff, Upload, Check, RotateCcw, Sparkles } from 'lucide-react';
-import { useCustomization } from './CustomizationProvider';
+import { useCustomization } from './CustomizationProvider'
+import { PanicDoc } from '@/components/live/PanicDoc';
 import { THEMES, WALLPAPERS, RELEASE_NAME, bindingFromEvent, bindingLabel, iconHref, normalizeDestination, type Colors, type KeyBinding } from '@/lib/customization/settings';
 import { saveMedia, deleteMedia, imageData } from '@/lib/customization/media';
+import { FAVICON_PRESETS, presetIcon, BLANK_FAVICON } from '@/lib/customization/favicon-presets';
 const tabs=[{id:'tab',label:'Tab cloak',icon:EyeOff},{id:'panic',label:'Panic key',icon:Keyboard},{id:'theme',label:'Themes',icon:Palette},{id:'background',label:'Background',icon:ImageIcon},{id:'cursor',label:'Cursor',icon:MousePointer2},{id:'reactive',label:'Key effects',icon:Sparkles}];
 function Toggle({label,description,checked,onChange}:{label:string;description?:string;checked:boolean;onChange:(v:boolean)=>void}){return <label className="gg-toggle"><span><strong>{label}</strong>{description&&<small>{description}</small>}</span><input type="checkbox" role="switch" checked={checked} onChange={e=>onChange(e.target.checked)}/></label>;}
 function Section({title,children,description}:{title:string;description?:string;children:ReactNode}){return <section className="gg-settings-section"><h3>{title}</h3>{description&&<p className="gg-help">{description}</p>}{children}</section>;}
 export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onClose:()=>void;onPlayVideo:()=>void}) {
   const {settings,update,reset,capturing,setCapturing,saveError,mediaError,runPanic}=useCustomization();
-  const dialog=useRef<HTMLDialogElement>(null),[tab,setTab]=useState('tab'),[error,setError]=useState(''),[busy,setBusy]=useState(false),[iconDraft,setIconDraft]=useState(settings.cloak.icon),[destination,setDestination]=useState(settings.panic.destination),[resetConfirm,setResetConfirm]=useState(false);
+  const dialog=useRef<HTMLDialogElement>(null),[tab,setTab]=useState('tab'),[error,setError]=useState(''),[busy,setBusy]=useState(false),[iconDraft,setIconDraft]=useState(settings.cloak.icon),[destination,setDestination]=useState(settings.panic.destination),[resetConfirm,setResetConfirm]=useState(false),[previewDoc,setPreviewDoc]=useState(false);
+  const bodyRef=useRef<HTMLDivElement>(null);
+  /**
+   * Switch section without losing the visitor's place in the world.
+   *
+   * Clicking a tab used to remount the panel via `key={tab}`, which threw the
+   * scroll position back to the top of a long form and left focus on the tab
+   * button — so a keyboard user's next Tab jumped into the nav instead of into
+   * the section they had just asked for. The panel still remounts (that is what
+   * resets the local draft state each tab relies on), but the scroll is restored
+   * and focus is moved into the panel.
+   */
+  const chooseTab=(id:string)=>{
+    setTab(id);
+    requestAnimationFrame(()=>{
+      const el=bodyRef.current;
+      if(!el) return;
+      el.scrollTop=0;
+      el.querySelector<HTMLElement>('button, input, select, textarea, a[href]')?.focus({preventScroll:true});
+    });
+  };
   useEffect(()=>setIconDraft(settings.cloak.icon.startsWith('data:')?'':settings.cloak.icon),[settings.cloak.icon]);
   useEffect(()=>setDestination(settings.panic.destination),[settings.panic.destination]);
-  useEffect(()=>{const el=dialog.current;if(!el)return;if(open&&!el.open)el.showModal();if(!open&&el.open)el.close();if(open){const old=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=old;};}},[open]);
+  /**
+   * A modal <dialog> is promoted to the browser's **top layer**, which paints
+   * above every z-index in the document — including the animated cursor canvas
+   * at 2147483000. Combined with `html.ggl-cursor-on * { cursor: none }` that
+   * meant the Customize panel showed *no pointer at all*: the native cursor was
+   * hidden globally and the replacement canvas was painted underneath the
+   * dialog. Moving a slider was guesswork.
+   *
+   * The fix is to stop hiding the native pointer while the dialog is open and
+   * to park the custom cursor canvas *inside* the top layer alongside it. The
+   * canvas is a direct child of <body>, so re-parenting it into the dialog keeps
+   * it above the panel's background while the panel's own controls still
+   * receive clicks (both are top-layer siblings; the canvas is inert).
+   */
+  useEffect(()=>{
+    const el=dialog.current;if(!el)return;
+    const root=document.documentElement;
+    if(open&&!el.open)el.showModal();
+    if(!open&&el.open)el.close();
+    if(!open)return;
+    root.classList.add('ggl-dialog-open');
+    const old=document.body.style.overflow;
+    document.body.style.overflow='hidden';
+    return ()=>{document.body.style.overflow=old;root.classList.remove('ggl-dialog-open');};
+  },[open]);
   useEffect(()=>{setError('');setResetConfirm(false);setCapturing(false);},[tab,setCapturing]);
   useEffect(()=>{
     if(!capturing)return;let pending:KeyBinding|null=null;
@@ -31,31 +77,77 @@ export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onC
   const colorLabels:Record<keyof Colors,string>={background:'Page background',surface:'Surface',panel:'Cards & panels',text:'Text',muted:'Secondary text',accent:'Accent',secondary:'Secondary accent'};
   return <dialog ref={dialog} className="gg-customization" aria-labelledby="gg-customize-title" onCancel={()=>onClose()} onClose={()=>onClose()} onClick={e=>{if(e.target===dialog.current){const rect=dialog.current.getBoundingClientRect();if(e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom)onClose();}}}>
     <header className="gg-settings-header"><div><p className="gg-overline">MAKE IT YOURS</p><h2 id="gg-customize-title">Your lounge. Your rules.</h2><p>Personalize this browser. Changes apply instantly.</p></div><button className="gg-icon-button" onClick={onClose} aria-label="Close customization"><X size={20}/></button></header>
-    <div className="gg-settings-layout"><nav aria-label="Customization sections" className="gg-settings-nav">{tabs.map(({id,label,icon:Icon})=><button type="button" key={id} aria-current={tab===id?'page':undefined} onClick={()=>setTab(id)}><Icon size={17}/>{label}</button>)}<span className="gg-local-badge">Stored on this device</span></nav>
-      <div className="gg-settings-body" key={tab}>
+    <div className="gg-settings-layout"><nav aria-label="Customization sections" className="gg-settings-nav">{tabs.map(({id,label,icon:Icon})=><button type="button" key={id} aria-current={tab===id?'page':undefined} onClick={()=>chooseTab(id)}><Icon size={17}/>{label}</button>)}<span className="gg-local-badge">Stored on this device</span></nav>
+      {/* The section is announced once, politely, instead of relying on the
+          focus ring that the tab click just left behind. */}
+      <p className="sr-only" role="status" aria-live="polite">{tabs.find(t=>t.id===tab)?.label} settings</p>
+      <div className="gg-settings-body" ref={bodyRef} key={tab}>
       {(error||saveError)&&<p className="gg-settings-error" role="alert">{error||saveError}</p>}
       {busy&&<p role="status" className="gg-help">Checking and saving your file…</p>}
       {tab==='tab'&&<>
         <Section title="A tab that looks how you want" description="Choose any tab name and an icon. This changes the browser tab—not the address, history or network visibility.">
           <Toggle label="Enable tab cloaking" checked={settings.cloak.enabled} onChange={enabled=>update(s=>({...s,cloak:{...s.cloak,enabled}}))}/>
           <label className="gg-field">Tab name<input maxLength={120} value={settings.cloak.title} onChange={e=>update(s=>({...s,cloak:{...s.cloak,title:e.target.value}}))} placeholder="Type any tab name"/></label>
-          <label className="gg-field">Favicon URL or emoji<input value={iconDraft} onChange={e=>setIconDraft(e.target.value)} placeholder={settings.cloak.icon.startsWith('data:')?'Uploaded image is active':'https://example.com/favicon.ico or 📚'} autoComplete="off" spellCheck={false}/></label>
+          <label className="gg-field">Favicon URL<input value={iconDraft} onChange={e=>setIconDraft(e.target.value)} placeholder={settings.cloak.icon.startsWith('data:')?'An uploaded or preset icon is active':'https://example.com/favicon.ico'} autoComplete="off" spellCheck={false}/></label>
           <div className="gg-action-row"><button className="gg-primary" onClick={applyIcon}>Apply favicon</button><label className="gg-file-button"><Upload size={15}/> Upload favicon<input aria-label="Upload favicon" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/x-icon,image/vnd.microsoft.icon" disabled={busy} onChange={e=>{void uploadImage(e.target.files?.[0],'favicon');e.target.value='';}}/></label></div>
           <div className="gg-tab-preview"><img alt="Favicon preview" src={iconHref(settings.cloak.icon)}/><span>{settings.cloak.title||'Untitled tab'}</span><X size={13}/></div>
           <p className="gg-help">Uploads become a local 64 × 64 icon. A remote favicon URL must be reachable from your browser; upload the image if it is blocked.</p>
         </Section>
-        <Section title="Quick starts"><div className="gg-chip-row">{[{name:'Workspace',title:'My workspace',icon:'📚'},{name:'Notes',title:'Notes',icon:'📝'},{name:'Calendar',title:'Calendar',icon:'📅'},{name:'Blank',title:' ',icon:'⬜'}].map(p=><button key={p.name} className="gg-chip" onClick={()=>update(s=>({...s,cloak:{enabled:true,title:p.title,icon:p.icon}}))}>{p.icon} {p.name}</button>)}</div></Section>
+        <Section title="about:blank cloaking" description="Makes this tab look like a blank page: no title, no icon. Useful when a tab name would give the game away.">
+          <div className="gg-action-row">
+            <button className="gg-primary" onClick={()=>{update(s=>({...s,cloak:{enabled:true,title:'about:blank',icon:BLANK_FAVICON}}));setIconDraft(BLANK_FAVICON);}}>Apply about:blank cloak</button>
+            <button className="gg-secondary" onClick={()=>{update(s=>({...s,cloak:{...s.cloak,title:'New Tab',icon:BLANK_FAVICON}}));setIconDraft(BLANK_FAVICON);}}>New Tab look</button>
+          </div>
+          <p className="gg-help">The address bar still shows the real URL — browsers do not let a page change that. This changes only the title and icon.</p>
+        </Section>
+        <Section title="Favicon presets" description="Real favicons drawn as vector icons, so they stay sharp at 16 px and need no network request.">
+          <div className="gg-favicon-grid">
+            {FAVICON_PRESETS.map(preset=>{
+              const src = presetIcon(preset);
+              const active = settings.cloak.icon === src;
+              return (
+                <button
+                  key={preset.id}
+                  className={'gg-favicon-tile' + (active ? ' active' : '')}
+                  title={preset.name}
+                  aria-pressed={active}
+                  onClick={()=>{update(s=>({...s,cloak:{enabled:true,title:preset.name,icon:src}}));setIconDraft(src);}}
+                >
+                  <img alt="" src={src} width={28} height={28}/>
+                  <span>{preset.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </Section>
       </>}
       {tab==='panic'&&<>
-        <Section title="One shortcut. A different page." description="Redirect this tab instantly, including from same-origin game frames. Browser and operating-system reserved shortcuts cannot be overridden.">
+        <Section title="One shortcut. A different page." description="Pick what the shortcut does. Both modes work from same-origin game frames; browser and operating-system reserved shortcuts cannot be overridden.">
           <Toggle label="Enable panic shortcut" checked={settings.panic.enabled} onChange={enabled=>update(s=>({...s,panic:{...s.panic,enabled}}))}/>
+          <div className="gg-mode-choice" role="radiogroup" aria-label="Panic mode">
+            <button role="radio" aria-checked={settings.panic.mode==='redirect'} className={settings.panic.mode==='redirect'?'is-active':''} onClick={()=>update(s=>({...s,panic:{...s.panic,mode:'redirect'}}))}>
+              <strong>Redirect to URL</strong>
+              <small>Leaves this page instantly for your destination.</small>
+            </button>
+            <button role="radio" aria-checked={settings.panic.mode==='doc'} className={settings.panic.mode==='doc'?'is-active':''} onClick={()=>update(s=>({...s,panic:{...s.panic,mode:'doc'}}))}>
+              <strong>Fake Google Doc</strong>
+              <small>Stays on this tab: the game pauses and a document you can type into takes over. The same shortcut returns you to the game exactly where it stopped.</small>
+            </button>
+          </div>
           <div className="gg-key-recorder"><span>Current shortcut</span><kbd>{bindingLabel(settings.panic.binding)}</kbd><button className="gg-primary" onClick={()=>setCapturing(!capturing)}>{capturing?'Cancel recording':'Record a key'}</button></div>
           {capturing&&<p role="status" className="gg-recording">Press a key or key combination now. To bind a modifier alone, press and release it. Escape can be recorded too.</p>}
-          <label className="gg-field">Panic destination<input value={destination} onChange={e=>setDestination(e.target.value)} onBlur={()=>{if(destination!==settings.panic.destination)applyDestination();}} placeholder="https://example.com or about:blank" autoComplete="off" spellCheck={false}/></label>
+          <label className="gg-field" style={{opacity:settings.panic.mode==='doc'?.45:1}}>Panic destination<input value={destination} onChange={e=>setDestination(e.target.value)} onBlur={()=>{if(destination!==settings.panic.destination)applyDestination();}} placeholder="https://example.com or about:blank" autoComplete="off" spellCheck={false}/></label>
           <div className="gg-action-row"><button className="gg-primary" onClick={applyDestination}>Save destination</button><button className="gg-secondary" onClick={()=>{setDestination('about:blank');update(s=>({...s,panic:{...s.panic,destination:'about:blank'}}));}}>Use a blank page</button></div>
           <Toggle label="Also trigger while typing" description="Off by default to avoid accidental redirects in search boxes, chat and forms." checked={settings.panic.whileTyping} onChange={whileTyping=>update(s=>({...s,panic:{...s.panic,whileTyping}}))}/>
           <p className="gg-help">Escape may first release a game’s mouse lock. Cross-origin embedded pages cannot forward their keys. Panic does not erase browser history. Unsaved progress may be lost.</p>
-          <button className="gg-secondary" onClick={()=>{if(applyDestination())setTimeout(runPanic,0);}}>Test redirect — leaves this page</button>
+          {settings.panic.mode==='redirect'
+            ? <button className="gg-secondary" onClick={()=>{if(applyDestination())setTimeout(runPanic,0);}}>Test redirect — leaves this page</button>
+            : <>
+                <button className="gg-secondary" onClick={()=>setPreviewDoc(true)}>Preview the fake document</button>
+                <button className="gg-secondary" onClick={()=>{dialog.current?.close();setTimeout(runPanic,0)}}>Test it now — the shortcut brings you back</button>
+              </>}
+          <p className="gg-help">In fake-document mode the shortcut pauses and mutes the game instead of leaving the tab. Type <kbd>ggout</kbd>, click the word count seven times, or press the shortcut again to return.</p>
+          {previewDoc&&<PanicDoc onExit={()=>setPreviewDoc(false)}/>}
         </Section>
       </>}
       {tab==='theme'&&<>
@@ -79,6 +171,13 @@ export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onC
           <CursorGallery />
           <label className="gg-slider"><span>Size <b>{settings.cursor.size}px</b></span><input type="range" min={16} max={64} step={2} value={settings.cursor.size} onChange={e=>update(s=>({...s,cursor:{...s.cursor,size:Number(e.target.value)}}))} aria-label="Cursor size"/></label>
           <label className="gg-slider"><span>Follow speed <b>{Math.round(settings.cursor.speed*100)}%</b></span><input type="range" min={0} max={1} step={0.05} value={settings.cursor.speed} onChange={e=>update(s=>({...s,cursor:{...s.cursor,speed:Number(e.target.value)}}))} aria-label="Cursor follow speed"/></label>
+        </Section>
+        <Section title="Other players on the lounge" description="Ghost cursors show where everyone else is pointing, in their own custom cursor style. The activity feed reports launches and unlocks as they happen. Nothing here is shared with anyone outside GG-LOUNGE, and your real cursor is never affected.">
+          <Toggle label="Show live layer" description="Off hides every ghost, toast and co-op button and stops all presence traffic." checked={settings.live.enabled} onChange={enabled=>update(s=>({...s,live:{...s.live,enabled}}))}/>
+          <Toggle label="Ghost cursors" checked={settings.live.ghosts} onChange={ghosts=>update(s=>({...s,live:{...s.live,ghosts}}))}/>
+          <label className="gg-slider"><span>Ghost opacity <b>{settings.live.ghostOpacity}%</b></span><input type="range" min={15} max={100} step={5} value={settings.live.ghostOpacity} onChange={e=>update(s=>({...s,live:{...s.live,ghostOpacity:Number(e.target.value)}}))} aria-label="Ghost cursor opacity"/></label>
+          <Toggle label="Activity popups" description="Short toasts, bottom right: who launched what, who unlocked something, how many players are online." checked={settings.live.feed} onChange={feed=>update(s=>({...s,live:{...s.live,feed}}))} />
+          <p className="gg-help">Presence is a heartbeat every couple of seconds and only while this tab is visible. Nothing is stored after 30 seconds of silence.</p>
           <Toggle label="Ribbon trail" description="A tapered light ribbon behind the pointer. Respects reduced motion." checked={settings.cursor.trail} onChange={trail=>update(s=>({...s,cursor:{...s.cursor,trail}}))}/>
           <Toggle label="GPU afterglow" description="WebGL motion-blur light streaks under the pointer. Auto-off with reduced motion or without WebGL." checked={settings.cursor.glow} onChange={glow=>update(s=>({...s,cursor:{...s.cursor,glow}}))}/>
         </Section>
@@ -101,6 +200,6 @@ export function CustomizationDialog({open,onClose,onPlayVideo}:{open:boolean;onC
       </>}
       </div>
     </div>
-    <footer className="gg-settings-footer"><span>{saveError?'Not saved':busy?'Saving file…':<><Check size={13}/> Automatically saved</>}<small>{RELEASE_NAME}</small></span><div className="gg-action-row"><button className="gg-reset" onClick={()=>{if(!resetConfirm){setResetConfirm(true);return;}const id=settings.background.mediaId;reset();if(id)deleteMedia(id).catch(()=>{});setResetConfirm(false);setError('');}}><RotateCcw size={13}/>{resetConfirm?'Confirm reset':'Reset preferences'}</button><button className="gg-primary" onClick={onClose}>Done</button></div></footer>
+    <footer className="gg-settings-footer"><span>{saveError?'Not saved':busy?'Saving file…':<><Check size={13}/> Automatically saved • </> }<small>{RELEASE_NAME}</small></span><div className="gg-action-row"><button className="gg-reset" onClick={()=>{if(!resetConfirm){setResetConfirm(true);return;}const id=settings.background.mediaId;reset();if(id)deleteMedia(id).catch(()=>{});setResetConfirm(false);setError('');}}><RotateCcw size={13}/>{resetConfirm?'Confirm reset':'Reset preferences'}</button><button className="gg-primary" onClick={onClose}>Done</button></div></footer>
   </dialog>;
 }

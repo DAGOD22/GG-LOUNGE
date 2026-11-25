@@ -7,7 +7,7 @@
 // - press + click-pulse signals, ribbon trail, reduced-motion + touch fallbacks
 // - hides while the pointer is inside an iframe (native cursor takes over there)
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import {
   ANIMATED_CURSOR_IDS,
   drawCursorScene,
@@ -58,7 +58,9 @@ export function AnimatedCursor({ cursor }: Props) {
     trailLength: 0.5,
   };
   const settingsRef = useRef(settings);
-  settingsRef.current = settings;
+  // Written in an effect, never during render: a render can be discarded, and
+  // the rAF loop below must only ever read committed state.
+  useLayoutEffect(() => { settingsRef.current = settings; }, [settings]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -108,14 +110,14 @@ export function AnimatedCursor({ cursor }: Props) {
     let clickPulse = false;
     let visible = false;
     let inIframe = false;
-    let startTime = performance.now();
+    const startTime = performance.now();
     const trail: { x: number; y: number }[] = [];
 
     /* hovered element box (target + smoothed) */
     let targetRect: CursorRect | null = null;
     let animRect: CursorRect | null = null;
 
-    let instance: CursorInstance = getCursorPreset(settingsRef.current.preset).create();
+    const instance: CursorInstance = getCursorPreset(settingsRef.current.preset).create();
 
     /* per-context spring stiffness: text feels tight & precise, games loose,
        disabled controls heavy — the pointer "weighs" different per surface */
