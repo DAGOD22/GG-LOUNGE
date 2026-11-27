@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isChatverseMember } from "@/lib/chatverse-auth";
 import { cleanBody, getRoom, markPresent, postMessage, readMessages, whoIsHere } from "@/lib/db/chat";
 import { consumeSharedBudget, callerKey } from "@/lib/live-budget";
+import { describeDbError } from "@/lib/db/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +14,11 @@ export const dynamic = "force-dynamic";
  * backlog and the tail without a second round trip. Only messages a person
  * typed exist here — there are no seeds, no join notices and no bots, so an
  * empty list genuinely means "nobody has said anything".
+ *
+ * Both handlers catch their own database failures and answer in JSON. This is
+ * not decoration: an unhandled throw here produced an HTML 500, the client's
+ * `response.json()` silently failed, and a message that never landed looked
+ * exactly like one that had — the worst failure mode a chat can have.
  */
 export async function GET(req: Request) {
   if (!(await isChatverseMember())) return NextResponse.json({ error: "Locked" }, { status: 401 });
@@ -22,14 +28,21 @@ export async function GET(req: Request) {
   const who = (url.searchParams.get("who") ?? "").slice(0, 24);
 
   if (!room) return NextResponse.json({ error: "Which room?" }, { status: 400 });
-  if (!(await getRoom(room))) return NextResponse.json({ error: "No such room" }, { status: 404 });
 
-  if (who) await markPresent(room, who).catch(() => {});
-  const [messages, here] = await Promise.all([readMessages(room, after), whoIsHere(room)]);
-  return NextResponse.json(
-    { messages, here },
-    { headers: { "cache-control": "no-store" } },
-  );
+  try {
+    if (!(await getRoom(room))) return NextResponse.json({ error: "No such room" }, { status: 404 });
+
+    if (who) await markPresent(room, who).catch(() => {});
+    const [messages, here] = await Promise.all([readMessages(room, after), whoIsHere(room)]);
+    return NextResponse.json(
+      { messages, here },
+      { headers: { "cache-control": "no-store" } },
+    );
+  } catch (cause) {
+    const info = describeDbError(cause);
+    console.error("[chat:messages]", info.detail);
+    return NextResponse.json({ error: info.message, schema: info.schema }, { status: 503 });
+  }
 }
 
 export async function POST(req: Request) {
@@ -47,9 +60,17 @@ export async function POST(req: Request) {
     : null;
 
   if (!room) return NextResponse.json({ error: "Which room?" }, { status: 400 });
-  if (!(await getRoom(room))) return NextResponse.json({ error: "No such room" }, { status: 404 });
+  if (!text && !media) return NextResponse.json({ error: "Nothing to send." }, { status: 400 });
 
-  const saved = await postMessage(room, author, text, media);
-  if (!saved) return NextResponse.json({ error: "Nothing to send." }, { status: 400 });
-  return NextResponse.json({ message: saved });
+  try {
+    if (!(await getRoom(room))) return NextResponse.json({ error: "No such room" }, { status: 404 });
+
+    const saved = await postMessage(room, author, text, media);
+    if (!saved) return NextResponse.json({ error: "Nothing to send." }, { status: 400 });
+    return NextResponse.json({ message: saved });
+  } catch (cause) {
+    const info = describeDbError(cause);
+    console.error("[chat:messages]", info.detail);
+    return NextResponse.json({ error: info.message, schema: info.schema }, { status: 503 });
+  }
 }

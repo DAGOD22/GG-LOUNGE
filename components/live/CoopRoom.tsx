@@ -159,6 +159,17 @@ export function CoopRoom() {
     nameRef.current = myName;
   }, [myName]);
 
+  /**
+   * CHATVERSE rooms can open this panel directly ("Play together" in a room
+   * header). A window event keeps the two components strangers to each other:
+   * the chat has no dependency on the co-op code, it just rings a bell.
+   */
+  useEffect(() => {
+    const open = () => setOpen(true);
+    window.addEventListener('ggl:coop-open', open);
+    return () => window.removeEventListener('ggl:coop-open', open);
+  }, []);
+
   const push = useCallback((who: ChatLine['who'], text: string) => {
     setChat(current => [...current.slice(-40), { id: lineId.current++, who, text }]);
   }, []);

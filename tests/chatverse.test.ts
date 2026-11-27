@@ -110,3 +110,44 @@ test('the custom cursor is not hidden behind the customize dialog', () => {
   const dialog = read('components/customization/CustomizationDialog.tsx');
   assert.match(dialog, /ggl-dialog-open/);
 });
+
+test('a database failure in a chat route answers in JSON, never as a silent HTML 500', () => {
+  // The failure that ate messages: an unhandled throw produced an HTML 500,
+  // the client's response.json() failed, the message was marked "not sent"
+  // with no reason, and a send looked identical to a save that vanished.
+  // Every route that touches the database now catches and answers 503 JSON.
+  for (const route of [
+    'app/api/chat/rooms/route.ts',
+    'app/api/chat/messages/route.ts',
+    'app/api/chat/poll/route.ts',
+    'app/api/chat/media/route.ts',
+  ]) {
+    const source = read(route);
+    assert.match(source, /describeDbError/, `${route} must translate database errors`);
+    assert.match(source, /catch \(cause\)/, `${route} must catch its own failures`);
+    assert.match(source, /status: 503/, `${route} must answer a storage failure as 503`);
+  }
+});
+
+test('a failed send is loud and recoverable', () => {
+  const app = read('components/chatverse/ChatverseApp.tsx');
+  // The old code only surfaced errors for media sends (`if (!text)`), so a
+  // refused text message showed "not sent" and nothing else.
+  assert.doesNotMatch(app, /if \(!text\) setError/);
+  assert.match(app, /Your message is back in the box/, 'the error names what happened to the text');
+  assert.match(app, /cv-retry/, 'a failed row carries a retry affordance');
+  assert.match(app, /Try again/);
+  // A failed rooms load is an error, not an empty list: an empty list reads
+  // as "every room vanished", which is how a storage outage gaslights people.
+  assert.match(app, /Could not load the rooms/);
+});
+
+test('a chat room leads somewhere playable', () => {
+  // "I made a room, a friend joined, and then nothing happens" — the room
+  // header now carries a door into the co-op panel, and the co-op panel
+  // listens for it.
+  const app = read('components/chatverse/ChatverseApp.tsx');
+  assert.match(app, /ggl:coop-open/, 'the chat dispatches the open event');
+  const coop = read('components/live/CoopRoom.tsx');
+  assert.match(coop, /ggl:coop-open/, 'the co-op panel answers the chat');
+});

@@ -42,16 +42,30 @@ test('every class the secret layer and rewind use is actually styled', () => {
   const used = new Set(
     execFileSync(
       'bash',
-      ['-c', 'grep -rhoE "(gg-rewind|gg-bubble|gg-runner|gg-secret|gg-spotlight|gg-timewarp|gg-retro|vault)-?[a-z-]*" --include="*.tsx" components/live/ | sort -u'],
+      ['-c', 'grep -rhoE "(gg-rewind|gg-bubble|gg-runner|gg-secret|gg-spotlight|gg-timewarp|gg-retro|gg-warp|vault)-?[a-z-]*" --include="*.tsx" components/live/ | sort -u'],
       { cwd: new URL('..', import.meta.url).pathname, encoding: 'utf8' },
     )
       .split('\n')
       .filter(Boolean),
   );
-  assert.ok(used.size >= 20, 'the scan found the component classes');
-  const styled = new Set(css.match(/(?:gg-rewind|gg-bubble|gg-runner|gg-secret|gg-spotlight|gg-timewarp|gg-retro|vault)-?[a-z-]*/g) ?? []);
+  assert.ok(used.size >= 25, 'the scan found the component classes');
+  const styled = new Set(css.match(/(?:gg-rewind|gg-bubble|gg-runner|gg-secret|gg-spotlight|gg-timewarp|gg-retro|gg-warp|vault)-?[a-z-]*/g) ?? []);
   const missing = [...used].filter(name => !styled.has(name));
   assert.deepEqual(missing, [], `these classes have no CSS: ${missing.join(', ')}`);
+});
+
+test('every class-based warp has its rule in the stylesheet', async () => {
+  const { SECRETS } = await import('../lib/secrets');
+  const classWarps = SECRETS.filter(secret => secret.warp.kind === 'class').map(secret => secret.id);
+  for (const id of classWarps) {
+    assert.match(code, new RegExp(`html\\.gg-warp-${id}[\\s,{:\\[]`), `gg-warp-${id} toggles a class with no CSS`);
+  }
+  // The animated warps must define their keyframes, and all of it must
+  // switch off under prefers-reduced-motion.
+  for (const id of ['oilslick', 'quake', 'jelly', 'floaty', 'drift', 'rainbow', 'disco']) {
+    assert.match(css, new RegExp(`@keyframes gg-warp-${id}`), `gg-warp-${id} has no keyframes`);
+  }
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*gg-warp-quake/);
 });
 
 test('the rewind overlay covers the frame and never blocks it', () => {

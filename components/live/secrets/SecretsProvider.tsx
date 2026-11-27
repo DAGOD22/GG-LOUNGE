@@ -7,13 +7,13 @@
  *
  *   · a single keystroke listener that feeds a rolling character buffer (the
  *     typed codes) and a rolling key buffer (the konami sequence);
- *   · the toggled overlays, rendered only while their secret is on;
+ *   · the warp layer — every toggled effect applied to the document;
  *   · discovery toasts — one per secret, first time only, no matter which
  *     part of the site discovered it (a chat command, the vault page, the
  *     runner's scoreboard all land here through the same subscription).
  *
  * It renders nothing visible until a secret fires, so the server render is an
- * empty fragment and there is nothing to hide from anyone who does not know.
+ * empty fragment and there is nothing to give the layer away.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -22,7 +22,9 @@ import {
   SECRETS,
   SECRETS_KEY,
   TYPED_CODES,
+  activeWarps,
   discover,
+  isDiscovered,
   isKonamiSuffix,
   isToggled,
   setToggle,
@@ -30,10 +32,11 @@ import {
   typedCodeMatch,
   type SecretId,
 } from '@/lib/secrets';
-import { CodeRain, Confetti, RetroMode, Snowfall, Spotlight, TimeWarp } from './Overlays';
+import { Confetti } from './Overlays';
+import { WarpLayer } from './WarpLayer';
 
-/** Secrets that behave as switches: the same trigger toggles them off again. */
-const TOGGLEABLE = new Set<SecretId>(['konami', 'matrix', 'snow', 'xyzzy', 'timewarp', 'ghost']);
+/** The key sequence that is its own code, matched outside the typed buffer. */
+const KONAMI = 'konami' as const;
 
 type Toast = { key: number; name: string; body: string };
 
@@ -48,21 +51,15 @@ function discoveryBody(id: SecretId): string {
     case 'runner':
       return 'A best score is saved from here on.';
     case 'vault':
-      return 'Ten secrets live here. The hints are the rest of the map.';
+      return 'Every secret, every code, every switch — all in the open.';
     default:
-      return 'On. The same code switches it off.';
+      return 'On. The same code switches it off — or use its switch in the vault.';
   }
 }
 
 export function SecretsProvider() {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [toggles, setToggles] = useState({
-    konami: false,
-    matrix: false,
-    snow: false,
-    xyzzy: false,
-    timewarp: false,
-  });
+  const [active, setActive] = useState<SecretId[]>([]);
   const [burst, setBurst] = useState(0);
 
   const buffer = useRef('');
@@ -79,31 +76,25 @@ export function SecretsProvider() {
   }, []);
 
   /**
-   * One subscription drives both the overlays and the toasts: any component
-   * that calls `discover` or `setToggle` — chat, the vault page, the runner —
+   * One subscription drives the warp layer and the toasts: any component that
+   * calls `discover` or `setToggle` — chat, the vault page, the runner —
    * lands here, wherever this provider is mounted.
    */
   const sync = useCallback(() => {
     for (const secret of SECRETS) {
       if (seen.current.has(secret.id)) continue;
-      if (!isToggled(secret.id) && !isDiscoveredQuiet(secret.id)) continue;
+      if (!isDiscovered(secret.id)) continue;
       seen.current.add(secret.id);
       toast(secret.name, discoveryBody(secret.id));
     }
-    setToggles({
-      konami: isToggled('konami'),
-      matrix: isToggled('matrix'),
-      snow: isToggled('snow'),
-      xyzzy: isToggled('xyzzy'),
-      timewarp: isToggled('timewarp'),
-    });
+    setActive(activeWarps());
   }, [toast]);
 
   useEffect(() => {
     // Secrets found in earlier sessions are known, not news: seed the set
     // silently, then toast only what lands after mount.
     for (const secret of SECRETS) {
-      if (isDiscoveredQuiet(secret.id)) seen.current.add(secret.id);
+      if (isDiscovered(secret.id)) seen.current.add(secret.id);
     }
     sync();
     const unsubscribe = subscribeSecrets(sync);
@@ -130,10 +121,9 @@ export function SecretsProvider() {
         .catch(() => {});
       return;
     }
-    if (!TOGGLEABLE.has(id)) return;
     const on = !isToggled(id);
     setToggle(id, on);
-    if (id === 'konami' && on) setBurst(value => value + 1);
+    if (id === KONAMI && on) setBurst(value => value + 1);
   }, []);
 
   useEffect(() => {
@@ -153,7 +143,7 @@ export function SecretsProvider() {
       keys.current = [...keys.current, event.key.toLowerCase()].slice(-12);
       if (isKonamiSuffix(keys.current)) {
         keys.current = [];
-        activate('konami');
+        activate(KONAMI);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -162,11 +152,7 @@ export function SecretsProvider() {
 
   return (
     <>
-      {toggles.konami && <RetroMode />}
-      {toggles.matrix && <CodeRain />}
-      {toggles.snow && <Snowfall />}
-      {toggles.xyzzy && <Spotlight />}
-      {toggles.timewarp && <TimeWarp />}
+      <WarpLayer active={active} />
       {burst > 0 && <Confetti key={burst} />}
       <div className="gg-secret-toast-stack" aria-live="polite">
         {toasts.map(entry => (
@@ -178,21 +164,4 @@ export function SecretsProvider() {
       </div>
     </>
   );
-}
-
-/** Read without importing the whole store surface — a narrow local helper. */
-function isDiscoveredQuiet(id: SecretId): boolean {
-  return readFound().includes(id);
-}
-
-function readFound(): SecretId[] {
-  try {
-    if (typeof localStorage === 'undefined') return [];
-    const raw = localStorage.getItem(SECRETS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as { found?: string[] };
-    return (parsed.found ?? []) as SecretId[];
-  } catch {
-    return [];
-  }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isChatverseMember } from "@/lib/chatverse-auth";
 import { MAX_CHAT_MEDIA_BYTES, putMedia, sniffMedia } from "@/lib/db/chat-media";
 import { consumeSharedBudget, callerKey } from "@/lib/live-budget";
+import { describeDbError } from "@/lib/db/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +43,12 @@ export async function POST(req: Request) {
 
   const room = (new URL(req.url).searchParams.get("room") ?? "").slice(0, 40);
   const name = req.headers.get("x-file-name") ?? "image";
-  const saved = await putMedia(buffer, mime, decodeURIComponent(name), room);
-  return NextResponse.json({ url: saved.url, mime, name });
+  try {
+    const saved = await putMedia(buffer, mime, decodeURIComponent(name), room);
+    return NextResponse.json({ url: saved.url, mime, name });
+  } catch (cause) {
+    const info = describeDbError(cause);
+    console.error("[chat:media]", info.detail);
+    return NextResponse.json({ error: info.message, schema: info.schema }, { status: 503 });
+  }
 }

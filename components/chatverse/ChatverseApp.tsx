@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Send, Hash, Plus, X, LogOut, Image as ImageIcon, Loader2, Users, Trash2, Check, AlertTriangle, CornerDownLeft,
+  Gamepad2,
 } from 'lucide-react';
 import type { ChatMessage, ChatRoom } from '@/lib/db/chat';
 import { discover, parseChatCommand } from '@/lib/secrets';
@@ -66,7 +67,14 @@ export function ChatverseApp() {
       window.location.reload();
       return;
     }
-    const data = await response.json().catch(() => ({ rooms: [] }));
+    const data = await response.json().catch(() => ({ rooms: [], error: '' }));
+    if (!response.ok) {
+      // A storage failure used to fall through to an empty list, which read
+      // as "every room vanished". Say what actually happened instead.
+      setStatus('error');
+      setError(data?.error ?? 'Could not load the rooms.');
+      return;
+    }
     const list: ChatRoom[] = data.rooms ?? [];
     setRooms(list);
     setStatus('ready');
@@ -119,11 +127,16 @@ export function ChatverseApp() {
           `/api/chat/messages?room=${encodeURIComponent(room)}&after=0&who=${encodeURIComponent(name)}`,
           { cache: 'no-store' },
         );
-        const data = await response.json().catch(() => ({ messages: [] }));
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          setError(data?.error ?? 'Could not load this room.');
+          return;
+        }
+        const data = await response.json().catch(() => ({ messages: [], here: [] }));
         merge(data.messages ?? []);
         setHere(data.here ?? []);
       } catch {
-        setError('Could not load this room.');
+        setError('Could not load this room. Check your connection — messages are kept on the server.');
       }
     })();
   }, [room, name, merge]);
@@ -231,13 +244,17 @@ export function ChatverseApp() {
       if (data?.message) merge([data.message]);
       setMessages(current => current.filter(message => message.id !== temp.id));
     } catch (cause) {
-      // Never leave a failed send looking delivered.
+      // Never leave a failed send looking delivered — and never fail silently.
+      // The reason is shown, the text comes back, and the row itself is
+      // clickable to try again (a network blip should not cost a retyping).
+      const reason = (cause as Error).message || 'Message not sent';
+      setError(`${reason} Your message is back in the box — press send to try again.`);
       setMessages(current =>
         current.map(message =>
           message.id === temp.id ? { ...message, pending: false, failed: true } : message,
         ),
       );
-      if (!text) setError((cause as Error).message);
+      setDraft(current => (text && !current ? text : current));
     }
   }, [room, name, merge]);
 
@@ -444,6 +461,19 @@ export function ChatverseApp() {
                 {Math.max(1, here.length)}
                 <span className="cv-here-names">{here.slice(0, 4).join(', ')}</span>
               </span>
+              <button
+                type="button"
+                className="cv-play"
+                title="Play a two-player game together — opens the co-op room"
+                onClick={() => {
+                  // The co-op panel is mounted site-wide; this is the door
+                  // from a chat room straight into it, so "join a room"
+                  // actually leads to playing something together.
+                  window.dispatchEvent(new CustomEvent('ggl:coop-open'));
+                }}
+              >
+                <Gamepad2 size={13} /> Play together
+              </button>
             </header>
 
             <div
@@ -483,8 +513,17 @@ export function ChatverseApp() {
                   <span className="cv-msg-time">
                     {new Date(message.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     {message.pending && ' · sending'}
-                    {message.failed && ' · not sent'}
+                    {message.failed && ' · not sent — click to retry'}
                   </span>
+                  {message.failed && (
+                    <button
+                      type="button"
+                      className="cv-retry"
+                      onClick={() => void send(message.body, message.media ? { url: message.media, name: message.mediaName } : undefined)}
+                    >
+                      Try again
+                    </button>
+                  )}
                 </article>
               ))}
             </div>

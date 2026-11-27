@@ -15,6 +15,7 @@ import { test } from 'node:test';
 import {
   CODES,
   EIGHT_BALL,
+  GROUP_LABELS,
   KONAMI_KEYS,
   SECRETS,
   TYPED_CODES,
@@ -24,6 +25,7 @@ import {
   typedCodeMatch,
 } from '../lib/secrets';
 import { recordRunnerScore, runnerBest, resetSecrets, discover, isDiscovered, isToggled, setToggle } from '../lib/secrets';
+import { overlayIdsFor } from '../components/live/secrets/WarpLayer';
 import {
   PLAYER_SIZE,
   GROUND_Y,
@@ -48,10 +50,10 @@ function memoryStorage(): Storage {
   } as Storage;
 }
 
-test('secrets: the layer is exactly ten features', () => {
-  assert.equal(SECRETS.length, 10);
+test('secrets: the layer is exactly sixty features — ten originals + fifty warps', () => {
+  assert.equal(SECRETS.length, 60);
   const ids = new Set(SECRETS.map(secret => secret.id));
-  assert.equal(ids.size, 10, 'secret ids must be unique');
+  assert.equal(ids.size, 60, 'secret ids must be unique');
 });
 
 test('secrets: every code is typable and every code maps to a real secret', () => {
@@ -59,6 +61,38 @@ test('secrets: every code is typable and every code maps to a real secret', () =
     assert.match(code, /^[a-z0-9]+$/, 'codes are single lowercase words or years');
     assert.ok(SECRETS.some(secret => secret.id === TYPED_CODES[code]), `${code} points nowhere`);
   }
+  // 4 of the 60 arrive by other means (konami, chat, runner, vault page) —
+  // the other 56 are typed codes.
+  assert.equal(CODES.length, 56);
+});
+
+test('secrets: no code is the tail of another code', () => {
+  // The matcher fires when the typed buffer *ends with* a code, so a code
+  // that is a suffix of another would shadow it: typing the longer one would
+  // trigger the shorter secret first (loop order, not intent).
+  for (const a of CODES) {
+    for (const b of CODES) {
+      if (a === b) continue;
+      assert.ok(!b.endsWith(a), `code "${b}" ends with code "${a}" — the shorter one would steal it`);
+    }
+  }
+});
+
+test('secrets: every secret carries a group, an about line and a wired warp', () => {
+  for (const secret of SECRETS) {
+    assert.ok(GROUP_LABELS[secret.group], `${secret.id} has an unknown group`);
+    assert.ok(secret.about.length > 12, `${secret.id} does not say what it does`);
+    assert.ok(secret.warp, `${secret.id} has no warp spec`);
+  }
+  // Ghost mode is the behaviour archetype: it intentionally has no visual of
+  // its own — the presence layer does the work.
+  assert.equal(SECRETS.find(secret => secret.id === 'ghost')?.warp.kind, 'none');
+});
+
+test('secrets: every overlay warp has a component behind it', () => {
+  const overlayIds = SECRETS.filter(secret => secret.warp.kind === 'overlay').map(secret => secret.id);
+  assert.ok(overlayIds.length >= 22, 'the overlay warps are the biggest family');
+  assert.deepEqual(overlayIdsFor(overlayIds).sort(), [...overlayIds].sort(), 'an overlay warp would silently do nothing');
 });
 
 test('secrets: the typed matcher only fires on whole codes', () => {

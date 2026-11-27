@@ -3,21 +3,24 @@
 /**
  * The Vault — the page behind /secrets.
  *
- * This is the one place the secrets are written down, and it is reachable
- * only if someone told you the address: it is in no nav, no sitemap, no
- * robots-allowed list and no link directory. Inside, the page is honest with
- * its owner: every secret is listed, undiscovered ones show only their hint,
- * discovered ones show the code and a switch where one exists.
+ * Everything is listed openly: all sixty secrets, every code, every switch.
+ * Nothing here is hidden behind a discovery gate — the secrecy lives in the
+ * address, not in the page. The page is in no nav, no sitemap, no
+ * robots-allowed list and no link directory, and it noindexes itself, so the
+ * only way in is to already know it exists.
  *
  * The game lives here too, because a vault with nothing in it is just a page.
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Check, Copy, DoorOpen, Eye, EyeOff, Gamepad2, RotateCcw, Shuffle, Sparkles } from 'lucide-react';
+import { Check, Copy, DoorOpen, Gamepad2, Eye, EyeOff, RotateCcw, Search, Shuffle, Sparkles, Trophy } from 'lucide-react';
 import {
+  GROUP_LABELS,
   SECRETS,
   type SecretDef,
+  type SecretGroup,
+  clearWarps,
   discover,
   isDiscovered,
   isToggled,
@@ -28,20 +31,25 @@ import {
 } from '@/lib/secrets';
 import { VaultRunner } from './VaultRunner';
 
-const TOGGLE_KINDS = new Set<SecretDef['kind']>(['typed-toggle', 'konami']);
+const GROUP_ORDER: SecretGroup[] = ['classic', 'theme', 'layout', 'text', 'overlay', 'behavior'];
+
+/** Kinds whose secret is an on/off switch with a real visual or behaviour. */
+function isSwitchable(secret: SecretDef): boolean {
+  return secret.kind === 'typed-toggle' || secret.kind === 'konami';
+}
 
 export function VaultPage() {
   // `version` is the render clock: every store change bumps it, which both
-  // re-renders and re-runs the memos below. The memos must not be computed
-  // before mount — the store lives in localStorage, so a server render would
-  // disagree with the client's first paint and React would warn.
+  // re-renders and re-runs the memos below. The store lives in localStorage,
+  // so nothing that reads it renders before mount — a server render would
+  // disagree with this browser's real state and React would warn.
   const [version, setVersion] = useState(0);
   const [copied, setCopied] = useState(false);
   const [ready, setReady] = useState(false);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
-    // Visiting the door is itself a secret. The store event re-renders the
-    // cards; the bump is for callers outside the provider's subscription.
+    // Visiting the door is itself a secret.
     discover('vault');
     setReady(true);
     setVersion(value => value + 1);
@@ -49,28 +57,29 @@ export function VaultPage() {
   }, []);
 
   const found = useMemo(() => SECRETS.filter(secret => isDiscovered(secret.id)).length, [version]);
+  const liveCount = useMemo(() => SECRETS.filter(secret => isToggled(secret.id)).length, [version]);
+
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return null;
+    return SECRETS.filter(secret =>
+      `${secret.name} ${secret.code} ${secret.about} ${secret.group}`.toLowerCase().includes(needle),
+    );
+  }, [query]);
 
   const cheatsheet = useMemo(
-    () =>
-      SECRETS.filter(secret => isDiscovered(secret.id))
-        .map(secret => `${secret.name}: ${secret.code}`)
-        .join('\n'),
+    () => SECRETS.map(secret => `${secret.name}: ${secret.code}`).join('\n'),
     [version],
   );
 
   const copySheet = async () => {
     try {
-      await navigator.clipboard.writeText(cheatsheet || 'Nothing discovered yet.');
+      await navigator.clipboard.writeText(cheatsheet);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       /* clipboard refused: the list stays on screen either way */
     }
-  };
-
-  const forget = () => {
-    resetSecrets();
-    setVersion(value => value + 1);
   };
 
   const luckyDip = () => {
@@ -82,6 +91,13 @@ export function VaultPage() {
       .catch(() => {});
   };
 
+  const groups: SecretGroup[] = filtered
+    ? [...new Set(filtered.map(secret => secret.group))].sort((a, b) => GROUP_ORDER.indexOf(a) - GROUP_ORDER.indexOf(b))
+    : GROUP_ORDER;
+
+  const ofGroup = (group: SecretGroup): SecretDef[] =>
+    (filtered ?? SECRETS).filter(secret => secret.group === group);
+
   return (
     <main className="vault">
       <header className="vault-head">
@@ -90,87 +106,102 @@ export function VaultPage() {
         </span>
         <h1>The Vault</h1>
         <p>
-          Ten things this site does that nobody is told about. No menu entry, no tour step, no shortcut card. You are
-          here because you know something.
+          Every secret this site has, listed in the open — all {SECRETS.length} of them, every code, every switch.
+          The only thing secret about this page is its address. Nothing here is linked, indexed, or told to anyone.
         </p>
-        {/* The progress bar and cards read localStorage, so they render only
-            after mount: a server render would guess, and the guess would
-            disagree with this browser's real state. */}
         {ready ? (
-          <div className="vault-progress" role="status">
-            <span className="vault-progress-fill" style={{ width: `${(found / SECRETS.length) * 100}%` }} />
-            <span className="vault-progress-label">
-              {found} of {SECRETS.length} found
-            </span>
-          </div>
+          <>
+            <div className="vault-progress" role="status">
+              <span className="vault-progress-fill" style={{ width: `${(found / SECRETS.length) * 100}%` }} />
+              <span className="vault-progress-label">
+                {found} of {SECRETS.length} tried · {liveCount} live right now
+              </span>
+            </div>
+            <div className="vault-tools">
+              <label className="vault-search">
+                <Search size={13} aria-hidden="true" />
+                <input
+                  value={query}
+                  onChange={event => setQuery(event.target.value)}
+                  placeholder="Filter by name, code or effect…"
+                  aria-label="Filter secrets"
+                />
+              </label>
+              <button type="button" onClick={() => clearWarps()} disabled={!liveCount}>
+                <RotateCcw size={13} /> Switch every warp off{liveCount ? ` (${liveCount})` : ''}
+              </button>
+            </div>
+          </>
         ) : (
           <p className="vault-hint">Opening the vault…</p>
         )}
       </header>
 
-      {ready && (
-        <ul className="vault-grid">
-        {SECRETS.map(secret => {
-          const unlocked = isDiscovered(secret.id);
-          const toggleable = TOGGLE_KINDS.has(secret.kind);
-          const on = toggleable && isToggled(secret.id);
+      {ready &&
+        groups.map(group => {
+          const list = ofGroup(group);
+          if (!list.length) return null;
           return (
-            <li key={secret.id} className={`vault-card${unlocked ? ' found' : ''}`}>
-              <span className="vault-card-badge">{unlocked ? 'found' : 'undiscovered'}</span>
-              <h2>
-                {unlocked ? secret.name : '???'}
-                {on && <em className="vault-on">on</em>}
-              </h2>
-              {unlocked ? (
-                <>
-                  <code className="vault-code">{secret.code}</code>
-                  <div className="vault-actions">
-                    {toggleable && (
-                      <button type="button" className={on ? 'on' : ''} onClick={() => setToggle(secret.id, !on)}>
-                        {on ? <EyeOff size={13} /> : <Eye size={13} />} {on ? 'Switch off' : 'Switch on'}
-                      </button>
-                    )}
-                    {secret.id === 'shuffle' && (
-                      <button type="button" onClick={luckyDip}>
-                        <Shuffle size={13} /> Open a random game
-                      </button>
-                    )}
-                    {secret.id === 'vault' && (
-                      <span className="vault-static">You are standing in it.</span>
-                    )}
-                    {secret.id === 'runner' && (
-                      <span className="vault-static">Best score so far: {runnerBest() || 'none yet'}</span>
-                    )}
-                    {secret.id === 'chat' && (
-                      <span className="vault-static">Works in every chat room.</span>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <p className="vault-hint">{secret.hint}</p>
-              )}
-            </li>
+            <section key={group} className="vault-group">
+              <h2>{GROUP_LABELS[group]}</h2>
+              <ul className="vault-grid">
+                {list.map(secret => {
+                  const toggleable = isSwitchable(secret);
+                  const on = toggleable && isToggled(secret.id);
+                  return (
+                    <li key={secret.id} className={`vault-card${on ? ' live' : ''}${isDiscovered(secret.id) ? ' found' : ''}`}>
+                      <span className="vault-card-badge">{on ? 'live' : 'off'}</span>
+                      <h3>{secret.name}</h3>
+                      <code className="vault-code">{secret.code}</code>
+                      <p className="vault-about">{secret.about}</p>
+                      <div className="vault-actions">
+                        {toggleable && (
+                          <button type="button" className={on ? 'on' : ''} onClick={() => setToggle(secret.id, !on)}>
+                            {on ? <EyeOff size={13} /> : <Eye size={13} />} {on ? 'Switch off' : 'Switch on'}
+                          </button>
+                        )}
+                        {secret.id === 'shuffle' && (
+                          <button type="button" onClick={luckyDip}>
+                            <Shuffle size={13} /> Open a random game
+                          </button>
+                        )}
+                        {secret.id === 'vault' && <span className="vault-static">You are standing in it.</span>}
+                        {secret.id === 'runner' && (
+                          <span className="vault-static">
+                            <Trophy size={12} /> Best score so far: {runnerBest() || 'none yet'}
+                          </span>
+                        )}
+                        {secret.id === 'chat' && <span className="vault-static">Works in every chat room.</span>}
+                        {secret.id === 'ghost' && <span className="vault-static">Silences presence until switched off.</span>}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           );
         })}
-        </ul>
+
+      {ready && filtered && !filtered.length && (
+        <p className="vault-hint">Nothing matches “{query}”. Every secret is listed — try fewer words.</p>
       )}
 
       <section className="vault-runner" aria-label="Vault Runner">
         <h2>
-          <Gamepad2 size={15} /> Vault Runner <span>· found here, plays here</span>
+          <Gamepad2 size={15} /> Vault Runner <span>· the hidden game, plays here</span>
         </h2>
         <VaultRunner />
       </section>
 
       <footer className="vault-foot">
         <button type="button" onClick={copySheet}>
-          {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'Copied' : 'Copy your cheatsheet'}
+          {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'Copied' : 'Copy every code'}
         </button>
-        <button type="button" className="danger" onClick={forget}>
+        <button type="button" className="danger" onClick={() => resetSecrets()}>
           <RotateCcw size={13} /> Forget everything
         </button>
         <span className="vault-note">
-          <Sparkles size={13} /> Found on this device only. Nothing about secrets is sent anywhere.
+          <Sparkles size={13} /> Kept on this device only. Nothing about secrets is sent anywhere.
         </span>
         <Link href="/">← back to the lounge</Link>
       </footer>
