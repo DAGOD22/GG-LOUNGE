@@ -33,6 +33,7 @@ import { GhostCursors } from './GhostCursors';
 import { ActivityFeed } from './ActivityFeed';
 import { CoopRoom } from './CoopRoom';
 import { useCustomization } from '@/components/customization/CustomizationProvider';
+import { isGhostOn, subscribeSecrets } from '@/lib/secrets';
 import {
   cursorForPresence,
   type Activity,
@@ -131,6 +132,16 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     settingsRef.current = settings;
   }, [settings]);
 
+  /**
+   * Ghost Mode — the secret that stops the heartbeat entirely.
+   *
+   * The honest way to be invisible is to say nothing: no cursor, no activity,
+   * no heartbeat POST, so the server simply ages this tab out of the roster.
+   * The flag is read through a ref inside `send`, because the send callback is
+   * stable by design and must not re-create for a toggle.
+   */
+  const ghostRef = useRef(false);
+
   /* ---- identity: the same signed guest token the rest of the site uses ---- */
   useEffect(() => {
     try {
@@ -181,6 +192,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const send = useCallback(async () => {
     if (!alive.current || inFlight.current) return;
     if (!settingsRef.current.live.enabled) return;
+    if (ghostRef.current) return;
     inFlight.current = true;
     const current = settingsRef.current;
     const accent = current.theme.colors.accent;
@@ -224,6 +236,24 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
       inFlight.current = false;
     }
   }, []);
+
+  /* ---- Ghost Mode subscription (see ghostRef above) ---------------------- */
+  useEffect(() => {
+    ghostRef.current = isGhostOn();
+    const unsubscribe = subscribeSecrets(() => {
+      const wasOn = ghostRef.current;
+      ghostRef.current = isGhostOn();
+      if (wasOn && !ghostRef.current) void send();
+      if (!wasOn && ghostRef.current) {
+        // Going dark: blank the local room so nothing stale stays on screen.
+        setPeers([]);
+        setEvents([]);
+        setOnline(0);
+        setOthers(0);
+      }
+    });
+    return unsubscribe;
+  }, [send]);
 
   /* ---- the heartbeat ---------------------------------------------------- */
   useEffect(() => {
@@ -284,6 +314,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
 
   const announce = useCallback((kind: AnnounceKind, detail: AnnounceDetail) => {
     if (!settingsRef.current.live.enabled) return;
+    if (ghostRef.current) return; // a ghost does not announce anything
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (guestToken.current) headers['x-gg-guest'] = guestToken.current;
     fetch('/api/presence/event', {

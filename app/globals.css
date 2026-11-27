@@ -5639,453 +5639,616 @@ summary:focus-visible,
 }
 
 /* ==================================================================== */
-/* Arcade Lab                                                            */
+/* Rewind overlay                                                        */
 /* ==================================================================== */
 /*
- * This panel shipped with 110 class names and no stylesheet at all, so it
- * rendered as unstyled browser default chrome — a column of 13px serif text,
- * grey buttons and a canvas with no box, sitting on top of the game. That is
- * what "ugly" was: not a design that needed adjusting, but the total absence
- * of one.
+ * The rewind replay covers the game frame: the layer portals into .frame-wrap
+ * (which is position:relative and clips its children), draws the tape into a
+ * full-bleed canvas and docks the scrubber HUD at the bottom edge.
  *
  * Design rules, so additions stay coherent:
- *   - it floats over the game, so it needs its own surface, border and shadow;
+ *   - the overlay never blocks the game: the canvas is pointer-events:none,
+ *     and only the HUD is interactive;
  *   - controls are pills, like every other control on the site;
- *   - one accent (lime) marks the active state and nothing else does;
- *   - 11px labels, 12px controls — the panel is a tool, not content.
+ *   - one accent (lime) marks the tape clock and nothing else does.
  */
-.gglab {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-/* ---- the trigger that lives in the launcher's control cluster ---- */
-.gglab-trigger {
-  display: inline-flex;
+.rewind-toggle {
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 10px;
+  display: flex;
   align-items: center;
   gap: 6px;
-  height: 34px;
-  padding: 0 12px;
+  flex: 0 0 auto;
   border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--foreground);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
-.gglab-trigger:hover {
-  border-color: rgba(215, 243, 74, 0.5);
-  background: rgba(215, 243, 74, 0.1);
-}
-.gglab-trigger.on {
-  border-color: var(--lime);
-  background: var(--lime);
-  color: var(--ink);
-}
-.gglab-trigger:focus-visible {
-  outline: 2px solid var(--lime);
-  outline-offset: 2px;
-}
-
-/* ---- the popover ---- */
-.gglab-panel-box {
+.gg-rewind-layer {
   position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  z-index: 70;
-  width: min(380px, calc(100vw - 28px));
-  max-height: min(70vh, 560px);
+  inset: 0;
+  z-index: 7;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  border-radius: 16px;
-  border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  backdrop-filter: blur(14px) saturate(140%);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
-  color: var(--foreground);
-  font-size: 12px;
+  justify-content: flex-end;
+  background: rgba(4, 6, 10, 0.35);
 }
-.gglab-panel-box > header {
+.gg-rewind-screen {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #05070b;
+  pointer-events: none;
+}
+.gg-rewind-hud {
+  position: relative;
+  z-index: 2;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
-}
-.gglab-title {
-  display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--lime);
-}
-.gglab-panel-box > header button {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
+  margin: 10px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  background: rgba(9, 11, 16, 0.9);
   border: 1px solid var(--line);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
+  backdrop-filter: blur(8px);
 }
-.gglab-panel-box > header button:hover {
-  color: var(--foreground);
-  background: var(--surface-hover);
-}
-
-/* ---- tabs: one scrollable row, never a wrapped block of text ---- */
-.gglab-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 8px 10px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  border-bottom: 1px solid var(--line);
-}
-.gglab-tabs::-webkit-scrollbar {
-  display: none;
-}
-.gglab-tabs button {
-  flex: 0 0 auto;
-  padding: 6px 11px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-}
-.gglab-tabs button:hover {
-  color: var(--foreground);
-  background: var(--surface-hover);
-}
-.gglab-tabs button.on {
-  border-color: var(--lime);
-  background: rgba(215, 243, 74, 0.14);
-  color: var(--foreground);
-}
-
-/* ---- body ---- */
-.gglab-body {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-.gglab-body > * {
-  min-width: 0;
-}
-.gglab-panel {
-  display: grid;
-  gap: 10px;
-}
-.gglab-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  min-width: 0;
-}
-.gglab-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 62px;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.gglab-note {
-  margin: 0;
-  font-size: 10.5px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-.gglab-note.error {
-  color: var(--coral);
-}
-.gglab-note.ok {
-  color: var(--lime);
-}
-.gglab-count {
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-  padding: 2px 7px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-}
-
-/* ---- every control in the panel is the same pill ---- */
-.gglab-body button,
-.gglab-panel button {
+.gg-rewind-hud button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  min-height: 28px;
-  padding: 0 11px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--foreground);
-  font: inherit;
-  font-size: 11.5px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
-}
-.gglab-body button:hover,
-.gglab-panel button:hover {
-  background: var(--surface-hover);
-  border-color: rgba(215, 243, 74, 0.4);
-}
-.gglab-body button.on,
-.gglab-panel button.on {
-  border-color: var(--lime);
-  background: var(--lime);
-  color: var(--ink);
-}
-.gglab-body button:disabled,
-.gglab-panel button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-.gglab-body button:focus-visible,
-.gglab-panel button:focus-visible,
-.gglab-vault-input button:focus-visible {
-  outline: 2px solid var(--lime);
-  outline-offset: 2px;
-}
-.gglab-primary {
-  border-color: var(--lime) !important;
-  background: var(--lime) !important;
-  color: var(--ink) !important;
-}
-
-/* ---- speed + filter groups ---- */
-.gglab-scales,
-.gglab-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  width: 28px;
+  height: 28px;
   min-width: 0;
-}
-.gglab-scales button,
-.gglab-filters button {
-  min-height: 26px;
-  padding: 0 9px;
-  font-size: 11px;
-}
-
-/* ---- rewind ---- */
-.gglab-rewind-wrap {
-  position: relative;
-  display: grid;
-  gap: 8px;
-}
-.gglab-rewind {
-  width: 100%;
-  height: 96px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: #07080c;
-  display: block;
-}
-
-/* ---- voice ---- */
-.gglab-toggle {
-  position: relative;
-  overflow: hidden;
-  min-height: 30px !important;
-  padding: 0 14px !important;
-}
-/* The level meter is a fill behind the label, so the button never changes size
-   while you talk — a control that reflows mid-sentence is unreadable. */
-.gglab-meter {
-  position: absolute;
-  inset: 0;
-  transform-origin: left center;
-  transform: scaleX(var(--v, 0));
-  background: rgba(215, 243, 74, 0.3);
-  pointer-events: none;
-}
-.gglab-heard {
-  flex: 1 1 120px;
-  min-width: 0;
-  font-size: 10.5px;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ---- vault ---- */
-.gglab-vault {
-  display: grid;
-  gap: 8px;
-}
-.gglab-vault-field {
-  display: grid;
-  gap: 4px;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.gglab-vault-input {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-.gglab-vault-input input,
-.gglab-vault-input textarea,
-.gglab-body input[type='text'],
-.gglab-body textarea {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 30px;
-  padding: 6px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--foreground);
-  font: inherit;
-  font-size: 11.5px;
-  resize: vertical;
-}
-.gglab-body input[type='text']:focus,
-.gglab-body textarea:focus {
-  outline: none;
-  border-color: var(--lime);
-}
-
-/* ---- generated micro-game ---- */
-.gglab-idea {
-  display: grid;
-  gap: 2px;
-  padding: 10px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: linear-gradient(135deg, rgba(125, 107, 255, 0.14), rgba(215, 243, 74, 0.08));
-}
-.gglab-idea strong {
-  font-size: 13px;
-  letter-spacing: 0.01em;
-}
-.gglab-idea span {
-  font-size: 10px;
-  color: var(--muted);
-}
-
-/* ---- mesh ---- */
-.gglab-mesh {
-  display: grid;
-  gap: 4px;
-  font-size: 11px;
-}
-.gglab-mesh-host {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 5px 8px;
+  min-height: 0;
+  padding: 0;
   border-radius: 8px;
-  background: var(--surface);
   border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--foreground);
+  cursor: pointer;
 }
-.gglab-mesh-ms {
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
+.gg-rewind-hud button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.gg-rewind-hud button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.gg-rewind-hud input[type='range'] {
+  flex: 1 1 auto;
+  min-width: 60px;
+  accent-color: var(--lime);
+}
+.gg-rewind-clock {
+  min-width: 56px;
+  text-align: center;
+  font: 700 11px/1 ui-monospace, monospace;
+  color: var(--lime);
+  letter-spacing: 0.04em;
+}
+.gg-rewind-note {
+  position: relative;
+  z-index: 2;
+  margin: 0 10px 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(9, 11, 16, 0.9);
+  border: 1px solid var(--line);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--foreground);
+  opacity: 0.85;
 }
 
-/* ---- gameplay bubble ---- */
-.gglab-bubble {
+/* ==================================================================== */
+/* Co-op game bubble                                                     */
+/* ==================================================================== */
+.gg-bubble-toggle {
   position: fixed;
-  z-index: 75;
-  width: 176px;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
-}
-.gglab-bubble video {
-  display: block;
-  width: 100%;
-  height: 132px;
-  object-fit: cover;
-  background: #07080c;
-}
-.gglab-bubble-toggle {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 24px;
-  height: 24px;
-  min-height: 0 !important;
-  padding: 0 !important;
+  right: 16px;
+  bottom: 88px;
+  z-index: 2147481000;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
   border-radius: 999px;
-  background: rgba(11, 13, 18, 0.7) !important;
-  border: 1px solid var(--line) !important;
+  border: 1px solid var(--line);
+  background: rgba(13, 16, 24, 0.94);
+  color: inherit;
+  font: 800 11.5px/1 system-ui, sans-serif;
+  cursor: pointer;
 }
-.gglab-bubble-actions {
+.gg-bubble-toggle.on {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+.gg-bubble {
+  position: fixed;
+  z-index: 2147481200;
+  width: 148px;
+  height: 148px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--lime);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+  background: #05070b;
+}
+.gg-bubble.big {
+  width: 260px;
+  height: 260px;
+}
+.gg-bubble video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.gg-bubble-wait {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: 700 10.5px/1.3 system-ui, sans-serif;
+  opacity: 0.7;
+  text-align: center;
+  padding: 10px;
+}
+.gg-bubble-actions {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
   display: flex;
   gap: 4px;
   padding: 6px;
 }
-.gglab-bubble-actions button {
+.gg-bubble-actions button {
   flex: 1;
   min-height: 24px;
   font-size: 10px;
-}
-.gglab-bubble-wait {
-  display: grid;
-  place-items: center;
-  height: 132px;
-  font-size: 10.5px;
-  color: var(--muted);
-  text-align: center;
-  padding: 0 14px;
+  width: 24px;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(11, 13, 18, 0.7);
+  border: 1px solid var(--line);
 }
 
-/* Phones: the popover becomes a sheet pinned to the viewport, because a
-   380px popover anchored to a button near the edge always overflows. */
-@media (max-width: 560px) {
-  .gglab-panel-box {
-    position: fixed;
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
-    top: auto;
-    width: auto;
-    max-height: 72vh;
+/* ==================================================================== */
+/* The secret layer                                                      */
+/* ==================================================================== */
+/*
+ * Nothing here is advertised in the interface. These surfaces only appear
+ * after one of the hidden triggers fires — which is the point: the styles are
+ * not referenced by any visible control, so the only way in is to know.
+ *
+ * Every overlay is position:fixed, pointer-events:none and sits on its own
+ * stacking level, so toggling one cannot disturb the site's layout.
+ */
+.gg-secret-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2147483400;
+  pointer-events: none;
+}
+.gg-spotlight {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483500;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at var(--gg-spot-x, 50%) var(--gg-spot-y, 50%),
+    transparent 0,
+    transparent 150px,
+    rgba(4, 5, 8, 0.94) 320px
+  );
+}
+.gg-timewarp-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483300;
+  pointer-events: none;
+  background: rgba(120, 72, 20, 0.16);
+  mix-blend-mode: multiply;
+}
+.gg-timewarp-ribbon {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2147483400;
+  overflow: hidden;
+  padding: 4px 0;
+  background: repeating-linear-gradient(90deg, #2b1d0e 0 60px, #33240f 60px 120px);
+  border-bottom: 1px solid rgba(255, 200, 90, 0.35);
+  pointer-events: none;
+}
+.gg-timewarp-ribbon span {
+  display: inline-block;
+  white-space: nowrap;
+  font: 900 12px/1.4 ui-monospace, monospace;
+  letter-spacing: 0.18em;
+  color: #ffd166;
+  animation: gg-timewarp-marquee 26s linear infinite;
+}
+@keyframes gg-timewarp-marquee {
+  from {
+    transform: translateX(100vw);
   }
-  .gglab-label {
-    min-width: 52px;
+  to {
+    transform: translateX(-100%);
+  }
+}
+.gg-retro-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483300;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 3px),
+    radial-gradient(circle at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.34) 100%);
+  mix-blend-mode: overlay;
+  animation: gg-retro-flicker 3.2s steps(1) infinite;
+}
+@keyframes gg-retro-flicker {
+  0%,
+  92%,
+  100% {
+    opacity: 1;
+  }
+  93% {
+    opacity: 0.82;
+  }
+  95% {
+    opacity: 1;
+  }
+  97% {
+    opacity: 0.9;
+  }
+}
+.gg-secret-toast-stack {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 2147483600;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gg-secret-toast {
+  max-width: 320px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--lime);
+  background: rgba(10, 12, 18, 0.96);
+  color: var(--foreground);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.5);
+  font: 600 12.5px/1.45 system-ui, sans-serif;
+  animation: gg-secret-toast-in 0.28s ease-out;
+}
+.gg-secret-toast strong {
+  display: block;
+  font: 800 11px/1.4 system-ui, sans-serif;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--lime);
+}
+.gg-secret-toast span {
+  display: block;
+  opacity: 0.8;
+}
+@keyframes gg-secret-toast-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .gglab-trigger,
-  .gglab-body button,
-  .gglab-panel button {
-    transition: none;
+  .gg-retro-veil,
+  .gg-timewarp-ribbon span,
+  .gg-secret-toast {
+    animation: none;
   }
+}
+
+/* ==================================================================== */
+/* The Vault page (/secrets)                                             */
+/* ==================================================================== */
+/*
+ * A standalone surface on purpose: the vault is not part of the lounge's
+ * chrome, so it gets its own quiet layout. Dark, centred, no nav bar — the
+ * page should look like nothing until you read it.
+ */
+.vault {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 48px 20px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  color: var(--foreground);
+}
+.vault-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 800 10.5px/1.4 system-ui, sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--lime);
+}
+.vault-head h1 {
+  margin: 8px 0 6px;
+  font-size: 34px;
+  letter-spacing: 0.01em;
+}
+.vault-head p {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.vault-progress {
+  position: relative;
+  margin-top: 16px;
+  height: 22px;
+  max-width: 420px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+.vault-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--lime);
+  opacity: 0.85;
+  transition: width 0.4s ease;
+}
+.vault-progress-label {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font: 800 11px/1 system-ui, sans-serif;
+  letter-spacing: 0.06em;
+}
+.vault-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+.vault-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+}
+.vault-card.found {
+  border-color: rgba(190, 242, 100, 0.4);
+  background: linear-gradient(160deg, rgba(190, 242, 100, 0.08), rgba(255, 255, 255, 0.03));
+}
+.vault-card-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font: 800 9.5px/1 system-ui, sans-serif;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.vault-card.found .vault-card-badge {
+  color: var(--lime);
+}
+.vault-card h2 {
+  margin: 0;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vault-card h2 em.vault-on {
+  font: 800 9.5px/1 system-ui, sans-serif;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lime);
+  border: 1px solid var(--lime);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+.vault-code {
+  font: 700 12px/1.4 ui-monospace, monospace;
+  color: var(--lime);
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  padding: 6px 9px;
+  width: fit-content;
+}
+.vault-hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.vault-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.vault-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--foreground);
+  font: 700 11.5px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+.vault-actions button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.vault-actions button.on {
+  border-color: var(--lime);
+  color: var(--lime);
+  background: rgba(190, 242, 100, 0.14);
+}
+.vault-static {
+  font: 600 12px/1.4 system-ui, sans-serif;
+  color: var(--muted);
+}
+.vault-runner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+.vault-runner h2 {
+  margin: 0;
+  font-size: 17px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.vault-runner h2 span {
+  font: 700 11px/1.4 ui-monospace, monospace;
+  color: var(--muted);
+}
+.gg-runner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gg-runner-stage {
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 480 / 260;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #070a10;
+  outline: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.gg-runner-stage:focus-visible {
+  border-color: var(--lime);
+}
+.gg-runner-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.gg-runner-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 800 12px/1 system-ui, sans-serif;
+  color: var(--lime);
+}
+.gg-runner-score em {
+  font: 800 9.5px/1 system-ui, sans-serif;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0b0d12;
+  background: var(--lime);
+  border-radius: 999px;
+  padding: 3px 7px;
+}
+.gg-runner-note {
+  font: 600 12px/1.4 system-ui, sans-serif;
+  color: var(--muted);
+}
+.gg-runner-play {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--lime);
+  background: var(--lime);
+  color: #0b0d12;
+  font: 800 11.5px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+.gg-runner-hint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.vault-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+.vault-foot button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--foreground);
+  font: 700 11.5px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+.vault-foot button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.vault-foot button.danger {
+  border-color: rgba(255, 92, 92, 0.4);
+  color: var(--coral);
+}
+.vault-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 11.5px/1.4 system-ui, sans-serif;
+  color: var(--muted);
+}
+.vault-foot a {
+  margin-left: auto;
+  color: var(--lime);
+  text-decoration: none;
+  font: 800 12px/1 system-ui, sans-serif;
+}
+.vault-foot a:hover {
+  text-decoration: underline;
 }

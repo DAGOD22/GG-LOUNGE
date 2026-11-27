@@ -34,6 +34,11 @@ Disallow: /banned
 # library, which is the duplicate-content problem the sitemap exists to avoid.
 Disallow: /secret-link-doc
 
+# The vault of secret features. It is unlisted by design: no nav entry, no
+# sitemap entry, and not for crawlers either — a secret that is indexed is a
+# feature announcement.
+Disallow: /secrets
+
 # Assets carry no indexable text; crawling them only burns crawl budget.
 Disallow: /*.webp$
 Disallow: /*.wasm$

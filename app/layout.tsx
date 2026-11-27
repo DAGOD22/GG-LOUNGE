@@ -9,6 +9,7 @@ import './chatverse.css'
 import { CustomizationProvider } from '@/components/customization/CustomizationProvider'
 import { PresenceProvider } from '@/components/live/PresenceProvider'
 import { GameBridgeProvider } from '@/components/live/GameBridge'
+import { SecretsProvider } from '@/components/live/secrets/SecretsProvider'
 import GlobalSW from './global-sw'
 
 /**
@@ -137,6 +138,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           }}
         />
         <CustomizationProvider><GameBridgeProvider><PresenceProvider>{children}</PresenceProvider></GameBridgeProvider></CustomizationProvider>
+        {/* The secret layer is deliberately outside every provider: it needs
+            nothing from them, and it must work on pages none of them reach. */}
+        <SecretsProvider />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

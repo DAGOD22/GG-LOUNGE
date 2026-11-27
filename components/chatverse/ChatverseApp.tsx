@@ -26,6 +26,7 @@ import {
   Send, Hash, Plus, X, LogOut, Image as ImageIcon, Loader2, Users, Trash2, Check, AlertTriangle, CornerDownLeft,
 } from 'lucide-react';
 import type { ChatMessage, ChatRoom } from '@/lib/db/chat';
+import { discover, parseChatCommand } from '@/lib/secrets';
 
 type Pending = ChatMessage & { pending?: boolean; failed?: boolean };
 
@@ -196,11 +197,18 @@ export function ChatverseApp() {
   const send = useCallback(async (body: string, media?: { url: string; name: string }) => {
     const text = body.trim();
     if ((!text && !media) || !room) return;
+    // Slash commands never leave this component as commands: they become their
+    // result, so everyone in the room sees the dice, not your keystrokes.
+    // Unknown slash text falls through untouched — the parser claims only
+    // what it understands.
+    const command = parseChatCommand(text);
+    const outgoing = command ?? text;
+    if (command) discover('chat');
     const temp: Pending = {
       id: -Date.now(),
       room,
       author: name,
-      body: text,
+      body: outgoing,
       media: media?.url ?? '',
       mediaName: media?.name ?? '',
       at: Date.now(),
@@ -213,7 +221,7 @@ export function ChatverseApp() {
       const response = await fetch('/api/chat/messages', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ room, author: name, body: text, media: media?.url, mediaName: media?.name }),
+        body: JSON.stringify({ room, author: name, body: outgoing, media: media?.url, mediaName: media?.name }),
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));

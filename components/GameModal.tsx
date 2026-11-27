@@ -8,7 +8,7 @@ import { inferAchievementUpdates } from '@/lib/achievement-tracker'
 import { getAchievementsForGame, RARITY_COLOR } from '@/lib/achievements'
 import { MiniPlayer } from '@/components/live/MiniPlayer'
 import { SplitScreen } from '@/components/live/SplitScreen'
-import { ArcadeLab } from '@/components/live/arcade/ArcadeLab'
+import { Rewind } from '@/components/live/arcade/Rewind'
 import { SessionClock, UpNext, VoteButtons, useSessionTimer } from '@/components/ArcadeExtras'
 import { useRegisterGameBridge } from '@/components/live/GameBridge'
 import { useLivePresence } from '@/components/live/PresenceProvider'
@@ -752,12 +752,13 @@ export function GameModal({
             <Columns2 size={14} /> Split
           </button>
 
-          {/* The wrap element is resolved lazily by the lab, so this render
-              never reads a ref: the node it wants is the one this component
-              already owns, and a snapshot here would be null on first paint. */}
-          <ArcadeLab
+          {/* Rewind resolves the wrap lazily for the same reason the lab did:
+              the node it portals into is the one this component already owns,
+              and a snapshot here would be null on first paint. */}
+          <Rewind
             frame={() => frameRef.current}
             wrap={() => wrapRef.current}
+            gameId={game.id}
           />
           <button
             onClick={() => {

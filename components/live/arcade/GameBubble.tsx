@@ -190,7 +190,7 @@ export function GameBubble({
     <>
       <button
         type="button"
-        className={`gglab-bubble-toggle${on ? ' on' : ''}`}
+        className={`gg-bubble-toggle${on ? ' on' : ''}`}
         onClick={() => {
           if (on) {
             setOn(false);
@@ -207,7 +207,7 @@ export function GameBubble({
 
       {(remoteStream || on) && (
         <div
-          className={`gglab-bubble${big ? ' big' : ''}`}
+          className={`gg-bubble${big ? ' big' : ''}`}
           style={{ left: position.x, top: position.y }}
           onPointerDown={event => {
             dragging.current = true;
@@ -220,12 +220,12 @@ export function GameBubble({
           {remoteStream ? (
             <video ref={video} autoPlay playsInline muted={false} aria-label="Friend's screen" />
           ) : (
-            <div className="gglab-bubble-wait">
+            <div className="gg-bubble-wait">
               <Move size={16} />
               <span>{status === 'error' ? 'Stream unavailable' : 'Waiting for their screen…'}</span>
             </div>
           )}
-          <div className="gglab-bubble-actions">
+          <div className="gg-bubble-actions">
             <button type="button" onClick={() => setBig(value => !value)} aria-label="Resize bubble">
               <Move size={11} />
             </button>

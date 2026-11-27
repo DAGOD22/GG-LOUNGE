@@ -34,6 +34,7 @@ import { useEffect, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 
 import { useLivePresence } from './PresenceProvider';
+import { isGhostOn, subscribeSecrets } from '@/lib/secrets';
 import { games } from '@/lib/games';
 import { hostOnly } from '@/lib/proxy-client';
 import { getProxyDestination, subscribeProxyDestination } from '@/lib/proxy-activity';
@@ -123,6 +124,17 @@ export function ActivityReporter() {
   const [labelsVersion, setLabelsVersion] = useState(0);
   const [frameDestination, setFrameDestination] = useState('');
 
+  /**
+   * Ghost Mode — a secret toggle. While it is on this reporter says nothing:
+   * no activity, no announcements, and one clearing report when it turns on so
+   * a stale "playing Slope" does not outlive the toggle.
+   */
+  const [ghost, setGhost] = useState(false);
+  useEffect(() => {
+    setGhost(isGhostOn());
+    return subscribeSecrets(() => setGhost(isGhostOn()));
+  }, []);
+
   // Names for `#tool` hashes, loaded once and only when a tools page is open.
   useEffect(() => {
     if (pathname !== '/tools' || Object.keys(TOOL_LABELS).length) return;
@@ -139,6 +151,12 @@ export function ActivityReporter() {
     if (!ghostCursors) return;
 
     const report = () => {
+      if (ghost) {
+        if (!lastKey.current) return; // already cleared
+        lastKey.current = '';
+        setActivity(null);
+        return;
+      }
       const query = search?.toString() ?? '';
       const hash = typeof window === 'undefined' ? '' : window.location.hash;
       const activity = activityFor(
@@ -194,7 +212,7 @@ export function ActivityReporter() {
       window.removeEventListener('hashchange', onHash);
       unsubscribe();
     };
-  }, [pathname, search, setActivity, announce, ghostCursors, labelsVersion, frameDestination]);
+  }, [pathname, search, setActivity, announce, ghostCursors, labelsVersion, frameDestination, ghost]);
 
   return null;
 }
