@@ -29,6 +29,8 @@ import {
   setToggle,
   subscribeSecrets,
 } from '@/lib/secrets';
+import { clearDiary, diaryWhen, readDiary } from '@/lib/play-diary';
+import { readHidden, unhideAll } from '@/lib/hidden-games';
 import { VaultRunner } from './VaultRunner';
 
 const GROUP_ORDER: SecretGroup[] = ['classic', 'theme', 'layout', 'text', 'overlay', 'behavior'];
@@ -47,6 +49,7 @@ export function VaultPage() {
   const [copied, setCopied] = useState(false);
   const [ready, setReady] = useState(false);
   const [query, setQuery] = useState('');
+  const [diaryOpen, setDiaryOpen] = useState(false);
 
   useEffect(() => {
     // Visiting the door is itself a secret.
@@ -173,7 +176,46 @@ export function VaultPage() {
                         )}
                         {secret.id === 'chat' && <span className="vault-static">Works in every chat room.</span>}
                         {secret.id === 'ghost' && <span className="vault-static">Silences presence until switched off.</span>}
+                        {secret.id === 'counter' && (
+                          <span className="vault-static">Real visitors, all devices — the strip sits at the bottom edge of every page.</span>
+                        )}
+                        {secret.id === 'incognito' && (
+                          <span className="vault-static">History is wiped the moment it turns on; keep it on to stay unwritten.</span>
+                        )}
+                        {secret.id === 'resume' && (
+                          <span className="vault-static">Look for the ▶ pill at the bottom-left of any page.</span>
+                        )}
+                        {secret.id === 'context' && (
+                          <button type="button" onClick={() => unhideAll()} disabled={!ready || readHidden().length === 0}>
+                            <RotateCcw size={13} /> Restore hidden games{ready && readHidden().length ? ` (${readHidden().length})` : ''}
+                          </button>
+                        )}
+                        {secret.id === 'diary' && (() => {
+                          const diary = ready ? readDiary() : [];
+                          return (
+                            <>
+                              <button type="button" onClick={() => setDiaryOpen(value => !value)} disabled={!diary.length}>
+                                {diaryOpen ? 'Close the diary' : `Read the diary (${diary.length})`}
+                              </button>
+                              {diary.length > 0 && (
+                                <button type="button" onClick={() => { clearDiary(); setDiaryOpen(false); setVersion(value => value + 1); }}>
+                                  <RotateCcw size={13} /> Clear the diary
+                                </button>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
+                      {secret.id === 'diary' && diaryOpen && (
+                        <div className="vault-diary">
+                          {readDiary().slice(-40).reverse().map((entry, index) => (
+                            <div key={`${entry.at}-${index}`} className="vault-diary-row">
+                              <span>{entry.title}</span>
+                              <time>{diaryWhen(entry.at)}</time>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </li>
                   );
                 })}

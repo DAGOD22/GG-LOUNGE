@@ -13,6 +13,9 @@ import { Gamepad2, Heart, ShieldCheck, Trophy, X, AlertCircle, Download, Cloud, 
 import dynamic from 'next/dynamic'
 import { games, filters, pubColors, FEATURED_IDS, STAFF_PICKS, LOW_QUALITY_HINTS, gameOfDayIndex, isNearDuplicate, curatedRank } from '@/lib/games'
 import type { Game } from '@/lib/games'
+import { useSecretFlag } from '@/components/live/secrets/useSecretFlag'
+import { recordDiaryEntry } from '@/lib/play-diary'
+import { HIDDEN_EVENT, readHidden } from '@/lib/hidden-games'
 import {  } from '@/components/GameCard'
 import { LibraryToolbar } from '@/components/LibraryToolbar'
 import { CatalogGrid } from '@/components/CatalogGrid'
@@ -68,6 +71,23 @@ export default function Page() {
   const theme = customization.settings.theme.mode
   const [online, setOnline] = useState(true)
   const [installPrompt, setInstallPrompt] = useState<any>(null)
+
+  // Secret behaviour warps that rewire the page itself. Flags read the secret
+  // store reactively (a flip in the vault lands within one tick); hidden games
+  // come from their own list with a version bump on change.
+  const incognitoOn = useSecretFlag('incognito')
+  const chaosOn = useSecretFlag('chaos')
+  const fullblastOn = useSecretFlag('fullblast')
+  const backwardsOn = useSecretFlag('backwards')
+  const diaryOn = useSecretFlag('diary')
+  const [hiddenVersion, setHiddenVersion] = useState(0)
+  const hiddenSet = useMemo(() => new Set(readHidden()), [hiddenVersion])
+  useEffect(() => {
+    const bump = () => setHiddenVersion(value => value + 1)
+    window.addEventListener(HIDDEN_EVENT, bump)
+    return () => window.removeEventListener(HIDDEN_EVENT, bump)
+  }, [])
+
   const [installable, setInstallable] = useState(false)
   const [playCounts, setPlayCounts] = useState<Record<string,number>>({})
   const [requests, setRequests] = useState<RequestItem[]>([])
@@ -80,6 +100,13 @@ export default function Page() {
   const [authForm, setAuthForm] = useState({ username:'', password:'', favoriteFood:'', newPassword:'' })
   const [authError, setAuthError] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
+  // Incognito's eraser clears storage; this clears the memory the page would
+  // otherwise re-save the moment any effect sees a change.
+  useEffect(() => {
+    if (!incognitoOn) return
+    setRecentlyPlayed([])
+    setPlayCounts({})
+  }, [incognitoOn])
   // Kept for the search input's debounce pipeline; the rendered list reads query.
   const [, setDebouncedQuery] = useState('')
   const [sortBy, setSortBy] = useState<'featured'|'popular'|'newest'|'az'>('featured')
@@ -187,9 +214,11 @@ export default function Page() {
       if (last) setLastVisit(last)
     }catch{}
   },[])
-  useEffect(()=>{ try{localStorage.setItem('ggl_fav', JSON.stringify(favorites))}catch{} },[favorites])
-  useEffect(()=>{ try{localStorage.setItem('ggl_recent', JSON.stringify(recentlyPlayed.slice(0,12)))}catch{} },[recentlyPlayed])
-  useEffect(()=>{ try{ localStorage.setItem('ggl_playcounts', JSON.stringify(playCounts))}catch{}},[playCounts])
+  // The persist effects stand down while Incognito is on: nothing the visitor
+  // does is written to this device (the account sync below stands down too).
+  useEffect(()=>{ if(incognitoOn) return; try{localStorage.setItem('ggl_fav', JSON.stringify(favorites))}catch{} },[favorites, incognitoOn])
+  useEffect(()=>{ if(incognitoOn) return; try{localStorage.setItem('ggl_recent', JSON.stringify(recentlyPlayed.slice(0,12)))}catch{} },[recentlyPlayed, incognitoOn])
+  useEffect(()=>{ if(incognitoOn) return; try{ localStorage.setItem('ggl_playcounts', JSON.stringify(playCounts))}catch{}},[playCounts, incognitoOn])
   useEffect(()=>{ try{ localStorage.setItem('ggl_req_votes', JSON.stringify(requestVotes))}catch{}},[requestVotes])
   // auth: fetch me
   useEffect(()=>{
@@ -273,13 +302,15 @@ export default function Page() {
   useEffect(()=>{
     // Signed in: the cookie identifies the row. Guest: the signed token does.
     if(!authUser && !guestToken) return
+    // Incognito sends nothing anywhere.
+    if(incognitoOn) return
     const headers: Record<string,string> = { 'content-type':'application/json' }
     if(!authUser) headers['x-gg-guest'] = guestToken
     const h = setTimeout(()=>{
       fetch('/api/user-state', { method:'POST', headers, body: JSON.stringify({ favorites, playCounts, recentlyPlayed })}).catch(()=>{})
     }, 1200)
     return ()=> clearTimeout(h)
-  },[favorites, playCounts, recentlyPlayed, authUser, guestToken])
+  },[favorites, playCounts, recentlyPlayed, authUser, guestToken, incognitoOn])
 
   // The Escape handler lives above the URL hook for historical reasons, so it
   // reaches the push function through a ref rather than a stale closure.
@@ -430,6 +461,10 @@ export default function Page() {
         base = base.filter(g => g.genre.toLowerCase().includes(genreOperator))
       }
       if (showStaffOnly) base = base.filter(g=> STAFF_PICKS.includes(g.id))
+      // Secret warps on the catalogue itself: games hidden via the Power Menu
+      // vanish from every listing, and Backwards runs the list bottom-up.
+      if (hiddenSet.size) base = base.filter(g=> !hiddenSet.has(g.id))
+      if (backwardsOn) base = [...base].reverse()
       // sorting
       if (sortBy==='popular') base = [...base].sort((a,b)=> (playCounts[b.id]||0) - (playCounts[a.id]||0))
       else if (sortBy==='az') base = [...base].sort((a,b)=> a.title.localeCompare(b.title))
@@ -440,7 +475,7 @@ export default function Page() {
       )
       return base
     },
-    [allGames, favorites, filter, query, playCounts, sortBy, hideLow, showStaffOnly, searchIndex, fuse, parsedQuery, genreOperator],
+    [allGames, favorites, filter, query, playCounts, sortBy, hideLow, showStaffOnly, searchIndex, fuse, parsedQuery, genreOperator, hiddenSet, backwardsOn],
   )
   const loadMoreRef = useRef<HTMLDivElement>(null)
   const paginatedGames = useMemo(()=> visibleGames.slice(0, visibleCount), [visibleGames, visibleCount])
@@ -535,10 +570,28 @@ export default function Page() {
   }), [allGames])
 
   function launch(game: Game) {
+    // Roulette: the requested game is re-rolled into a random one — the site
+    // deals what it wants, not what you asked for.
+    if (chaosOn) {
+      const roll = pickRandom(allGames)
+      if (roll) game = roll
+    }
     setActiveGame(game)
     pushGame(game)
     setRecentlyPlayed(prev=> [game.id, ...prev.filter(x=> x!==game.id)].slice(0,12))
     setPlayCounts(prev=> ({ ...prev, [game.id]: (prev[game.id]||0)+1 }))
+    if (!incognitoOn) {
+      // The Play Diary is written at the one choke point every launch funnels
+      // through, so cards, palette, deep links and co-op all land here — but
+      // only while its secret is switched on.
+      if (diaryOn) recordDiaryEntry(game.id, game.title)
+      try{ fetch('/api/visit', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ gameId: game.id }) }).catch(()=>{}) }catch{}
+    }
+    // Full Blast: throw the site fullscreen while the click's user activation
+    // is still fresh — a fullscreen call later than this gets refused.
+    if (fullblastOn) {
+      try{ void document.documentElement.requestFullscreen?.().catch(()=>{}) }catch{}
+    }
     try{ fetch('/api/visit', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ gameId: game.id }) }).catch(()=>{}) }catch{}
   }
         function toggleFavorite(id: string) {

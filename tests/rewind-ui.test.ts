@@ -21,6 +21,12 @@ import { REWIND_KEY, Rewind } from '../components/live/arcade/Rewind';
 function installDom() {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'https://gg-lounge.test/' });
   const g = globalThis as any;
+  // jsdom has no animation frames; the sampler rides them, so hand it a
+  // timer-based stand-in (fast enough for the tests, synchronous enough not
+  // to flake, and cleaned up by the component's own cancel).
+  dom.window.requestAnimationFrame = (callback: (time: number) => void) =>
+    setTimeout(() => callback(Date.now()), 4) as unknown as number;
+  dom.window.cancelAnimationFrame = (id: number) => clearTimeout(id);
   g.window = dom.window;
   g.document = dom.window.document;
   Object.defineProperty(g, 'navigator', { value: dom.window.navigator, configurable: true });
@@ -120,19 +126,24 @@ test('rewind: with a readable canvas the HUD arrives, and a new game blanks the 
   dom.window.HTMLCanvasElement.prototype.getContext = (() => fakeContext) as unknown as typeof dom.window.HTMLCanvasElement.prototype.getContext;
 
   // A frame whose canvas is readable, so the sampler has something to eat.
+  // `currentFrame` swaps when the game does: a new game means a NEW iframe in
+  // reality (the old canvas is gone with it), and the test must simulate that
+  // or the sampler would legitimately keep recording the same canvas.
+  let currentFrame: HTMLIFrameElement | null = null;
   const iframe = dom.window.document.createElement('iframe');
   wrap.append(iframe);
   const canvas = iframe.contentDocument!.createElement('canvas');
   canvas.width = 64;
   canvas.height = 64;
   iframe.contentDocument!.body.append(canvas);
+  currentFrame = iframe as unknown as HTMLIFrameElement;
 
   const root = createRoot(wrap);
   const render = (gameId: string) =>
     act(async () => {
       root.render(
         React.createElement(Rewind, {
-          frame: () => (iframe as unknown as HTMLIFrameElement) ?? null,
+          frame: () => currentFrame,
           wrap: () => wrap,
           gameId,
         }),
@@ -153,11 +164,17 @@ test('rewind: with a readable canvas the HUD arrives, and a new game blanks the 
     assert.ok(wrap.querySelector('.gg-rewind-screen'), 'and the tape screen over the frame');
     assert.equal(wrap.querySelector('.gg-rewind-note'), null, 'no empty-state note once frames exist');
 
-    // Switching games re-renders with a new id; reopening shows the empty
-    // state again, because the previous game's frames must not leak into it.
+    // Switching games swaps the frame (a new game is a new iframe) and
+    // re-renders with a new id; reopening shows the empty state, because the
+    // previous game's frames must not leak into it.
+    const iframe2 = dom.window.document.createElement('iframe');
+    wrap.append(iframe2);
+    currentFrame = iframe2 as unknown as HTMLIFrameElement;
     await render('superhot');
+    // The replay was left open from the first game (a game switch resets the
+    // tape, not the window): close it, then reopen onto the fresh tape.
     await act(async () => {
-      dom.window.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: REWIND_KEY, bubbles: true, cancelable: true }));
+      wrap.querySelector('button.rewind-toggle')!.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }));
     });
     await act(async () => {
       wrap.querySelector('button.rewind-toggle')!.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }));

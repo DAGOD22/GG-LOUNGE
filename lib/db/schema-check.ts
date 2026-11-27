@@ -43,6 +43,8 @@ export const CORE_TABLES = [
   "chat_message",
   "chat_presence",
   "chat_media",
+  "site_visitor",
+  "site_hit",
 ] as const;
 
 export type SchemaStatus = {

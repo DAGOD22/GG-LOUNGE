@@ -41,7 +41,7 @@ export function GameCard({
   const ratingColor = getRatingColor(rating)
 
   return (
-    <article className={`game-card ${game.color}`} style={{ contentVisibility: 'auto' as any }}>
+    <article className={`game-card ${game.color}`} data-game-id={game.id} data-game-title={game.title} style={{ contentVisibility: 'auto' as any }}>
       <span aria-label={`Rating ${rating}`} title={rating==='M'?'Mature 17+ — horror/violence': rating==='T'?'Teen 13+': 'Everyone'} style={{position:'absolute', top:10, left:10, zIndex:3, fontSize:9, fontWeight:900, letterSpacing:'.06em', padding:'3px 6px', borderRadius:999, background: ratingColor, color: rating==='M'?'#fff':'#0b0d12', border:'1px solid rgba(0,0,0,.12)', lineHeight:1}}>{rating}</span>
       <PlayTimeBadge gameId={game.id} />
       <button

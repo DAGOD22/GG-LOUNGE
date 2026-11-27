@@ -333,6 +333,17 @@ export const SCHEMA_STATEMENTS = `
           "name" TEXT NOT NULL DEFAULT '',
           "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
+
+        CREATE TABLE IF NOT EXISTS "site_visitor" (
+          "id" TEXT PRIMARY KEY,
+          "first_seen" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS "site_hit" (
+          "id" BOOLEAN PRIMARY KEY DEFAULT TRUE,
+          "hits" BIGINT NOT NULL DEFAULT 0
+        );
+        INSERT INTO "site_hit" ("id", "hits") VALUES (TRUE, 0) ON CONFLICT DO NOTHING;
 `;
 
 /**

@@ -70,6 +70,12 @@ interface LocalStore {
   chatMessages?: unknown;
   chatPresence?: unknown;
   chatMedia?: unknown;
+  /** The real visitor counter: one entry per anonymous visitor id, plus the
+   *  site-wide hit total. Same reason as every slice above — readLocal
+   *  rebuilds the store from this key list, so a missing key here would wipe
+   *  the count on the next unrelated write. */
+  siteVisitors?: unknown;
+  siteHits?: unknown;
 }
 
 let localDir: string | null = null;
@@ -130,6 +136,8 @@ export async function readLocal(): Promise<LocalStore> {
       chatMessages: (parsed as any).chatMessages,
       chatPresence: (parsed as any).chatPresence,
       chatMedia: (parsed as any).chatMedia,
+      siteVisitors: (parsed as any).siteVisitors,
+      siteHits: (parsed as any).siteHits,
     };
   } catch {
     return { bans: [], visits: [], requests: [], games: [], reports: [], userStates: {}, users: [], sessions: [], saves: [], achievements: [], gameStats: [], gateStates: {}, ggChats: [], ggMessages: [], ggMemory: [], notifications: [] };

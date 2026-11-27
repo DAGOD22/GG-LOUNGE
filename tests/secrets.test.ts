@@ -11,6 +11,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 
 import {
   CODES,
@@ -25,7 +26,7 @@ import {
   typedCodeMatch,
 } from '../lib/secrets';
 import { recordRunnerScore, runnerBest, resetSecrets, discover, isDiscovered, isToggled, setToggle } from '../lib/secrets';
-import { overlayIdsFor } from '../components/live/secrets/WarpLayer';
+import { mountedIdsFor } from '../components/live/secrets/WarpLayer';
 import {
   PLAYER_SIZE,
   GROUND_Y,
@@ -51,9 +52,9 @@ function memoryStorage(): Storage {
 }
 
 test('secrets: the layer is exactly sixty features — ten originals + fifty warps', () => {
-  assert.equal(SECRETS.length, 60);
+  assert.equal(SECRETS.length, 75);
   const ids = new Set(SECRETS.map(secret => secret.id));
-  assert.equal(ids.size, 60, 'secret ids must be unique');
+  assert.equal(ids.size, 75, 'secret ids must be unique');
 });
 
 test('secrets: every code is typable and every code maps to a real secret', () => {
@@ -61,9 +62,9 @@ test('secrets: every code is typable and every code maps to a real secret', () =
     assert.match(code, /^[a-z0-9]+$/, 'codes are single lowercase words or years');
     assert.ok(SECRETS.some(secret => secret.id === TYPED_CODES[code]), `${code} points nowhere`);
   }
-  // 4 of the 60 arrive by other means (konami, chat, runner, vault page) —
-  // the other 56 are typed codes.
-  assert.equal(CODES.length, 56);
+  // 4 of the 75 arrive by other means (konami, chat, runner, vault page) —
+  // the other 71 are typed codes.
+  assert.equal(CODES.length, 71);
 });
 
 test('secrets: no code is the tail of another code', () => {
@@ -89,10 +90,20 @@ test('secrets: every secret carries a group, an about line and a wired warp', ()
   assert.equal(SECRETS.find(secret => secret.id === 'ghost')?.warp.kind, 'none');
 });
 
-test('secrets: every overlay warp has a component behind it', () => {
+test('secrets: every overlay and behaviour warp has a component behind it', () => {
   const overlayIds = SECRETS.filter(secret => secret.warp.kind === 'overlay').map(secret => secret.id);
-  assert.ok(overlayIds.length >= 22, 'the overlay warps are the biggest family');
-  assert.deepEqual(overlayIdsFor(overlayIds).sort(), [...overlayIds].sort(), 'an overlay warp would silently do nothing');
+  assert.ok(overlayIds.length >= 22, 'the overlay warps are the biggest visual family');
+  assert.deepEqual(mountedIdsFor(overlayIds).sort(), [...overlayIds].sort(), 'an overlay warp would silently do nothing');
+  // The behaviour warps rewire the site from mounted components (or from the
+  // launcher in app/page.tsx) — each one must exist somewhere.
+  const behaviorIds = SECRETS.filter(secret => secret.group === 'behavior' && secret.warp.kind === 'none').map(secret => secret.id);
+  assert.ok(behaviorIds.length >= 12, 'behaviour warps are the second-biggest family');
+  const page = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  for (const id of behaviorIds) {
+    const mounted = mountedIdsFor([id]).length > 0;
+    const inLauncher = page.includes(`'${id}'`);
+    assert.ok(mounted || inLauncher, `${id} has no component and no launcher wiring — it would do nothing`);
+  }
 });
 
 test('secrets: the typed matcher only fires on whole codes', () => {

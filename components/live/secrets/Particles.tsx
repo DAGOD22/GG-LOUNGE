@@ -717,24 +717,69 @@ export function ClockOverlay() {
   );
 }
 
-const HITS_KEY = 'gg_warp_hits';
+const HITS_KEY = 'gg_counted';
 
-export function HitCounter() {
-  const [hits, setHits] = useState<number | null>(null);
+/**
+ * The real visitor counter.
+ *
+ * The old version incremented a number in localStorage — it counted nobody but
+ * itself. This one asks the server: POST /api/visits once per browser session
+ * (the server keeps one anonymous cookie per visitor, so people are counted
+ * once no matter how many devices... rather, each device counts once, and the
+ * total is shared by everyone). It renders as a slim strip pinned to the very
+ * bottom edge, and the page gains matching padding while it is up, so nothing
+ * underneath is ever covered.
+ */
+export function VisitorCounter() {
+  const [stats, setStats] = useState<{ visitors: number; hits: number } | null>(null);
+  const [offline, setOffline] = useState(false);
+
   useEffect(() => {
-    try {
-      const next = (Number(localStorage.getItem(HITS_KEY)) || 0) + 1;
-      localStorage.setItem(HITS_KEY, String(next));
-      setHits(next);
-    } catch {
-      setHits(0);
-    }
+    document.documentElement.classList.add('gg-counter-live');
+    const counted = sessionStorage.getItem(HITS_KEY) === '1';
+    const post = fetch('/api/visits', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+      cache: 'no-store',
+    })
+      .then(async response => {
+        if (!response.ok) throw new Error(String(response.status));
+        const data = await response.json();
+        if (!data?.ok) throw new Error(data?.error ?? 'counter offline');
+        sessionStorage.setItem(HITS_KEY, '1');
+        setStats({ visitors: Number(data.visitors) || 0, hits: Number(data.hits) || 0 });
+      })
+      .catch(() => setOffline(true));
+    // The strip refreshes quietly so the number stays live when others visit.
+    const timer = counted
+      ? window.setInterval(() => {
+          fetch('/api/visits', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', cache: 'no-store' })
+            .then(response => (response.ok ? response.json() : null))
+            .then(data => {
+              if (data?.ok) setStats({ visitors: Number(data.visitors) || 0, hits: Number(data.hits) || 0 });
+            })
+            .catch(() => {});
+        }, 60000)
+      : 0;
+    return () => {
+      if (timer) window.clearInterval(timer);
+      void post;
+      document.documentElement.classList.remove('gg-counter-live');
+    };
   }, []);
-  if (hits === null) return null;
+
   return (
-    <div className="gg-warp-counter-overlay" role="status" aria-label="Visitor counter">
-      <span>VISITORS</span>
-      <strong>{String(Math.min(hits, 999999)).padStart(6, '0')}</strong>
+    <div className="gg-counter-bar" role="status" aria-label="Site visitor counter">
+      <span className="gg-counter-bar-label">GG LOUNGE</span>
+      {stats ? (
+        <span className="gg-counter-bar-led" title={`${stats.hits} visits total, ${stats.visitors} visitors all-time`}>
+          VISITORS {String(Math.min(stats.visitors, 99999999)).padStart(7, '0')}
+        </span>
+      ) : (
+        <span className="gg-counter-bar-led">{offline ? 'COUNTER OFFLINE' : 'COUNTING…'}</span>
+      )}
+      <span className="gg-counter-bar-note">every visitor, every device — counted once, kept forever</span>
     </div>
   );
 }

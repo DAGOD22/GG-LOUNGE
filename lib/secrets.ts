@@ -41,6 +41,9 @@ export const SECRET_IDS = [
   'blossom', 'confetti', 'bats', 'ufo',
   // behaviour warps — change how the site reacts to you
   'disco', 'bigcursor', 'trail', 'ripples', 'party', 'clock', 'counter',
+  // behaviour warps, round two — the site's real machinery, changed
+  'incognito', 'resume', 'chaos', 'hotkeys', 'diary', 'talk', 'backwards',
+  'context', 'alibi', 'turbo', 'pulse', 'note', 'lazy', 'fullblast', 'awake',
 ] as const;
 
 export type SecretId = (typeof SECRET_IDS)[number];
@@ -408,8 +411,83 @@ export const SECRETS: SecretDef[] = [
   },
   {
     id: 'counter', name: 'Hit Counter', code: 'counter', group: 'behavior', kind: 'typed-toggle',
-    about: 'A retro LED visitor counter, like 1997 promised.',
+    about: 'The real thing: a slim counter at the very bottom of the page counting every actual visitor — every device, every person, stored on the server. No sign-in needed to be counted.',
     warp: overlay(),
+  },
+  {
+    id: 'incognito', name: 'Incognito', code: 'incognito', group: 'behavior', kind: 'typed-toggle',
+    about: 'Ghost mode for your activity: the site stops saving what you play, wipes your history and play counts, and sends nothing to your account until you switch it off.',
+    warp: none(),
+  },
+  {
+    id: 'resume', name: 'Continue Playing', code: 'resume', group: 'behavior', kind: 'typed-toggle',
+    about: 'A small pill at the bottom-left always remembers the last game you had open — on any later visit, one click puts you back where you stopped.',
+    warp: none(),
+  },
+  {
+    id: 'chaos', name: 'Roulette', code: 'chaos', group: 'behavior', kind: 'typed-toggle',
+    about: 'Every game you open is secretly re-rolled into a random one. You ask for one game, the site deals you another.',
+    warp: none(),
+  },
+  {
+    id: 'hotkeys', name: 'Number Keys', code: 'hotkeys', group: 'behavior', kind: 'typed-toggle',
+    about: 'Press 1 to 9 anywhere on the home page to launch the first nine games of the catalogue — the keyboard becomes a launcher.',
+    warp: none(),
+  },
+  {
+    id: 'diary', name: 'Play Diary', code: 'diary', group: 'behavior', kind: 'typed-toggle',
+    about: 'The site quietly keeps a real diary of everything you open, with timestamps. Read it from the diary’s card in the vault.',
+    warp: none(),
+  },
+  {
+    id: 'talk', name: 'Talking Site', code: 'talk', group: 'behavior', kind: 'typed-toggle',
+    about: 'Hover a game and your browser says its name out loud. The site speaks.',
+    warp: none(),
+  },
+  {
+    id: 'backwards', name: 'Backwards Home', code: 'backwards', group: 'behavior', kind: 'typed-toggle',
+    about: 'The home catalogue lists itself in reverse — the bottom of the pile becomes the top, everywhere you look.',
+    warp: none(),
+  },
+  {
+    id: 'context', name: 'Power Menu', code: 'context', group: 'behavior', kind: 'typed-toggle',
+    about: 'Right-click any game card for a real menu: copy its link, open it in a new tab, or hide it from your home list for good (restore from this card in the vault).',
+    warp: none(),
+  },
+  {
+    id: 'alibi', name: 'Alibi Tab', code: 'alibi', group: 'behavior', kind: 'typed-toggle',
+    about: 'The browser tab renames itself to something boring and swaps the favicon, on a slow rotation. The site hides in plain sight.',
+    warp: none(),
+  },
+  {
+    id: 'turbo', name: 'Turbo', code: 'turbo', group: 'behavior', kind: 'typed-toggle',
+    about: 'Every animation and transition on the site is cut to zero — the whole lounge reacts instantly.',
+    warp: css(),
+  },
+  {
+    id: 'pulse', name: 'Pulse', code: 'pulse', group: 'behavior', kind: 'typed-toggle',
+    about: 'A tiny pill at the bottom-right shows the site’s live heartbeat: database mode and catalogue size, straight from the health endpoint.',
+    warp: none(),
+  },
+  {
+    id: 'note', name: 'Sticky Note', code: 'note', group: 'behavior', kind: 'typed-toggle',
+    about: 'A sticky note pins itself to the bottom-right corner. Click it, write anything — it stays, on this device, between visits.',
+    warp: none(),
+  },
+  {
+    id: 'lazy', name: 'Lazy River', code: 'lazy', group: 'behavior', kind: 'typed-toggle',
+    about: 'The page drifts slowly downwards on its own until you touch the mouse, keyboard or screen — then it behaves.',
+    warp: none(),
+  },
+  {
+    id: 'fullblast', name: 'Full Blast', code: 'fullblast', group: 'behavior', kind: 'typed-toggle',
+    about: 'Opening a game throws the site straight into fullscreen — no chrome, no bar, just the game.',
+    warp: none(),
+  },
+  {
+    id: 'awake', name: 'Stay Awake', code: 'awake', group: 'behavior', kind: 'typed-toggle',
+    about: 'The site holds a screen wake lock while it is on, so your display will not sleep mid-session.',
+    warp: none(),
   },
 ];
 

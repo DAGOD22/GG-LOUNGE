@@ -151,3 +151,28 @@ test('a chat room leads somewhere playable', () => {
   const coop = read('components/live/CoopRoom.tsx');
   assert.match(coop, /ggl:coop-open/, 'the co-op panel answers the chat');
 });
+
+test('the long poll declares its duration, so the host does not kill it mid-wait', () => {
+  // A serverless function killed at its timeout ends the poll with no
+  // response — the client then waits two seconds and re-polls, which works,
+  // but an explicit maxDuration keeps the long wait legal in the first place.
+  const poll = read('app/api/chat/poll/route.ts');
+  assert.match(poll, /maxDuration/);
+  assert.match(poll, /force-dynamic/);
+});
+
+test('the behaviour warps that rewire the home page are wired in the page', () => {
+  const page = read('app/page.tsx');
+  // Incognito: the history writes and the account sync stand down.
+  assert.match(page, /useSecretFlag\('incognito'\)/);
+  assert.match(page, /if\(incognitoOn\) return; try\{localStorage\.setItem\('ggl_recent'/);
+  assert.match(page, /if\(incognitoOn\) return/, 'the account sync sends nothing while incognito is on');
+  // Roulette re-rolls launches through the same random picker the palette's
+  // "play a random game" uses; Full Blast goes fullscreen inside the click.
+  assert.match(page, /useSecretFlag\('chaos'\)/);
+  assert.match(page, /if \(chaosOn\) \{\s*const roll = pickRandom\(allGames\)/);
+  assert.match(page, /requestFullscreen/, 'fullscreen must be requested inside the launch (user activation)');
+  // Backwards reverses the catalogue; the Power Menu's hidden games vanish.
+  assert.match(page, /useSecretFlag\('backwards'\)/);
+  assert.match(page, /hiddenSet\.size\)/);
+});

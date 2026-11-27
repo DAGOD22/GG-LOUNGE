@@ -10,6 +10,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 
 import {
   BUFFER_SECONDS,
@@ -74,4 +75,18 @@ test('rewind: clip names sort by time and carry their extension', () => {
   const later = clipName('webm', new Date(2026, 10, 27, 14, 5, 10));
   assert.ok(name < later, 'two exports one second apart must sort correctly');
   assert.match(clipName('PNG', new Date(2026, 0, 1)), /\.png$/, 'the extension is cleaned, not trusted');
+});
+
+test('rewind: samples inside the game frame, so WebGL games are not a black tape', () => {
+  // The original bug: sampling on a setInterval read each WebGL canvas after
+  // its frame was presented — and with the default preserveDrawingBuffer:false
+  // the drawing buffer is cleared at present, so every captured frame was
+  // black. The sampler must ride the game's own animation frames (reading in
+  // the same cycle the game drew), with a timer watchdog for frames whose rAF
+  // never ticks.
+  const source = readFileSync(new URL('../components/live/arcade/Rewind.tsx', import.meta.url), 'utf8');
+  assert.match(source, /contentWindow/, 'the sampler must reach the game frame');
+  assert.match(source, /win\.requestAnimationFrame\(tick\)/, 'sampling rides the game frame');
+  assert.match(source, /watchdog/, 'a dead iframe rAF must fall back to timers');
+  assert.doesNotMatch(source, /window\.setInterval\(\(\) => \{\s*const canvas = gameCanvas/, 'no bare timer sampler');
 });

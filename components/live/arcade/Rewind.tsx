@@ -120,10 +120,31 @@ export function Rewind({
   }, [gameId]);
 
   /* ---- sampling: the tape is always rolling ------------------------------ */
+  /**
+   * Sampling runs inside the GAME's animation frames, not on a timer.
+   *
+   * The reason is the black tape: WebGL canvases are presented with
+   * `preserveDrawingBuffer: false` (the default), which means the moment a
+   * frame reaches the screen the drawing buffer is cleared — and any readback
+   * from our own loop or a timer happens *after* that clear, capturing solid
+   * black. Reading in the same rendering cycle the game drew in — right after
+   * its requestAnimationFrame callback, before the present — captures the real
+   * picture. 2D canvases read fine either way, so they ride the same loop.
+   *
+   * If the iframe's rAF never ticks (hidden frame, sandbox, cross-origin), a
+   * watchdog falls back to timer sampling so 2D games keep working.
+   */
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      const canvas = gameCanvas();
-      if (!canvas || !canvas.width || !canvas.height) return;
+    let stopped = false;
+    let killed = false; // a thrown readback stops the sampler for good
+    let raf = 0;
+    let rafOwner: Window | null = null;
+    let lastSample = 0;
+    let lastTick = Date.now();
+    let attempts = 0;
+
+    const capture = (canvas: HTMLCanvasElement) => {
+      if (!canvas.width || !canvas.height) return;
       const slot = slots.current[head.current];
       // Reuse the slot's surface while the game size is unchanged.
       const surface =
@@ -135,8 +156,8 @@ export function Rewind({
       try {
         context.drawImage(canvas, 0, 0, surface.width, surface.height);
       } catch {
+        killed = true;
         setErrorState('This game’s canvas cannot be read (it is served through the proxy). Rewind works on the lounge’s own games.');
-        window.clearInterval(timer);
         return;
       }
       slot.surface = surface;
@@ -144,9 +165,73 @@ export function Rewind({
       head.current = (head.current + 1) % FRAMES;
       countRef.current = Math.min(FRAMES, countRef.current + 1);
       setCount(countRef.current);
+    };
+
+    const tick = () => {
+      if (stopped || killed) return;
+      raf = 0;
+      rafOwner = null;
+      lastTick = Date.now();
+      if (Date.now() - lastSample >= SAMPLE_MS) {
+        lastSample = Date.now();
+        const canvas = gameCanvas();
+        if (canvas) {
+          attempts += 1;
+          capture(canvas);
+        }
+        // Honest, early: a frame we can never read should say so instead of
+        // sitting as an empty tape forever.
+        if (!killed && attempts === 24 && !countRef.current) {
+          setErrorState('Nothing to record yet — this game’s canvas is not readable from here. Rewind works on the lounge’s own games.');
+        }
+      }
+      schedule();
+    };
+
+    const schedule = () => {
+      if (stopped || killed) return;
+      try {
+        const win = frame()?.contentWindow;
+        if (win && typeof win.requestAnimationFrame === 'function') {
+          rafOwner = win;
+          raf = win.requestAnimationFrame(tick);
+          return;
+        }
+      } catch {
+        /* cross-origin frame: fall back to our own loop below */
+      }
+      rafOwner = window;
+      raf = window.requestAnimationFrame(tick);
+    };
+
+    schedule();
+
+    // The watchdog: when the iframe's animation frames never fire, timer
+    // sampling keeps 2D games recording.
+    const watchdog = window.setInterval(() => {
+      if (stopped || killed) return;
+      if (Date.now() - lastTick > 1200) {
+        lastTick = Date.now();
+        const canvas = gameCanvas();
+        if (canvas) {
+          attempts += 1;
+          capture(canvas);
+        }
+      }
     }, SAMPLE_MS);
-    return () => window.clearInterval(timer);
-  }, [gameCanvas]);
+
+    return () => {
+      stopped = true;
+      if (raf) {
+        try {
+          (rafOwner ?? window).cancelAnimationFrame(raf);
+        } catch {
+          window.cancelAnimationFrame(raf);
+        }
+      }
+      window.clearInterval(watchdog);
+    };
+  }, [gameCanvas, frame]);
 
   /* ---- painting one frame of the tape into the overlay ------------------- */
   const paint = useCallback((index: number) => {

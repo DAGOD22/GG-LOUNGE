@@ -9,8 +9,9 @@
  *      zoom are combined into inline styles on <html>, class warps toggle
  *      their `gg-warp-*` class — and cleans all of it up when the list
  *      empties, so switching every warp off restores the site exactly;
- *   2. renders the overlay components (weather, creatures, the clock) that
- *      their warps call for.
+ *   2. mounts the per-secret components: the screen overlays (weather,
+ *      creatures, the clock) and the behaviour hosts (launcher rewires,
+ *      wake locks, the visitor counter).
  *
  * Multiple filter warps compose ("Negative World" + "Night Shift" genuinely
  * stacks), which is half the fun of a warp system.
@@ -18,6 +19,7 @@
 
 import { useCallback, useEffect, type ReactElement } from 'react';
 import { SECRETS, type SecretId, type WarpEffect } from '@/lib/secrets';
+import { BEHAVIOR_COMPONENTS } from './Behaviors';
 import { CodeRain, RetroMode, Snowfall, Spotlight, TimeWarp } from './Overlays';
 import {
   BatSwarm,
@@ -29,7 +31,6 @@ import {
   EmberRise,
   Fireflies,
   FireworksShow,
-  HitCounter,
   MeteorShower,
   PartyClicks,
   RainbowTrail,
@@ -37,10 +38,11 @@ import {
   StarrySky,
   Thunderstorm,
   UFOVisit,
+  VisitorCounter,
 } from './Particles';
 
-/** Overlay component per overlay-kind secret id. */
-const OVERLAYS: Partial<Record<SecretId, () => ReactElement | null>> = {
+/** Mounted component per secret id: screen overlays and behaviour hosts. */
+const MOUNTED: Partial<Record<SecretId, () => ReactElement | null>> = {
   konami: RetroMode,
   matrix: CodeRain,
   snow: Snowfall,
@@ -62,7 +64,8 @@ const OVERLAYS: Partial<Record<SecretId, () => ReactElement | null>> = {
   ripples: ClickRipples,
   party: PartyClicks,
   clock: ClockOverlay,
-  counter: HitCounter,
+  counter: VisitorCounter,
+  ...BEHAVIOR_COMPONENTS,
 };
 
 const WARP_BY_ID = new Map(SECRETS.map(secret => [secret.id, secret]));
@@ -134,14 +137,14 @@ export function WarpLayer({ active }: { active: SecretId[] }) {
   return (
     <>
       {ids.map(id => {
-        const Overlay = OVERLAYS[id];
-        return Overlay ? <Overlay key={id} /> : null;
+        const Mounted = MOUNTED[id];
+        return Mounted ? <Mounted key={id} /> : null;
       })}
     </>
   );
 }
 
-/** Exported for tests: which of the given ids render an overlay component. */
-export function overlayIdsFor(ids: SecretId[]): SecretId[] {
-  return ids.filter(id => OVERLAYS[id]);
+/** Exported for tests: which of the given ids mount a component. */
+export function mountedIdsFor(ids: SecretId[]): SecretId[] {
+  return ids.filter(id => MOUNTED[id]);
 }
